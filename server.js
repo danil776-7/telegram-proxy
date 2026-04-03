@@ -5,12 +5,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Проверка работы сервера
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
 });
 
+// Отправка сообщения в Telegram
 app.post('/send', async (req, res) => {
     const { token, chatId, text } = req.body;
+    
+    console.log('📨 Отправка:', { chatId, textLength: text?.length });
     
     if (!token || !chatId || !text) {
         return res.status(400).json({ ok: false, error: 'Missing parameters' });
@@ -23,30 +27,29 @@ app.post('/send', async (req, res) => {
             body: JSON.stringify({ chat_id: chatId, text: text })
         });
         const data = await response.json();
+        console.log('✅ Ответ Telegram:', data.ok ? 'Успех' : 'Ошибка');
         res.json(data);
     } catch (error) {
+        console.error('❌ Ошибка:', error.message);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
 
-// ВАЖНО: endpoint для получения обновлений
+// Получение новых сообщений из Telegram
 app.get('/getUpdates', async (req, res) => {
     const { token, offset } = req.query;
     
-    console.log('📥 Запрос getUpdates, token:', token ? 'есть' : 'нет', 'offset:', offset);
+    console.log('📥 Запрос getUpdates, offset:', offset);
     
     if (!token) {
         return res.status(400).json({ ok: false, error: 'Token required' });
     }
     
     try {
-        const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset || 0}&timeout=5`;
-        console.log('📡 Запрос к Telegram:', url);
-        
+        const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset || 0}&timeout=10`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        console.log('✅ Ответ от Telegram:', data.ok ? 'OK' : 'ERROR');
+        console.log('✅ Получено обновлений:', data.result?.length || 0);
         res.json(data);
     } catch (error) {
         console.error('❌ Ошибка:', error.message);
@@ -56,8 +59,8 @@ app.get('/getUpdates', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`✅ Сервер запущен на порту ${PORT}`);
-    console.log(`📡 Доступные endpoints:`);
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log(`📡 Endpoints:`);
     console.log(`   GET  /`);
     console.log(`   POST /send`);
     console.log(`   GET  /getUpdates?token=...&offset=...`);
