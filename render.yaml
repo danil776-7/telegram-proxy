@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: test
+    runtime: node
+    repo: https://github.com/danil776-7/test
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_VERSION
+        value: 18
