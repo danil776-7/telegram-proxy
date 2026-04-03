@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            font-family: Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -21,20 +21,16 @@
             border-radius: 20px;
             max-width: 500px;
             margin: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
         h1 { color: #333; margin-bottom: 20px; }
-        p { color: #666; line-height: 1.6; }
+        p { color: #666; }
         .note {
             margin-top: 20px;
             padding: 15px;
             background: #f0f0f0;
             border-radius: 10px;
             font-size: 12px;
-            color: #666;
-            text-align: left;
         }
-        .note strong { color: #333; }
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -49,7 +45,6 @@
             overflow: hidden;
             transition: all 0.3s ease;
             z-index: 1000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
         }
         .chat-widget.closed {
             width: 60px;
@@ -64,7 +59,6 @@
             padding: 12px 16px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
         }
         .close-btn {
             background: none;
@@ -72,50 +66,33 @@
             color: white;
             font-size: 24px;
             cursor: pointer;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
         }
-        .close-btn:hover { background: rgba(255,255,255,0.2); }
         .chat-messages {
             flex: 1;
             overflow-y: auto;
             padding: 12px;
             background: #f9f9f9;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
         }
         .message {
             max-width: 80%;
             padding: 8px 12px;
             border-radius: 16px;
+            margin-bottom: 8px;
             word-wrap: break-word;
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         .user-message {
             background: #25a3e2;
             color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 4px;
+            margin-left: auto;
+            text-align: right;
         }
         .bot-message {
             background: #e4e6eb;
             color: black;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
         }
         .chat-input-area {
             display: flex;
             padding: 12px;
-            border-top: 1px solid #ddd;
             background: white;
             gap: 8px;
         }
@@ -125,9 +102,7 @@
             border: 1px solid #ddd;
             border-radius: 20px;
             outline: none;
-            font-size: 14px;
         }
-        .chat-input:focus { border-color: #25a3e2; }
         .send-btn {
             background: #25a3e2;
             border: none;
@@ -135,9 +110,7 @@
             padding: 8px 14px;
             border-radius: 20px;
             cursor: pointer;
-            font-size: 16px;
         }
-        .send-btn:hover { background: #1d8bc2; }
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
         .chat-widget.closed .chat-input-area {
@@ -166,11 +139,6 @@
         .status.online { background: #d4edda; color: #155724; }
         .status.error { background: #f8d7da; color: #721c24; }
         .status.sending { background: #fff3cd; color: #856404; }
-        
-        @media (max-width: 480px) {
-            .chat-widget { width: 100%; height: 100%; bottom: 0; right: 0; border-radius: 0; }
-            .chat-widget.closed { width: 60px; height: 60px; bottom: 20px; right: 20px; border-radius: 30px; }
-        }
     </style>
 </head>
 <body>
@@ -178,10 +146,10 @@
     <h1>💬 Чат с поддержкой</h1>
     <p>Напишите нам в виджет справа 👉</p>
     <div class="note">
-        <strong>📌 Как это работает:</strong><br>
+        📌 <strong>Как это работает:</strong><br>
         1. Вы пишете сообщение → оно приходит в Telegram<br>
         2. Вы отвечаете в Telegram → ответ приходит сюда через 5-10 секунд<br><br>
-        <strong>⚠️ Важно:</strong> Напишите боту первым в Telegram, чтобы начать диалог
+        ⚠️ Напишите боту первым в Telegram, чтобы начать диалог
     </div>
 </div>
 
@@ -201,20 +169,19 @@
 </div>
 
 <script>
-    // ========== НАСТРОЙКИ ==========
     const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
     const YOUR_CHAT_ID = '7545540622';
-    const PROXY_URL = 'https://test-c7ow.onrender.com';
+    // ⚠️ ЗАМЕНИ НА СВОЙ URL ОТ RENDER ⚠️
+    const PROXY_URL = 'https://test.onrender.com';  // <--- ВСТАВЬ СВОЙ URL!
     
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
-        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        userId = 'user_' + Date.now();
         localStorage.setItem('chat_user_id', userId);
     }
     
     let lastUpdateId = 0;
     
-    // Элементы
     const widget = document.getElementById('chatWidget');
     const closeBtn = document.querySelector('.close-btn');
     const messagesDiv = document.getElementById('chatMessages');
@@ -222,7 +189,6 @@
     const sendBtn = document.getElementById('sendBtn');
     const statusDiv = document.getElementById('status');
     
-    // Открыть/закрыть виджет
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
             widget.classList.remove('closed');
@@ -239,11 +205,6 @@
         div.innerText = text;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        
-        // Сохраняем историю
-        const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-        history.push({ text, isUser, time: Date.now() });
-        localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
     }
     
     function setStatus(text, type = 'online') {
@@ -255,8 +216,6 @@
         addMessage(text, true);
         setStatus('⏳ Отправка...', 'sending');
         
-        const messageText = `📝 НОВОЕ СООБЩЕНИЕ\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}\n\n⏰ Время: ${new Date().toLocaleString('ru-RU')}`;
-        
         try {
             const response = await fetch(`${PROXY_URL}/send`, {
                 method: 'POST',
@@ -264,22 +223,20 @@
                 body: JSON.stringify({
                     token: BOT_TOKEN,
                     chatId: YOUR_CHAT_ID,
-                    text: messageText
+                    text: `📝 Сообщение от ${userId}\n\n${text}`
                 })
             });
             
             const data = await response.json();
-            console.log('Ответ прокси:', data);
             
             if (data.ok) {
                 setStatus('✅ Отправлено!', 'online');
                 setTimeout(() => setStatus('🟢 Онлайн', 'online'), 2000);
             } else {
-                throw new Error(data.description || 'Ошибка отправки');
+                throw new Error(data.description);
             }
         } catch (error) {
-            console.error('Ошибка:', error);
-            setStatus('❌ Ошибка: ' + error.message, 'error');
+            setStatus('❌ Ошибка', 'error');
             setTimeout(() => setStatus('🟢 Онлайн', 'online'), 3000);
         }
     }
@@ -294,33 +251,15 @@
                     lastUpdateId = update.update_id + 1;
                     const message = update.message;
                     
-                    // Проверяем, что сообщение от тебя (поддержки) и не является нашим исходящим
                     if (message && message.chat.id == YOUR_CHAT_ID && message.text) {
-                        if (!message.text.includes('📝 НОВОЕ СООБЩЕНИЕ')) {
-                            console.log('Новый ответ:', message.text);
+                        if (!message.text.includes('📝 Сообщение от')) {
                             addMessage(message.text, false);
                         }
                     }
                 }
             }
         } catch (error) {
-            console.error('Ошибка проверки ответов:', error);
-        }
-    }
-    
-    async function checkServer() {
-        try {
-            const response = await fetch(`${PROXY_URL}/`);
-            const data = await response.json();
-            if (data.status === 'ok') {
-                console.log('✅ Сервер доступен');
-                setStatus('🟢 Онлайн', 'online');
-                return true;
-            }
-        } catch (error) {
-            console.error('❌ Сервер недоступен:', error);
-            setStatus('🔴 Сервер недоступен', 'error');
-            return false;
+            console.error('Ошибка:', error);
         }
     }
     
@@ -336,27 +275,10 @@
         if (e.key === 'Enter') sendMessage();
     });
     
-    // Загрузка истории
-    const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-    history.forEach(msg => {
-        const div = document.createElement('div');
-        div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-        div.innerText = msg.text;
-        messagesDiv.appendChild(div);
-    });
+    setTimeout(() => {
+        addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
+    }, 500);
     
-    // Приветствие
-    if (messagesDiv.children.length <= 1) {
-        setTimeout(() => {
-            addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
-        }, 500);
-    }
-    
-    // Проверка сервера
-    checkServer();
-    setInterval(checkServer, 30000);
-    
-    // Проверка новых ответов каждые 5 секунд
     setInterval(checkForReplies, 5000);
 </script>
 </body>
