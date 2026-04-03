@@ -179,8 +179,7 @@
         1. Вы пишете сообщение<br>
         2. Оно приходит в Telegram<br>
         3. Мы отвечаем вам в Telegram<br><br>
-        ⚠️ <strong>Важно:</strong> Напишите боту первым в Telegram, чтобы начать диалог<br>
-        🤖 Бот: <strong>@чат_виджет_bot</strong>
+        ⚠️ <strong>Важно:</strong> Напишите боту первым в Telegram, чтобы начать диалог
     </div>
 </div>
 
@@ -237,7 +236,6 @@
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
-        // Сохраняем историю
         const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
         history.push({ text, isUser, time: Date.now() });
         localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
