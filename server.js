@@ -5,15 +5,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Хранилище последних ответов
-let lastReplies = [];
-
-// Проверка работы сервера
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
 });
 
-// Отправка сообщения в Telegram
 app.post('/send', async (req, res) => {
     const { token, chatId, text } = req.body;
     
@@ -34,7 +29,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Получение новых ответов (через прокси)
+// Эндпоинт для получения обновлений
 app.get('/getUpdates', async (req, res) => {
     const { token, offset } = req.query;
     
@@ -43,7 +38,7 @@ app.get('/getUpdates', async (req, res) => {
     }
     
     try {
-        const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset || 0}&timeout=30`;
+        const url = `https://api.telegram.org/bot${token}/getUpdates?offset=${offset || 0}&timeout=10`;
         const response = await fetch(url);
         const data = await response.json();
         res.json(data);
