@@ -29,7 +29,6 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Эндпоинт для получения обновлений
 app.get('/getUpdates', async (req, res) => {
     const { token, offset } = req.query;
     
