@@ -35,15 +35,6 @@
             color: #666;
             line-height: 1.6;
         }
-        .demo-text {
-            margin-top: 30px;
-            padding: 20px;
-            background: #f5f5f5;
-            border-radius: 10px;
-            font-size: 14px;
-        }
-        
-        /* ===== ВИДЖЕТ ЧАТА ===== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -59,7 +50,6 @@
             transition: all 0.3s ease;
             z-index: 1000;
             font-size: 14px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
         }
         .chat-widget.closed {
             width: 60px;
@@ -67,7 +57,6 @@
             border-radius: 30px;
             background: #25a3e2;
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         .chat-header {
             background: #25a3e2;
@@ -77,7 +66,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            cursor: move;
         }
         .close-btn {
             background: none;
@@ -85,16 +73,6 @@
             color: white;
             font-size: 24px;
             cursor: pointer;
-            width: 30px;
-            height: 30px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border-radius: 50%;
-            transition: background 0.2s;
-        }
-        .close-btn:hover {
-            background: rgba(255,255,255,0.2);
         }
         .chat-messages {
             flex: 1;
@@ -110,11 +88,6 @@
             padding: 8px 12px;
             border-radius: 16px;
             word-wrap: break-word;
-            animation: fadeIn 0.3s ease;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         .user-message {
             background: #25a3e2;
@@ -134,7 +107,6 @@
             border-top: 1px solid #ddd;
             background: white;
             gap: 8px;
-            align-items: center;
         }
         .chat-input {
             flex: 1;
@@ -142,30 +114,14 @@
             border: 1px solid #ddd;
             border-radius: 20px;
             outline: none;
-            font-size: 14px;
-            transition: border-color 0.2s;
         }
-        .chat-input:focus {
-            border-color: #25a3e2;
-        }
-        .send-btn, .file-btn {
+        .send-btn {
             background: #25a3e2;
             border: none;
             color: white;
             padding: 8px 14px;
             border-radius: 20px;
             cursor: pointer;
-            font-size: 16px;
-            transition: background 0.2s;
-        }
-        .send-btn:hover, .file-btn:hover {
-            background: #1d8bc2;
-        }
-        .file-btn {
-            background: #6c757d;
-        }
-        .file-btn:hover {
-            background: #5a6268;
         }
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
@@ -187,28 +143,17 @@
         .chat-widget.closed .open-icon {
             display: flex;
         }
-        
-        .message img {
-            max-width: 100%;
-            border-radius: 8px;
-            margin-top: 5px;
+        .status-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: #e4e6eb;
+            margin-bottom: 8px;
+            text-align: center;
         }
-        
-        @media (max-width: 480px) {
-            .chat-widget {
-                width: 100%;
-                height: 100%;
-                bottom: 0;
-                right: 0;
-                border-radius: 0;
-            }
-            .chat-widget.closed {
-                width: 60px;
-                height: 60px;
-                bottom: 20px;
-                right: 20px;
-                border-radius: 30px;
-            }
+        .status-online {
+            background: #4caf50;
+            color: white;
         }
     </style>
 </head>
@@ -218,10 +163,11 @@
     <p>Напишите нам в виджет справа 👉</p>
     <div class="demo-text">
         <strong>Как это работает:</strong><br>
-        1. Нажмите на иконку чата в углу<br>
+        1. Нажмите на иконку чата<br>
         2. Напишите сообщение<br>
-        3. Мы ответим вам в Telegram<br>
-        4. Вся переписка сохраняется в отдельном топике
+        3. Мы получим уведомление в Telegram<br>
+        4. Мы ответим вам в этом чате (обновляйте страницу)<br><br>
+        <small>⚠️ Упрощённая версия для GitHub Pages</small>
     </div>
 </div>
 
@@ -231,135 +177,124 @@
         <span>💬 Поддержка</span>
         <button class="close-btn">×</button>
     </div>
-    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-messages" id="chatMessages">
+        <div class="status-badge" id="statusBadge">🟢 Онлайн</div>
+    </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
-        <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
-        <input type="file" id="fileInput" accept="image/*" style="display: none;">
     </div>
 </div>
 
-<!-- ⚠️ ЗАМЕНИ ЭТОТ URL НА СВОЙ ИЗ RAILWAY ⚠️ -->
-<script src="https://твой-сервер.up.railway.app/socket.io/socket.io.js"></script>
-
 <script>
+    // ТВОИ ДАННЫЕ
+    const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
+    const GROUP_CHAT_ID = '7545540622'; // Замени на ID группы с топиками!
+    
+    // Генерируем ID пользователя
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
         localStorage.setItem('chat_user_id', userId);
     }
-    const site = window.location.hostname;
-
-    // ⚠️ ЗАМЕНИ ЭТОТ URL НА СВОЙ ИЗ RAILWAY ⚠️
-    const socket = io('https://твой-сервер.up.railway.app', {
-        query: { userId, site }
-    });
-
+    
+    // DOM элементы
     const widget = document.getElementById('chatWidget');
     const closeBtn = widget.querySelector('.close-btn');
     const messagesDiv = document.getElementById('chatMessages');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
-    const fileBtn = document.getElementById('fileBtn');
-    const fileInput = document.getElementById('fileInput');
-
-    let isOpen = false;
-
+    
+    // Открыть/закрыть виджет
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed')) {
             if (e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
-                isOpen = true;
             }
         }
     });
     
     closeBtn.addEventListener('click', () => {
         widget.classList.add('closed');
-        isOpen = false;
     });
-
-    function addMessage(text, isUser, isImage = false, imageUrl = null) {
+    
+    // Добавление сообщения в чат
+    function addMessage(text, isUser) {
         const div = document.createElement('div');
         div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-        if (isImage && imageUrl) {
-            const img = document.createElement('img');
-            img.src = imageUrl;
-            img.style.maxWidth = '100%';
-            img.style.borderRadius = '8px';
-            div.appendChild(img);
-            if (text) {
-                const textNode = document.createTextNode(' ' + text);
-                div.appendChild(textNode);
-            }
-        } else {
-            div.innerText = text;
-        }
+        div.innerText = text;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Сохраняем историю
+        const history = JSON.parse(localStorage.getItem('chat_history_' + userId) || '[]');
+        history.push({ text, isUser, timestamp: Date.now() });
+        localStorage.setItem('chat_history_' + userId, JSON.stringify(history.slice(-50)));
     }
-
-    async function sendMessage(text, imageBase64 = null) {
-        if (!text && !imageBase64) return;
-        if (text) addMessage(text, true);
-        else if (imageBase64) addMessage('📷 Изображение', true, true, imageBase64);
-
-        socket.emit('user_message', { text, imageBase64 });
+    
+    // Загрузка истории
+    function loadHistory() {
+        const history = JSON.parse(localStorage.getItem('chat_history_' + userId) || '[]');
+        history.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+            div.innerText = msg.text;
+            messagesDiv.appendChild(div);
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    // Отправка сообщения в Telegram
+    async function sendToTelegram(text) {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+        const message = `📝 Новое сообщение от пользователя!\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}\n\n⏰ Время: ${new Date().toLocaleString()}`;
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: GROUP_CHAT_ID,
+                    text: message,
+                    parse_mode: 'HTML'
+                })
+            });
+            
+            if (response.ok) {
+                addMessage('✅ Сообщение отправлено! Мы ответим в ближайшее время.', false);
+            } else {
+                addMessage('❌ Ошибка отправки. Попробуйте позже.', false);
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            addMessage('❌ Ошибка соединения. Проверьте интернет.', false);
+        }
+    }
+    
+    // Отправка сообщения
+    function sendMessage() {
+        const text = messageInput.value.trim();
+        if (!text) return;
+        
+        addMessage(text, true);
+        sendToTelegram(text);
         messageInput.value = '';
     }
-
-    sendBtn.addEventListener('click', () => {
-        const text = messageInput.value.trim();
-        if (text) sendMessage(text);
-    });
     
+    sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            const text = messageInput.value.trim();
-            if (text) sendMessage(text);
-        }
+        if (e.key === 'Enter') sendMessage();
     });
-
-    fileBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file || !file.type.startsWith('image/')) return;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-            sendMessage('', ev.target.result);
-        };
-        reader.readAsDataURL(file);
-        fileInput.value = '';
-    });
-
-    setInterval(() => {
-        socket.emit('user_activity');
-    }, 30000);
     
-    window.addEventListener('focus', () => socket.emit('tab_focus', true));
-    window.addEventListener('blur', () => socket.emit('tab_focus', false));
-    socket.emit('tab_focus', true);
-
+    // Приветствие
     setTimeout(() => {
-        addMessage('Здравствуйте! Задайте, пожалуйста, ваш вопрос 😊', false);
-    }, 500);
-
-    socket.on('tg_message', (data) => {
-        if (data.isImage) {
-            addMessage('📷 Изображение от поддержки', false, true, null);
-        } else {
-            addMessage(data.text, false);
+        if (messagesDiv.children.length <= 1) {
+            addMessage('Здравствуйте! Задайте, пожалуйста, ваш вопрос 😊', false);
         }
-    });
-
-    socket.on('error', (err) => {
-        addMessage(`❌ Ошибка: ${err}`, false);
-    });
+    }, 500);
     
-    socket.on('connect', () => {
-        console.log('✅ Подключено к серверу');
-    });
+    // Загружаем историю
+    loadHistory();
 </script>
 </body>
 </html>
