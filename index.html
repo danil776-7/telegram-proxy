@@ -35,6 +35,15 @@
             color: #666;
             line-height: 1.6;
         }
+        .demo-text {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        
+        /* ===== ВИДЖЕТ ЧАТА ===== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -50,6 +59,7 @@
             transition: all 0.3s ease;
             z-index: 1000;
             font-size: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
         }
         .chat-widget.closed {
             width: 60px;
@@ -57,6 +67,7 @@
             border-radius: 30px;
             background: #25a3e2;
             cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
         .chat-header {
             background: #25a3e2;
@@ -73,6 +84,16 @@
             color: white;
             font-size: 24px;
             cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        .close-btn:hover {
+            background: rgba(255,255,255,0.2);
         }
         .chat-messages {
             flex: 1;
@@ -88,6 +109,11 @@
             padding: 8px 12px;
             border-radius: 16px;
             word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .user-message {
             background: #25a3e2;
@@ -107,6 +133,7 @@
             border-top: 1px solid #ddd;
             background: white;
             gap: 8px;
+            align-items: center;
         }
         .chat-input {
             flex: 1;
@@ -114,14 +141,30 @@
             border: 1px solid #ddd;
             border-radius: 20px;
             outline: none;
+            font-size: 14px;
+            transition: border-color 0.2s;
         }
-        .send-btn {
+        .chat-input:focus {
+            border-color: #25a3e2;
+        }
+        .send-btn, .file-btn {
             background: #25a3e2;
             border: none;
             color: white;
             padding: 8px 14px;
             border-radius: 20px;
             cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        .send-btn:hover, .file-btn:hover {
+            background: #1d8bc2;
+        }
+        .file-btn {
+            background: #6c757d;
+        }
+        .file-btn:hover {
+            background: #5a6268;
         }
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
@@ -143,17 +186,58 @@
         .chat-widget.closed .open-icon {
             display: flex;
         }
-        .status-badge {
-            font-size: 11px;
-            padding: 4px 8px;
-            border-radius: 12px;
-            background: #e4e6eb;
-            margin-bottom: 8px;
-            text-align: center;
+        
+        .message img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 5px;
         }
-        .status-online {
-            background: #4caf50;
-            color: white;
+        
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            padding: 8px 12px;
+            background: #e4e6eb;
+            border-radius: 16px;
+            width: fit-content;
+        }
+        
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #888;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes typing {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+            30% { transform: translateY(-10px); opacity: 1; }
+        }
+        
+        @media (max-width: 480px) {
+            .chat-widget {
+                width: 100%;
+                height: 100%;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+            }
+            .chat-widget.closed {
+                width: 60px;
+                height: 60px;
+                bottom: 20px;
+                right: 20px;
+                border-radius: 30px;
+            }
         }
     </style>
 </head>
@@ -163,11 +247,10 @@
     <p>Напишите нам в виджет справа 👉</p>
     <div class="demo-text">
         <strong>Как это работает:</strong><br>
-        1. Нажмите на иконку чата<br>
-        2. Напишите сообщение<br>
-        3. Мы получим уведомление в Telegram<br>
-        4. Мы ответим вам в этом чате (обновляйте страницу)<br><br>
-        <small>⚠️ Упрощённая версия для GitHub Pages</small>
+        1. Напишите сообщение в чате<br>
+        2. Мы получим его в Telegram<br>
+        3. Ответим прямо в этом чате<br>
+        4. Вы увидите ответ мгновенно
     </div>
 </div>
 
@@ -177,21 +260,21 @@
         <span>💬 Поддержка</span>
         <button class="close-btn">×</button>
     </div>
-    <div class="chat-messages" id="chatMessages">
-        <div class="status-badge" id="statusBadge">🟢 Онлайн</div>
-    </div>
+    <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
+        <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
     </div>
 </div>
 
 <script>
-    // ТВОИ ДАННЫЕ
+    // ========== КОНФИГУРАЦИЯ ==========
     const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
-    const GROUP_CHAT_ID = '7545540622'; // Замени на ID группы с топиками!
+    const YOUR_CHAT_ID = '7545540622'; // ТВОЙ ID в Telegram (куда приходят сообщения)
     
-    // Генерируем ID пользователя
+    // Генерируем уникальный ID пользователя
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
@@ -204,6 +287,11 @@
     const messagesDiv = document.getElementById('chatMessages');
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
+    const fileBtn = document.getElementById('fileBtn');
+    const fileInput = document.getElementById('fileInput');
+    
+    let lastUpdateId = 0;
+    let isWaitingResponse = false;
     
     // Открыть/закрыть виджет
     widget.addEventListener('click', (e) => {
@@ -219,55 +307,169 @@
     });
     
     // Добавление сообщения в чат
-    function addMessage(text, isUser) {
+    function addMessage(text, isUser, isImage = false, imageUrl = null) {
         const div = document.createElement('div');
         div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-        div.innerText = text;
+        if (isImage && imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.maxWidth = '100%';
+            img.style.borderRadius = '8px';
+            div.appendChild(img);
+            if (text) {
+                const textNode = document.createTextNode(' ' + text);
+                div.appendChild(textNode);
+            }
+        } else {
+            div.innerText = text;
+        }
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
-        // Сохраняем историю
+        // Сохраняем в localStorage
         const history = JSON.parse(localStorage.getItem('chat_history_' + userId) || '[]');
-        history.push({ text, isUser, timestamp: Date.now() });
-        localStorage.setItem('chat_history_' + userId, JSON.stringify(history.slice(-50)));
+        history.push({ text, isUser, isImage: !!imageUrl, imageUrl, timestamp: Date.now() });
+        localStorage.setItem('chat_history_' + userId, JSON.stringify(history.slice(-100)));
     }
     
-    // Загрузка истории
+    // Показать индикатор печати
+    function showTyping() {
+        const typingDiv = document.createElement('div');
+        typingDiv.className = 'typing-indicator';
+        typingDiv.id = 'typingIndicator';
+        typingDiv.innerHTML = '<span></span><span></span><span></span>';
+        messagesDiv.appendChild(typingDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function hideTyping() {
+        const typing = document.getElementById('typingIndicator');
+        if (typing) typing.remove();
+    }
+    
+    // Отправка сообщения в Telegram
+    async function sendToTelegram(text, imageBase64 = null) {
+        addMessage(text || '📷 Изображение', true, !!imageBase64, imageBase64);
+        
+        let messageText = `📝 НОВОЕ СООБЩЕНИЕ\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text || 'Изображение'}\n\n⏰ Время: ${new Date().toLocaleString('ru-RU')}`;
+        
+        try {
+            if (imageBase64) {
+                // Отправляем фото
+                const blob = await (await fetch(imageBase64)).blob();
+                const formData = new FormData();
+                formData.append('chat_id', YOUR_CHAT_ID);
+                formData.append('photo', blob, 'image.jpg');
+                formData.append('caption', messageText);
+                
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка отправки фото');
+                }
+            } else {
+                // Отправляем текст
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: YOUR_CHAT_ID,
+                        text: messageText,
+                        parse_mode: 'HTML'
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка отправки');
+                }
+            }
+            
+            // Показываем индикатор, что ждём ответ
+            isWaitingResponse = true;
+            showTyping();
+            
+        } catch (error) {
+            console.error('Ошибка:', error);
+            addMessage('❌ Не удалось отправить сообщение. Попробуйте позже.', false);
+        }
+    }
+    
+    // Проверка новых сообщений от поддержки
+    async function checkForReplies() {
+        if (!isWaitingResponse) return;
+        
+        try {
+            const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=30`);
+            const data = await response.json();
+            
+            if (data.ok && data.result) {
+                for (const update of data.result) {
+                    lastUpdateId = update.update_id;
+                    
+                    const message = update.message;
+                    if (!message) continue;
+                    
+                    // Проверяем, что сообщение от тебя (поддержки)
+                    if (message.from && message.chat.id == YOUR_CHAT_ID) {
+                        let replyText = message.text;
+                        let isImage = false;
+                        let imageUrl = null;
+                        
+                        if (message.photo) {
+                            // Получаем фото
+                            const fileId = message.photo[message.photo.length - 1].file_id;
+                            const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
+                            const fileData = await fileResponse.json();
+                            if (fileData.ok) {
+                                imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                                isImage = true;
+                                replyText = message.caption || 'Изображение';
+                            }
+                        }
+                        
+                        if (replyText || isImage) {
+                            hideTyping();
+                            addMessage(replyText || '📷 Изображение', false, isImage, imageUrl);
+                            isWaitingResponse = false;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка при проверке ответов:', error);
+        }
+    }
+    
+    // Загрузка истории из localStorage
     function loadHistory() {
         const history = JSON.parse(localStorage.getItem('chat_history_' + userId) || '[]');
         history.forEach(msg => {
             const div = document.createElement('div');
             div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-            div.innerText = msg.text;
+            if (msg.isImage && msg.imageUrl) {
+                const img = document.createElement('img');
+                img.src = msg.imageUrl;
+                img.style.maxWidth = '100%';
+                img.style.borderRadius = '8px';
+                div.appendChild(img);
+                if (msg.text) {
+                    const textNode = document.createTextNode(' ' + msg.text);
+                    div.appendChild(textNode);
+                }
+            } else {
+                div.innerText = msg.text;
+            }
             messagesDiv.appendChild(div);
         });
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    }
-    
-    // Отправка сообщения в Telegram
-    async function sendToTelegram(text) {
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
-        const message = `📝 Новое сообщение от пользователя!\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}\n\n⏰ Время: ${new Date().toLocaleString()}`;
         
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: GROUP_CHAT_ID,
-                    text: message,
-                    parse_mode: 'HTML'
-                })
-            });
-            
-            if (response.ok) {
-                addMessage('✅ Сообщение отправлено! Мы ответим в ближайшее время.', false);
-            } else {
-                addMessage('❌ Ошибка отправки. Попробуйте позже.', false);
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            addMessage('❌ Ошибка соединения. Проверьте интернет.', false);
+        // Если последнее сообщение от пользователя, ждём ответ
+        if (history.length > 0 && history[history.length - 1].isUser) {
+            isWaitingResponse = true;
+            showTyping();
         }
     }
     
@@ -276,9 +478,19 @@
         const text = messageInput.value.trim();
         if (!text) return;
         
-        addMessage(text, true);
         sendToTelegram(text);
         messageInput.value = '';
+    }
+    
+    // Отправка изображения
+    function sendImage(file) {
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            sendToTelegram('', ev.target.result);
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = '';
     }
     
     sendBtn.addEventListener('click', sendMessage);
@@ -286,15 +498,28 @@
         if (e.key === 'Enter') sendMessage();
     });
     
+    fileBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        sendImage(e.target.files[0]);
+    });
+    
     // Приветствие
     setTimeout(() => {
-        if (messagesDiv.children.length <= 1) {
+        if (messagesDiv.children.length === 0) {
             addMessage('Здравствуйте! Задайте, пожалуйста, ваш вопрос 😊', false);
         }
     }, 500);
     
     // Загружаем историю
     loadHistory();
+    
+    // Проверяем новые ответы каждые 3 секунды
+    setInterval(checkForReplies, 3000);
+    
+    // Первая проверка
+    setTimeout(() => {
+        checkForReplies();
+    }, 1000);
 </script>
 </body>
 </html>
