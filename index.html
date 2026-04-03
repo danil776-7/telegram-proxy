@@ -24,6 +24,14 @@
         }
         h1 { color: #333; margin-bottom: 20px; }
         p { color: #666; }
+        .note {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            font-size: 12px;
+            color: #666;
+        }
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -104,6 +112,7 @@
             border-radius: 20px;
             cursor: pointer;
         }
+        .send-btn:hover { background: #1d8bc2; }
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
         .chat-widget.closed .chat-input-area {
@@ -131,13 +140,21 @@
         }
         .status.online { background: #d4edda; color: #155724; }
         .status.error { background: #f8d7da; color: #721c24; }
+        .status.sending { background: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
 <div class="content">
     <h1>💬 Чат с поддержкой</h1>
     <p>Напишите нам в виджет справа 👉</p>
-    <p style="font-size: 12px; margin-top: 20px;">Сообщения приходят в Telegram</p>
+    <div class="note">
+        📌 Как это работает:<br>
+        1. Вы пишете сообщение<br>
+        2. Оно приходит в Telegram<br>
+        3. Мы отвечаем вам в Telegram<br>
+        <br>
+        💡 <strong>Важно:</strong> Чтобы получать ответы, напишите боту первым в Telegram: <strong>@чат_виджет_bot</strong>
+    </div>
 </div>
 
 <div class="chat-widget closed" id="chatWidget">
@@ -147,7 +164,7 @@
         <button class="close-btn">×</button>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Подключение...</div>
+        <div class="status online" id="status">🟢 Готов к работе</div>
     </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
@@ -159,8 +176,9 @@
     // ========== НАСТРОЙКИ ==========
     const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
     const YOUR_CHAT_ID = '7545540622';
-    // ⚠️ ЗАМЕНИ НА СВОЙ URL ОТ RENDER ⚠️
-    const PROXY_URL = 'https://test.onrender.com';  // <--- ВСТАВЬ СЮДА СВОЙ URL!
+    
+    // ⚠️⚠️⚠️ ЗАМЕНИ НА СВОЙ URL ОТ RENDER ⚠️⚠️⚠️
+    const PROXY_URL = 'https://test.onrender.com';  // <--- ВСТАВЬ СВОЙ URL!
     
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
@@ -176,7 +194,7 @@
     const sendBtn = document.getElementById('sendBtn');
     const statusDiv = document.getElementById('status');
     
-    // Открыть/закрыть
+    // Открыть/закрыть виджет
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
             widget.classList.remove('closed');
@@ -193,18 +211,23 @@
         div.innerText = text;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Сохраняем историю
+        const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        history.push({ text, isUser, time: Date.now() });
+        localStorage.setItem('chat_history', JSON.stringify(history.slice(-50)));
     }
     
-    function setStatus(text, isError = false) {
+    function setStatus(text, type = 'online') {
         statusDiv.innerHTML = text;
-        statusDiv.className = isError ? 'status error' : 'status online';
+        statusDiv.className = `status ${type}`;
     }
     
     async function sendToTelegram(text) {
         addMessage(text, true);
-        setStatus('⏳ Отправка...');
+        setStatus('⏳ Отправка...', 'sending');
         
-        const messageText = `📝 Сообщение от ${userId}\n\nТекст: ${text}`;
+        const messageText = `📝 НОВОЕ СООБЩЕНИЕ\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}\n\n⏰ Время: ${new Date().toLocaleString('ru-RU')}`;
         
         try {
             const response = await fetch(`${PROXY_URL}/send`, {
@@ -218,18 +241,19 @@
             });
             
             const data = await response.json();
-            console.log('Ответ:', data);
+            console.log('Ответ прокси:', data);
             
             if (data.ok) {
-                setStatus('✅ Отправлено!');
-                setTimeout(() => setStatus('🟢 Онлайн'), 2000);
+                setStatus('✅ Отправлено!', 'online');
+                addMessage('✅ Сообщение отправлено. Мы ответим в Telegram!', false);
+                setTimeout(() => setStatus('🟢 Онлайн', 'online'), 2000);
             } else {
-                throw new Error(data.description || 'Ошибка');
+                throw new Error(data.description || 'Ошибка отправки');
             }
         } catch (error) {
             console.error('Ошибка:', error);
-            setStatus('❌ Ошибка: ' + error.message, true);
-            setTimeout(() => setStatus('🟢 Онлайн'), 3000);
+            setStatus('❌ Ошибка: ' + error.message, 'error');
+            setTimeout(() => setStatus('🟢 Онлайн', 'online'), 3000);
         }
     }
     
@@ -238,11 +262,11 @@
             const response = await fetch(`${PROXY_URL}/`);
             const data = await response.json();
             if (data.status === 'ok') {
-                setStatus('🟢 Онлайн');
+                setStatus('🟢 Онлайн', 'online');
                 return true;
             }
         } catch (error) {
-            setStatus('🔴 Сервер недоступен', true);
+            setStatus('🔴 Сервер недоступен', 'error');
             return false;
         }
     }
@@ -259,11 +283,23 @@
         if (e.key === 'Enter') sendMessage();
     });
     
-    // Запуск
-    setTimeout(() => {
-        addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
-    }, 500);
+    // Загрузка истории
+    const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    history.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+        div.innerText = msg.text;
+        messagesDiv.appendChild(div);
+    });
     
+    // Приветствие
+    if (messagesDiv.children.length === 0) {
+        setTimeout(() => {
+            addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
+        }, 500);
+    }
+    
+    // Проверка сервера
     checkServer();
     setInterval(checkServer, 30000);
 </script>
