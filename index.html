@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Чат с поддержкой</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .content {
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        p {
+            color: #666;
+            line-height: 1.6;
+        }
+        .demo-text {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        
+        /* ===== ВИДЖЕТ ЧАТА ===== */
+        .chat-widget {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 380px;
+            height: 550px;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            z-index: 1000;
+            font-size: 14px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+        }
+        .chat-widget.closed {
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            background: #25a3e2;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .chat-header {
+            background: #25a3e2;
+            color: white;
+            padding: 12px 16px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+        }
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background 0.2s;
+        }
+        .close-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f9f9f9;
+        }
+        .message {
+            max-width: 80%;
+            padding: 8px 12px;
+            border-radius: 16px;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-message {
+            background: #25a3e2;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .bot-message {
+            background: #e4e6eb;
+            color: black;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-input-area {
+            display: flex;
+            padding: 12px;
+            border-top: 1px solid #ddd;
+            background: white;
+            gap: 8px;
+            align-items: center;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        .chat-input:focus {
+            border-color: #25a3e2;
+        }
+        .send-btn, .file-btn {
+            background: #25a3e2;
+            border: none;
+            color: white;
+            padding: 8px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background 0.2s;
+        }
+        .send-btn:hover, .file-btn:hover {
+            background: #1d8bc2;
+        }
+        .file-btn {
+            background: #6c757d;
+        }
+        .file-btn:hover {
+            background: #5a6268;
+        }
+        .chat-widget.closed .chat-header, 
+        .chat-widget.closed .chat-messages,
+        .chat-widget.closed .chat-input-area {
+            display: none;
+        }
+        .chat-widget.closed .close-btn {
+            display: none;
+        }
+        .open-icon {
+            display: none;
+            width: 100%;
+            height: 100%;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+        }
+        .chat-widget.closed .open-icon {
+            display: flex;
+        }
+        
+        .message img {
+            max-width: 100%;
+            border-radius: 8px;
+            margin-top: 5px;
+        }
+        
+        @media (max-width: 480px) {
+            .chat-widget {
+                width: 100%;
+                height: 100%;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+            }
+            .chat-widget.closed {
+                width: 60px;
+                height: 60px;
+                bottom: 20px;
+                right: 20px;
+                border-radius: 30px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="content">
+    <h1>💬 Чат с поддержкой</h1>
+    <p>Напишите нам в виджет справа 👉</p>
+    <div class="demo-text">
+        <strong>Как это работает:</strong><br>
+        1. Нажмите на иконку чата в углу<br>
+        2. Напишите сообщение<br>
+        3. Мы ответим вам в Telegram<br>
+        4. Вся переписка сохраняется в отдельном топике
+    </div>
+</div>
+
+<div class="chat-widget closed" id="chatWidget">
+    <div class="open-icon">💬</div>
+    <div class="chat-header">
+        <span>💬 Поддержка</span>
+        <button class="close-btn">×</button>
+    </div>
+    <div class="chat-messages" id="chatMessages"></div>
+    <div class="chat-input-area">
+        <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
+        <button class="file-btn" id="fileBtn">📎</button>
+        <button class="send-btn" id="sendBtn">➤</button>
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
+    </div>
+</div>
+
+<!-- ⚠️ ЗАМЕНИ ЭТОТ URL НА СВОЙ ИЗ RAILWAY ⚠️ -->
+<script src="https://твой-сервер.up.railway.app/socket.io/socket.io.js"></script>
+
+<script>
+    let userId = localStorage.getItem('chat_user_id');
+    if (!userId) {
+        userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);
+        localStorage.setItem('chat_user_id', userId);
+    }
+    const site = window.location.hostname;
+
+    // ⚠️ ЗАМЕНИ ЭТОТ URL НА СВОЙ ИЗ RAILWAY ⚠️
+    const socket = io('https://твой-сервер.up.railway.app', {
+        query: { userId, site }
+    });
+
+    const widget = document.getElementById('chatWidget');
+    const closeBtn = widget.querySelector('.close-btn');
+    const messagesDiv = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const fileBtn = document.getElementById('fileBtn');
+    const fileInput = document.getElementById('fileInput');
+
+    let isOpen = false;
+
+    widget.addEventListener('click', (e) => {
+        if (widget.classList.contains('closed')) {
+            if (e.target.closest('.open-icon')) {
+                widget.classList.remove('closed');
+                isOpen = true;
+            }
+        }
+    });
+    
+    closeBtn.addEventListener('click', () => {
+        widget.classList.add('closed');
+        isOpen = false;
+    });
+
+    function addMessage(text, isUser, isImage = false, imageUrl = null) {
+        const div = document.createElement('div');
+        div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+        if (isImage && imageUrl) {
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.maxWidth = '100%';
+            img.style.borderRadius = '8px';
+            div.appendChild(img);
+            if (text) {
+                const textNode = document.createTextNode(' ' + text);
+                div.appendChild(textNode);
+            }
+        } else {
+            div.innerText = text;
+        }
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    async function sendMessage(text, imageBase64 = null) {
+        if (!text && !imageBase64) return;
+        if (text) addMessage(text, true);
+        else if (imageBase64) addMessage('📷 Изображение', true, true, imageBase64);
+
+        socket.emit('user_message', { text, imageBase64 });
+        messageInput.value = '';
+    }
+
+    sendBtn.addEventListener('click', () => {
+        const text = messageInput.value.trim();
+        if (text) sendMessage(text);
+    });
+    
+    messageInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const text = messageInput.value.trim();
+            if (text) sendMessage(text);
+        }
+    });
+
+    fileBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            sendMessage('', ev.target.result);
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = '';
+    });
+
+    setInterval(() => {
+        socket.emit('user_activity');
+    }, 30000);
+    
+    window.addEventListener('focus', () => socket.emit('tab_focus', true));
+    window.addEventListener('blur', () => socket.emit('tab_focus', false));
+    socket.emit('tab_focus', true);
+
+    setTimeout(() => {
+        addMessage('Здравствуйте! Задайте, пожалуйста, ваш вопрос 😊', false);
+    }, 500);
+
+    socket.on('tg_message', (data) => {
+        if (data.isImage) {
+            addMessage('📷 Изображение от поддержки', false, true, null);
+        } else {
+            addMessage(data.text, false);
+        }
+    });
+
+    socket.on('error', (err) => {
+        addMessage(`❌ Ошибка: ${err}`, false);
+    });
+    
+    socket.on('connect', () => {
+        console.log('✅ Подключено к серверу');
+    });
+</script>
+</body>
+</html>
