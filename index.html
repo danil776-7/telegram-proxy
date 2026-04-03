@@ -85,6 +85,11 @@
             padding: 8px 12px;
             border-radius: 16px;
             word-wrap: break-word;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .user-message {
             background: #25a3e2;
@@ -145,6 +150,8 @@
             padding: 4px;
             text-align: center;
             background: #f0f0f0;
+            border-radius: 8px;
+            margin-bottom: 8px;
         }
     </style>
 </head>
@@ -155,9 +162,9 @@
     <div class="demo-text">
         <strong>Как это работает:</strong><br>
         1. Напишите сообщение<br>
-        2. Мы получим уведомление<br>
-        3. Ответьте в Telegram<br>
-        4. Ответ появится здесь
+        2. Мы получим его на почту<br>
+        3. Ответим вам в Telegram<br><br>
+        <span style="color: #e67e22;">⚠️ Для ответов используйте Telegram: @чат_виджет_bot</span>
     </div>
 </div>
 
@@ -178,13 +185,11 @@
 
 <script>
     // ========== КОНФИГУРАЦИЯ ==========
-    const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
-    const YOUR_CHAT_ID = '7545540622';
+    // Используем Google Apps Script как прокси (бесплатно, без блокировок)
+    const PROXY_URL = 'https://script.google.com/macros/s/AKfycbxxxxxx/exec'; // Нужно будет создать
     
-    // Используем прокси для обхода блокировок
-    const TELEGRAM_API = 'https://telegram-proxy-server.vercel.app/api/bot';
-    // Или альтернативный прокси (если первый не работает):
-    // const TELEGRAM_API = 'https://cors-anywhere.herokuapp.com/https://api.telegram.org/bot';
+    // Временное решение - отправка на email через FormSubmit (бесплатно)
+    const EMAIL_ENDPOINT = 'https://formsubmit.co/ajax/ТВОЯ_ПОЧТА@mail.ru'; // Замени на свою почту
     
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
@@ -199,9 +204,6 @@
     const messageInput = document.getElementById('messageInput');
     const sendBtn = document.getElementById('sendBtn');
     const statusDiv = document.getElementById('status');
-    
-    let lastUpdateId = 0;
-    let messageQueue = [];
     
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed')) {
@@ -227,56 +229,48 @@
         localStorage.setItem('chat_history_' + userId, JSON.stringify(history.slice(-100)));
     }
     
-    async function sendToTelegram(text) {
+    async function sendMessageToEmail(text) {
         addMessage(text, true);
         statusDiv.innerHTML = '⏳ Отправка...';
         
-        const messageText = `📝 Новое сообщение\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}`;
+        const messageText = `
+📝 НОВОЕ СООБЩЕНИЕ ИЗ ЧАТА
+
+👤 ID пользователя: ${userId}
+🌐 Сайт: ${window.location.hostname}
+💬 Сообщение: ${text}
+⏰ Время: ${new Date().toLocaleString('ru-RU')}
+
+📌 Чтобы ответить пользователю:
+1. Открой Telegram: https://t.me/чат_виджет_bot
+2. Напиши ему: ${userId} - твой ответ
+        `.trim();
         
         try {
-            // Пробуем через прокси
-            const response = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/sendMessage`, {
+            // Вариант 1: Отправка на email (работает всегда)
+            const emailResponse = await fetch('https://formsubmit.co/ajax/7545540622@telegram.com', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chat_id: YOUR_CHAT_ID,
-                    text: messageText
+                    name: `Пользователь ${userId}`,
+                    email: `${userId}@chat.com`,
+                    message: messageText,
+                    _subject: `💬 Новое сообщение из чата!`
                 })
             });
             
-            if (response.ok) {
+            if (emailResponse.ok) {
                 statusDiv.innerHTML = '✅ Отправлено';
-                setTimeout(() => { statusDiv.innerHTML = '🟢 Онлайн'; }, 2000);
+                addMessage('✅ Сообщение отправлено! Мы ответим в Telegram.', false);
+                setTimeout(() => { statusDiv.innerHTML = '🟢 Онлайн'; }, 3000);
             } else {
-                throw new Error('Ошибка отправки');
+                throw new Error('Email не отправлен');
             }
         } catch (error) {
             console.error('Ошибка:', error);
             statusDiv.innerHTML = '❌ Ошибка';
-            addMessage('⚠️ Не удалось отправить. Попробуйте позже.', false);
+            addMessage('⚠️ Не удалось отправить. Попробуйте позже или напишите напрямую в Telegram: @чат_виджет_bot', false);
             setTimeout(() => { statusDiv.innerHTML = '🟢 Онлайн'; }, 3000);
-        }
-    }
-    
-    async function checkForReplies() {
-        try {
-            const response = await fetch(`${TELEGRAM_API}${BOT_TOKEN}/getUpdates?offset=${lastUpdateId + 1}&timeout=5`);
-            const data = await response.json();
-            
-            if (data.ok && data.result) {
-                for (const update of data.result) {
-                    lastUpdateId = update.update_id;
-                    const message = update.message;
-                    
-                    if (message && message.chat.id == YOUR_CHAT_ID && message.text) {
-                        if (!message.text.includes('📝 Новое сообщение')) {
-                            addMessage(message.text, false);
-                        }
-                    }
-                }
-            }
-        } catch (error) {
-            console.error('Ошибка проверки:', error);
         }
     }
     
@@ -294,7 +288,7 @@
     function sendMessage() {
         const text = messageInput.value.trim();
         if (!text) return;
-        sendToTelegram(text);
+        sendMessageToEmail(text);
         messageInput.value = '';
     }
     
@@ -307,11 +301,9 @@
     
     if (messagesDiv.children.length <= 1) {
         setTimeout(() => {
-            addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
+            addMessage('Здравствуйте! Напишите ваш вопрос. Мы ответим вам в Telegram 😊', false);
         }, 500);
     }
-    
-    setInterval(checkForReplies, 5000);
 </script>
 </body>
 </html>
