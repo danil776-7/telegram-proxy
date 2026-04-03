@@ -3,9 +3,14 @@ const cors = require('cors');
 const app = express();
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json());
 
-// Прокси для Telegram API
+// Проверка работы сервера
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
+});
+
+// Прокси для Telegram API (POST)
 app.post('/api/bot:token/:method', async (req, res) => {
     const { token, method } = req.params;
     const url = `https://api.telegram.org/bot${token}/${method}`;
@@ -23,6 +28,7 @@ app.post('/api/bot:token/:method', async (req, res) => {
     }
 });
 
+// Прокси для Telegram API (GET)
 app.get('/api/bot:token/:method', async (req, res) => {
     const { token, method } = req.params;
     const url = `https://api.telegram.org/bot${token}/${method}`;
@@ -36,12 +42,7 @@ app.get('/api/bot:token/:method', async (req, res) => {
     }
 });
 
-// Проверка работоспособности
-app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
-});
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`✅ Прокси-сервер запущен на порту ${PORT}`);
+    console.log(`✅ Сервер запущен на порту ${PORT}`);
 });
