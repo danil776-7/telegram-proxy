@@ -2,10 +2,6 @@ services:
   - type: web
     name: tg-proxy
     runtime: node
-    repo: https://github.com/danil776-7/tg-proxy
     buildCommand: npm install
     startCommand: node server.js
     plan: free
-    envVars:
-      - key: NODE_VERSION
-        value: 18
