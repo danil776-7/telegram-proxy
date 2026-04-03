@@ -71,6 +71,7 @@
             padding: 8px 12px;
             border-radius: 16px;
             margin-bottom: 8px;
+            word-wrap: break-word;
         }
         .user-message {
             background: #25a3e2;
@@ -136,6 +137,7 @@
 <div class="content">
     <h1>💬 Чат с поддержкой</h1>
     <p>Напишите нам в виджет справа 👉</p>
+    <p style="font-size: 12px; margin-top: 20px; color: #888;">Сообщения приходят в Telegram</p>
 </div>
 
 <div class="chat-widget closed" id="chatWidget">
@@ -157,8 +159,6 @@
     // ========== КОНФИГУРАЦИЯ ==========
     const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
     const YOUR_CHAT_ID = '7545540622';
-    
-    // ⚠️ ЗАМЕНИ НА СВОЙ URL ОТ RENDER ⚠️
     const PROXY_URL = 'https://test-gfg7.onrender.com';
     
     let userId = localStorage.getItem('chat_user_id');
@@ -191,6 +191,11 @@
         div.innerText = text;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Сохраняем историю
+        const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        history.push({ text, isUser, time: Date.now() });
+        localStorage.setItem('chat_history', JSON.stringify(history.slice(-50)));
     }
     
     async function sendToTelegram(text) {
@@ -198,19 +203,21 @@
         statusDiv.innerHTML = '⏳ Отправка...';
         statusDiv.className = 'status';
         
+        const messageText = `📝 НОВОЕ СООБЩЕНИЕ\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}\n\n⏰ Время: ${new Date().toLocaleString('ru-RU')}`;
+        
         try {
-            // Пробуем новый формат (без /api/)
-            const response = await fetch(`${PROXY_URL}/bot${BOT_TOKEN}/sendMessage`, {
+            const response = await fetch(`${PROXY_URL}/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    chat_id: YOUR_CHAT_ID,
-                    text: `📝 Сообщение от ${userId}\n🌐 Сайт: ${window.location.hostname}\n\n${text}`
+                    token: BOT_TOKEN,
+                    chatId: YOUR_CHAT_ID,
+                    text: messageText
                 })
             });
             
             const data = await response.json();
-            console.log('Ответ:', data);
+            console.log('Ответ прокси:', data);
             
             if (data.ok) {
                 statusDiv.innerHTML = '✅ Отправлено!';
@@ -220,7 +227,7 @@
                     statusDiv.className = 'status';
                 }, 2000);
             } else {
-                throw new Error(data.description || 'Ошибка');
+                throw new Error(data.description || 'Ошибка отправки');
             }
         } catch (error) {
             console.error('Ошибка:', error);
@@ -261,10 +268,21 @@
         if (e.key === 'Enter') sendMessage();
     });
     
+    // Загрузка истории
+    const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    history.forEach(msg => {
+        const div = document.createElement('div');
+        div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+        div.innerText = msg.text;
+        messagesDiv.appendChild(div);
+    });
+    
     // Приветствие
-    setTimeout(() => {
-        addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
-    }, 500);
+    if (messagesDiv.children.length <= 1) {
+        setTimeout(() => {
+            addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
+        }, 500);
+    }
     
     // Проверка соединения
     checkConnection();
