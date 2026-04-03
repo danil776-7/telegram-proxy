@@ -5,65 +5,44 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Корневой путь - проверка работы
+// Корневой путь
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
 });
 
-// Универсальный прокси для Telegram API
-app.all('/bot:token/:method', async (req, res) => {
-    const { token, method } = req.params;
-    const url = `https://api.telegram.org/bot${token}/${method}`;
+// Прокси для всех запросов к Telegram
+app.post('/send', async (req, res) => {
+    const { token, chatId, text } = req.body;
     
-    console.log(`📤 Запрос к: ${url}`);
+    if (!token || !chatId || !text) {
+        return res.status(400).json({ error: 'Missing parameters: token, chatId, text' });
+    }
+    
+    const url = `https://api.telegram.org/bot${token}/sendMessage`;
     
     try {
-        let response;
-        
-        if (req.method === 'GET') {
-            // Для GET запросов с query параметрами
-            const queryParams = new URLSearchParams(req.query).toString();
-            const fullUrl = queryParams ? `${url}?${queryParams}` : url;
-            response = await fetch(fullUrl);
-        } else {
-            // Для POST запросов
-            response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(req.body)
-            });
-        }
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: chatId,
+                text: text
+            })
+        });
         
         const data = await response.json();
-        console.log(`✅ Ответ:`, data.ok ? 'OK' : 'ERROR');
         res.json(data);
-        
     } catch (error) {
-        console.error(`❌ Ошибка:`, error.message);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
 
-// Поддержка старого формата (для совместимости)
-app.all('/api/bot:token/:method', async (req, res) => {
-    const { token, method } = req.params;
-    const url = `https://api.telegram.org/bot${token}/${method}`;
+// Проверка токена бота
+app.post('/check', async (req, res) => {
+    const { token } = req.body;
     
     try {
-        let response;
-        
-        if (req.method === 'GET') {
-            const queryParams = new URLSearchParams(req.query).toString();
-            const fullUrl = queryParams ? `${url}?${queryParams}` : url;
-            response = await fetch(fullUrl);
-        } else {
-            response = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(req.body)
-            });
-        }
-        
+        const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
         const data = await response.json();
         res.json(data);
     } catch (error) {
@@ -74,5 +53,5 @@ app.all('/api/bot:token/:method', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`✅ Прокси-сервер запущен на порту ${PORT}`);
-    console.log(`🌐 Используй: /bot{TOKEN}/sendMessage`);
+    console.log(`📡 Используй POST /send с параметрами: token, chatId, text`);
 });
