@@ -176,10 +176,9 @@
     <p>Напишите нам в виджет справа 👉</p>
     <div class="note">
         📌 <strong>Как это работает:</strong><br>
-        1. Вы пишете сообщение<br>
-        2. Оно приходит в Telegram<br>
-        3. Вы отвечаете в Telegram<br>
-        4. Ответ автоматически появится здесь через 5-10 секунд
+        1. Вы пишете сообщение → оно приходит в Telegram<br>
+        2. Вы отвечаете в Telegram → ответ приходит сюда через 5-10 секунд<br><br>
+        ⚠️ <strong>Важно:</strong> Напишите боту первым в Telegram, чтобы начать диалог
     </div>
 </div>
 
@@ -202,7 +201,7 @@
     // ========== НАСТРОЙКИ ==========
     const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
     const YOUR_CHAT_ID = '7545540622';
-    const PROXY_URL = 'https://test-9g38.onrender.com';
+    const PROXY_URL = 'https://test-acb5.onrender.com';
     
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
@@ -281,7 +280,6 @@
         }
     }
     
-    // Проверка новых сообщений из Telegram (через прокси)
     async function checkForReplies() {
         try {
             const response = await fetch(`${PROXY_URL}/getUpdates?token=${BOT_TOKEN}&offset=${lastUpdateId}`);
@@ -292,9 +290,7 @@
                     lastUpdateId = update.update_id + 1;
                     const message = update.message;
                     
-                    // Проверяем, что сообщение от тебя (поддержки) и не является нашим исходящим
                     if (message && message.chat.id == YOUR_CHAT_ID && message.text) {
-                        // Пропускаем сообщения, которые начинаются с "📝 НОВОЕ СООБЩЕНИЕ"
                         if (!message.text.includes('📝 НОВОЕ СООБЩЕНИЕ')) {
                             console.log('Новый ответ:', message.text);
                             addMessage(message.text, false);
