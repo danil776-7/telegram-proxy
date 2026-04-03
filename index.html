@@ -178,8 +178,8 @@
         📌 <strong>Как это работает:</strong><br>
         1. Вы пишете сообщение<br>
         2. Оно приходит в Telegram<br>
-        3. Мы отвечаем вам в Telegram<br><br>
-        ⚠️ <strong>Важно:</strong> Напишите боту первым в Telegram, чтобы начать диалог
+        3. Вы отвечаете в Telegram<br>
+        4. Ответ автоматически появится здесь через 5-10 секунд
     </div>
 </div>
 
@@ -209,6 +209,8 @@
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         localStorage.setItem('chat_user_id', userId);
     }
+    
+    let lastUpdateId = 0;
     
     // Элементы
     const widget = document.getElementById('chatWidget');
@@ -268,7 +270,6 @@
             
             if (data.ok) {
                 setStatus('✅ Отправлено!', 'online');
-                addMessage('✅ Сообщение отправлено. Мы ответим в Telegram!', false);
                 setTimeout(() => setStatus('🟢 Онлайн', 'online'), 2000);
             } else {
                 throw new Error(data.description || 'Ошибка отправки');
@@ -276,8 +277,33 @@
         } catch (error) {
             console.error('Ошибка:', error);
             setStatus('❌ Ошибка: ' + error.message, 'error');
-            addMessage(`❌ Ошибка отправки: ${error.message}`, false);
             setTimeout(() => setStatus('🟢 Онлайн', 'online'), 3000);
+        }
+    }
+    
+    // Проверка новых сообщений из Telegram (через прокси)
+    async function checkForReplies() {
+        try {
+            const response = await fetch(`${PROXY_URL}/getUpdates?token=${BOT_TOKEN}&offset=${lastUpdateId}`);
+            const data = await response.json();
+            
+            if (data.ok && data.result) {
+                for (const update of data.result) {
+                    lastUpdateId = update.update_id + 1;
+                    const message = update.message;
+                    
+                    // Проверяем, что сообщение от тебя (поддержки) и не является нашим исходящим
+                    if (message && message.chat.id == YOUR_CHAT_ID && message.text) {
+                        // Пропускаем сообщения, которые начинаются с "📝 НОВОЕ СООБЩЕНИЕ"
+                        if (!message.text.includes('📝 НОВОЕ СООБЩЕНИЕ')) {
+                            console.log('Новый ответ:', message.text);
+                            addMessage(message.text, false);
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка проверки ответов:', error);
         }
     }
     
@@ -328,6 +354,9 @@
     // Проверка сервера
     checkServer();
     setInterval(checkServer, 30000);
+    
+    // Проверка новых ответов каждые 5 секунд
+    setInterval(checkForReplies, 5000);
 </script>
 </body>
 </html>
