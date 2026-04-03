@@ -5,17 +5,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Корневой путь
+// Проверка работы сервера
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
 });
 
-// Прокси для всех запросов к Telegram
+// Отправка сообщения в Telegram
 app.post('/send', async (req, res) => {
     const { token, chatId, text } = req.body;
     
+    console.log('📨 Получен запрос:', { token: token ? 'есть' : 'нет', chatId, text: text?.substring(0, 50) });
+    
     if (!token || !chatId || !text) {
-        return res.status(400).json({ error: 'Missing parameters: token, chatId, text' });
+        return res.status(400).json({ 
+            ok: false, 
+            error: 'Missing parameters: token, chatId, text are required' 
+        });
     }
     
     const url = `https://api.telegram.org/bot${token}/sendMessage`;
@@ -31,8 +36,11 @@ app.post('/send', async (req, res) => {
         });
         
         const data = await response.json();
+        console.log('✅ Ответ Telegram:', data.ok ? 'Успешно' : 'Ошибка');
         res.json(data);
+        
     } catch (error) {
+        console.error('❌ Ошибка:', error.message);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
@@ -40,6 +48,10 @@ app.post('/send', async (req, res) => {
 // Проверка токена бота
 app.post('/check', async (req, res) => {
     const { token } = req.body;
+    
+    if (!token) {
+        return res.status(400).json({ ok: false, error: 'Token required' });
+    }
     
     try {
         const response = await fetch(`https://api.telegram.org/bot${token}/getMe`);
@@ -50,8 +62,13 @@ app.post('/check', async (req, res) => {
     }
 });
 
+// Keep-alive (каждые 4 минуты)
+setInterval(() => {
+    console.log('💓 Сервер активен, время:', new Date().toISOString());
+}, 4 * 60 * 1000);
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`✅ Прокси-сервер запущен на порту ${PORT}`);
-    console.log(`📡 Используй POST /send с параметрами: token, chatId, text`);
+    console.log(`🚀 Сервер запущен на порту ${PORT}`);
+    console.log(`🌐 Прокси доступен по адресу: https://test-gfg7.onrender.com`);
 });
