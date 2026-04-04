@@ -18,6 +18,7 @@ const GROUP_CHAT_ID = -1003765383331;
 
 // Хранилища
 const ipTopics = new Map();     // ip -> topicId
+const topicToIp = new Map();    // topicId -> ip
 const ipStatus = new Map();     // ip -> { online, lastActive, site, userId, pinnedMessageId }
 
 // ========== ФУНКЦИИ ==========
@@ -31,8 +32,8 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
-// Обновление закреплённого сообщения (только если изменился статус)
-async function updatePinnedMessage(ip, topicId, site, userName, force = false) {
+// Обновление закреплённого сообщения
+async function updatePinnedMessage(ip, topicId, site, userName) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
@@ -46,14 +47,8 @@ async function updatePinnedMessage(ip, topicId, site, userName, force = false) {
 ⏱ **Последняя активность:** ${lastActiveStr}
     `;
     
-    // Проверяем, нужно ли обновлять (чтобы не спамить)
-    if (!force && status.lastPinnedText === text) {
-        return; // Текст не изменился, не обновляем
-    }
-    
     try {
         if (status.pinnedMessageId) {
-            // Обновляем существующее закреплённое сообщение
             await callTelegram('editMessageText', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -62,7 +57,6 @@ async function updatePinnedMessage(ip, topicId, site, userName, force = false) {
                 parse_mode: 'Markdown'
             });
         } else {
-            // Создаём новое закреплённое сообщение
             const sent = await callTelegram('sendMessage', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -79,10 +73,7 @@ async function updatePinnedMessage(ip, topicId, site, userName, force = false) {
                 });
             }
         }
-        
-        status.lastPinnedText = text;
         ipStatus.set(ip, status);
-        
     } catch (e) {
         console.error('Ошибка обновления закрепления:', e.message);
     }
@@ -101,18 +92,16 @@ async function createTopicForIp(ip, site, userId) {
         
         const topicId = topic.result.message_thread_id;
         ipTopics.set(ip, topicId);
+        topicToIp.set(topicId, ip);
         
-        // Сохраняем информацию
         ipStatus.set(ip, {
             online: true,
             lastActive: Date.now(),
             site: site,
             userId: userId,
-            pinnedMessageId: null,
-            lastPinnedText: null
+            pinnedMessageId: null
         });
         
-        // Отправляем приветственное сообщение (только один раз)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -120,8 +109,7 @@ async function createTopicForIp(ip, site, userId) {
             parse_mode: 'Markdown'
         });
         
-        // Создаём закреплённое сообщение
-        await updatePinnedMessage(ip, topicId, site, userId, true);
+        await updatePinnedMessage(ip, topicId, site, userId);
         
         console.log(`✅ Топик для IP ${ip} создан: ${topicId}`);
         return topicId;
@@ -138,7 +126,7 @@ app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает! Сортировка по IP' });
 });
 
-// Отправка сообщения
+// Отправка сообщения от пользователя
 app.post('/send', async (req, res) => {
     const { userId, site, ip, text, imageBase64 } = req.body;
     
@@ -148,7 +136,6 @@ app.post('/send', async (req, res) => {
         return res.status(400).json({ ok: false, error: 'ip required' });
     }
     
-    // Обновляем статус
     let status = ipStatus.get(ip);
     if (!status) {
         status = {
@@ -156,8 +143,7 @@ app.post('/send', async (req, res) => {
             lastActive: Date.now(),
             site: site,
             userId: userId,
-            pinnedMessageId: null,
-            lastPinnedText: null
+            pinnedMessageId: null
         };
     }
     
@@ -167,7 +153,6 @@ app.post('/send', async (req, res) => {
     status.userId = userId || status.userId;
     ipStatus.set(ip, status);
     
-    // Получаем или создаём топик
     let topicId = ipTopics.get(ip);
     if (!topicId) {
         topicId = await createTopicForIp(ip, site, userId);
@@ -175,7 +160,6 @@ app.post('/send', async (req, res) => {
             return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
         }
     } else {
-        // Только обновляем статус (без создания нового сообщения)
         await updatePinnedMessage(ip, topicId, site, userId);
     }
     
@@ -214,7 +198,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Обновление статуса активности
+// Обновление статуса
 app.post('/updateStatus', async (req, res) => {
     const { userId, site, ip, isOnline, isActive } = req.body;
     
@@ -229,8 +213,7 @@ app.post('/updateStatus', async (req, res) => {
             lastActive: Date.now(),
             site: site,
             userId: userId,
-            pinnedMessageId: null,
-            lastPinnedText: null
+            pinnedMessageId: null
         };
     }
     
@@ -241,7 +224,6 @@ app.post('/updateStatus', async (req, res) => {
     status.userId = userId || status.userId;
     ipStatus.set(ip, status);
     
-    // Обновляем закреплённое сообщение только если изменился статус онлайн
     const topicId = ipTopics.get(ip);
     if (topicId && wasOnline !== status.online) {
         await updatePinnedMessage(ip, topicId, site, userId);
@@ -250,10 +232,12 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// Получение ответов
+// Получение ответов из Telegram для виджета
 app.get('/getUpdates', async (req, res) => {
-    const { offset } = req.query;
+    const { offset, ip } = req.query;
+    
     try {
+        // Получаем все обновления из группы
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=10`;
         const response = await fetch(url);
         const data = await response.json();
@@ -262,20 +246,20 @@ app.get('/getUpdates', async (req, res) => {
             const filtered = [];
             for (const update of data.result) {
                 const msg = update.message;
+                // Проверяем, что сообщение из нашей группы и из топика
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
-                    let userIp = null;
-                    for (let [ip, tid] of ipTopics.entries()) {
-                        if (tid === msg.message_thread_id) {
-                            userIp = ip;
-                            break;
-                        }
-                    }
-                    if (userIp) {
+                    // Определяем IP по topicId
+                    const topicId = msg.message_thread_id;
+                    const userIp = topicToIp.get(topicId);
+                    
+                    // Если IP совпадает с запрашиваемым (или нет фильтра) и сообщение не от бота
+                    if (userIp && (!ip || userIp === ip) && !msg.from?.is_bot) {
                         filtered.push({
                             update_id: update.update_id,
                             message: {
                                 text: msg.text,
-                                ip: userIp
+                                from: msg.from?.first_name || 'Поддержка',
+                                date: msg.date
                             }
                         });
                     }
@@ -283,8 +267,10 @@ app.get('/getUpdates', async (req, res) => {
             }
             data.result = filtered;
         }
+        
         res.json(data);
     } catch (error) {
+        console.error('Ошибка getUpdates:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
@@ -292,6 +278,5 @@ app.get('/getUpdates', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 Сортировка по IP адресу (без спама)`);
     console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}\n`);
 });
