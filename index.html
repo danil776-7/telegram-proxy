@@ -221,24 +221,23 @@
     // ========== НАСТРОЙКИ ==========
     const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
     const YOUR_CHAT_ID = '7545540622';
-
     const PROXY_URL = 'https://test-c7ow.onrender.com';
     
     // ID пользователя (сохраняется в localStorage)
     let userId = localStorage.getItem('chat_user_id');
-    let isNewUser = false;
-    
     if (!userId) {
-        // Новый пользователь!
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
         localStorage.setItem('chat_user_id', userId);
-        isNewUser = true;
-        console.log('🆕 Новый пользователь:', userId);
-    } else {
-        console.log('👤 Возвращающийся пользователь:', userId);
     }
     
-    let lastUpdateId = 0;
+    // Сохраняем lastUpdateId в localStorage, чтобы при перезагрузке не получать старые сообщения
+    let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
+    
+    // Множество для отслеживания уже полученных сообщений (предотвращение дублирования)
+    let processedMessageIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
+    
+    console.log('📌 lastUpdateId:', lastUpdateId);
+    console.log('📌 processedIds count:', processedMessageIds.size);
     
     // Элементы
     const widget = document.getElementById('chatWidget');
@@ -262,27 +261,27 @@
     
     // Функция очистки чата
     function clearChat() {
-        // Очищаем сообщения на экране (оставляем только статус)
+        // Очищаем сообщения на экране
         const messages = messagesDiv.querySelectorAll('.message');
         messages.forEach(msg => msg.remove());
         
         // Очищаем историю в localStorage
         localStorage.removeItem('chat_history');
+        localStorage.removeItem('chat_lastUpdateId');
+        localStorage.removeItem('chat_processedIds');
         
-        // Сбрасываем lastUpdateId, чтобы не подтягивать старые сообщения
+        // Сбрасываем переменные
         lastUpdateId = 0;
+        processedMessageIds.clear();
+        
+        // Сохраняем сброшенные значения
+        localStorage.setItem('chat_lastUpdateId', '0');
+        localStorage.setItem('chat_processedIds', JSON.stringify([]));
         
         // Показываем приветственное сообщение
         addMessage('Чат очищен. Задайте, пожалуйста, ваш вопрос 😊', false);
         
         console.log('🧹 Чат очищен');
-    }
-    
-    // Функция полного сброса для нового пользователя
-    function resetForNewUser() {
-        localStorage.removeItem('chat_history');
-        lastUpdateId = 0;
-        console.log('🆕 Чат очищен для нового пользователя');
     }
     
     // Кнопка очистки
@@ -292,18 +291,30 @@
         }
     });
     
-    function addMessage(text, isUser) {
+    function addMessage(text, isUser, messageId = null) {
+        // Проверяем, не было ли уже это сообщение
+        if (messageId && processedMessageIds.has(messageId)) {
+            console.log('⚠️ Сообщение уже есть, пропускаем:', messageId);
+            return;
+        }
+        
         const div = document.createElement('div');
         div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
         div.innerText = text;
         messagesDiv.appendChild(div);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
-        // Сохраняем историю (только если сообщение не системное)
+        // Сохраняем в историю (только если сообщение не системное)
         if (text !== 'Чат очищен. Задайте, пожалуйста, ваш вопрос 😊') {
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, time: Date.now() });
+            history.push({ text, isUser, time: Date.now(), id: messageId });
             localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
+            
+            // Сохраняем ID обработанного сообщения
+            if (messageId) {
+                processedMessageIds.add(messageId);
+                localStorage.setItem('chat_processedIds', JSON.stringify([...processedMessageIds]));
+            }
         }
     }
     
@@ -313,7 +324,7 @@
     }
     
     async function sendToTelegram(text) {
-        addMessage(text, true);
+        addMessage(text, true, Date.now());
         setStatus('⏳ Отправка...', 'sending');
         
         const messageText = `📝 НОВОЕ СООБЩЕНИЕ\n\n👤 ID: ${userId}\n🌐 Сайт: ${window.location.hostname}\n💬 Сообщение: ${text}\n\n⏰ Время: ${new Date().toLocaleString('ru-RU')}`;
@@ -350,18 +361,32 @@
             const response = await fetch(`${PROXY_URL}/getUpdates?token=${BOT_TOKEN}&offset=${lastUpdateId}`);
             const data = await response.json();
             
-            if (data.ok && data.result) {
+            if (data.ok && data.result && data.result.length > 0) {
+                console.log(`📨 Получено ${data.result.length} обновлений`);
+                
                 for (const update of data.result) {
-                    lastUpdateId = update.update_id + 1;
+                    const messageId = update.update_id;
+                    lastUpdateId = Math.max(lastUpdateId, messageId + 1);
+                    
                     const message = update.message;
                     
                     if (message && message.chat.id == YOUR_CHAT_ID && message.text) {
+                        // Пропускаем исходящие сообщения
                         if (!message.text.includes('📝 НОВОЕ СООБЩЕНИЕ')) {
-                            console.log('Новый ответ:', message.text);
-                            addMessage(message.text, false);
+                            // Проверяем, не обрабатывали ли мы уже это сообщение
+                            if (!processedMessageIds.has(messageId)) {
+                                console.log('✅ Новый ответ:', message.text);
+                                addMessage(message.text, false, messageId);
+                            } else {
+                                console.log('⚠️ Дубль, пропускаем:', messageId);
+                            }
                         }
                     }
                 }
+                
+                // Сохраняем последний обработанный ID
+                localStorage.setItem('chat_lastUpdateId', lastUpdateId);
+                localStorage.setItem('chat_processedIds', JSON.stringify([...processedMessageIds]));
             }
         } catch (error) {
             console.error('Ошибка проверки ответов:', error);
@@ -400,20 +425,27 @@
     function loadHistory() {
         const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
         
-        // Если пользователь новый и истории нет, показываем приветствие
+        // Восстанавливаем processedMessageIds из истории
+        history.forEach(msg => {
+            if (msg.id) {
+                processedMessageIds.add(msg.id);
+            }
+            const div = document.createElement('div');
+            div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+            div.innerText = msg.text;
+            messagesDiv.appendChild(div);
+        });
+        
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        
+        // Если истории нет, показываем приветствие
         if (history.length === 0) {
             setTimeout(() => {
-                addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
+                addMessage('Здравствуйте! Напишите ваш вопрос 😊', false, Date.now());
             }, 500);
-        } else {
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-                div.innerText = msg.text;
-                messagesDiv.appendChild(div);
-            });
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
         }
+        
+        console.log(`📜 Загружено ${history.length} сообщений, processedIds: ${processedMessageIds.size}`);
     }
     
     // Запуск
