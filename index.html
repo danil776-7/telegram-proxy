@@ -36,7 +36,6 @@
         }
         .note strong { color: #333; }
         
-        /* Виджет чата */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -233,8 +232,7 @@
 
 <script>
     // ========== НАСТРОЙКИ ==========
-    // ⚠️ ЗАМЕНИ НА СВОЙ URL ОТ RENDER ⚠️
-    const PROXY_URL = 'https://tg-proxy.onrender.com';
+    const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
@@ -245,7 +243,6 @@
     let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
     let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
     
-    // Получение IP пользователя
     let userIp = 'не определён';
     fetch('https://api.ipify.org?format=json')
         .then(r => r.json())
@@ -262,7 +259,6 @@
         }).catch(console.error);
     }
     
-    // DOM элементы
     const widget = document.getElementById('chatWidget');
     const closeBtn = document.querySelector('.close-btn');
     const clearBtn = document.getElementById('clearBtn');
@@ -427,7 +423,6 @@
         }
     });
     
-    // Отслеживание активности
     setInterval(() => updateStatus(true, true), 30000);
     window.addEventListener('focus', () => updateStatus(true, true));
     window.addEventListener('blur', () => updateStatus(false, false));
