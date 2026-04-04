@@ -50,7 +50,6 @@
             overflow: hidden;
             transition: all 0.3s ease;
             z-index: 1000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
         }
         .chat-widget.closed {
             width: 60px;
@@ -79,7 +78,6 @@
             cursor: pointer;
             padding: 4px 10px;
             border-radius: 20px;
-            transition: background 0.2s;
         }
         .clear-btn:hover { background: rgba(255,255,255,0.4); }
         .close-btn {
@@ -159,15 +157,11 @@
             cursor: pointer;
             font-size: 16px;
         }
-        .file-btn {
-            background: #6c757d;
-        }
+        .file-btn { background: #6c757d; }
         .send-btn:hover, .file-btn:hover { opacity: 0.9; }
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
-        .chat-widget.closed .chat-input-area {
-            display: none;
-        }
+        .chat-widget.closed .chat-input-area { display: none; }
         .open-icon {
             display: none;
             width: 100%;
@@ -177,9 +171,7 @@
             font-size: 28px;
             color: white;
         }
-        .chat-widget.closed .open-icon {
-            display: flex;
-        }
+        .chat-widget.closed .open-icon { display: flex; }
         .status {
             font-size: 11px;
             padding: 6px;
@@ -231,7 +223,6 @@
 </div>
 
 <script>
-    // ========== НАСТРОЙКИ ==========
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
     let userId = localStorage.getItem('chat_user_id');
@@ -298,10 +289,7 @@
             const img = document.createElement('img');
             img.src = imageUrl;
             div.appendChild(img);
-            if (text) {
-                const textNode = document.createTextNode(' ' + text);
-                div.appendChild(textNode);
-            }
+            if (text) div.appendChild(document.createTextNode(' ' + text));
         } else {
             div.innerText = text;
         }
@@ -356,16 +344,21 @@
         }
     }
     
+    // Получение ответов из Telegram
     async function checkReplies() {
         try {
-            const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}`);
+            const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&ip=${userIp}`);
             const data = await response.json();
             
             if (data.ok && data.result) {
                 for (const update of data.result) {
                     lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                    if (update.message && update.message.text && update.message.userId === userId) {
-                        addMessage(update.message.text, false, false, null, update.update_id);
+                    if (update.message && update.message.text) {
+                        // Пропускаем сообщения, которые начинаются с 💬 (наши исходящие)
+                        if (!update.message.text.startsWith('💬') && !update.message.text.includes('Новый пользователь')) {
+                            console.log('Новый ответ:', update.message.text);
+                            addMessage(update.message.text, false, false, null, update.update_id);
+                        }
                     }
                 }
                 localStorage.setItem('chat_lastUpdateId', lastUpdateId);
