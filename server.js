@@ -16,9 +16,9 @@ app.use(express.json({ limit: '10mb' }));
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003765383331;
 
-// Хранилища: теперь ключ - IP адрес (а не userId)
+// Хранилища
 const ipTopics = new Map();     // ip -> topicId
-const ipStatus = new Map();     // ip -> { online, lastActive, site, userId }
+const ipStatus = new Map();     // ip -> { online, lastActive, site, userId, pinnedMessageId }
 
 // ========== ФУНКЦИИ ==========
 async function callTelegram(method, params) {
@@ -31,13 +31,10 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
-async function updatePinnedMessage(ip, topicId, site, userName) {
-    const status = ipStatus.get(ip) || { 
-        online: false, 
-        lastActive: Date.now(), 
-        site: site || 'не известен',
-        userId: userName || 'неизвестен'
-    };
+// Обновление закреплённого сообщения (только если изменился статус)
+async function updatePinnedMessage(ip, topicId, site, userName, force = false) {
+    const status = ipStatus.get(ip);
+    if (!status) return;
     
     const lastActiveStr = new Date(status.lastActive).toLocaleString('ru-RU');
     
@@ -49,21 +46,43 @@ async function updatePinnedMessage(ip, topicId, site, userName) {
 ⏱ **Последняя активность:** ${lastActiveStr}
     `;
     
+    // Проверяем, нужно ли обновлять (чтобы не спамить)
+    if (!force && status.lastPinnedText === text) {
+        return; // Текст не изменился, не обновляем
+    }
+    
     try {
-        const sent = await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,
-            message_thread_id: topicId,
-            text: text,
-            parse_mode: 'Markdown'
-        });
-        
-        if (sent.ok) {
-            await callTelegram('pinChatMessage', {
+        if (status.pinnedMessageId) {
+            // Обновляем существующее закреплённое сообщение
+            await callTelegram('editMessageText', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                message_id: sent.result.message_id
+                message_id: status.pinnedMessageId,
+                text: text,
+                parse_mode: 'Markdown'
             });
+        } else {
+            // Создаём новое закреплённое сообщение
+            const sent = await callTelegram('sendMessage', {
+                chat_id: GROUP_CHAT_ID,
+                message_thread_id: topicId,
+                text: text,
+                parse_mode: 'Markdown'
+            });
+            
+            if (sent.ok) {
+                status.pinnedMessageId = sent.result.message_id;
+                await callTelegram('pinChatMessage', {
+                    chat_id: GROUP_CHAT_ID,
+                    message_thread_id: topicId,
+                    message_id: sent.result.message_id
+                });
+            }
         }
+        
+        status.lastPinnedText = text;
+        ipStatus.set(ip, status);
+        
     } catch (e) {
         console.error('Ошибка обновления закрепления:', e.message);
     }
@@ -88,9 +107,12 @@ async function createTopicForIp(ip, site, userId) {
             online: true,
             lastActive: Date.now(),
             site: site,
-            userId: userId
+            userId: userId,
+            pinnedMessageId: null,
+            lastPinnedText: null
         });
         
+        // Отправляем приветственное сообщение (только один раз)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -98,7 +120,8 @@ async function createTopicForIp(ip, site, userId) {
             parse_mode: 'Markdown'
         });
         
-        await updatePinnedMessage(ip, topicId, site, userId);
+        // Создаём закреплённое сообщение
+        await updatePinnedMessage(ip, topicId, site, userId, true);
         
         console.log(`✅ Топик для IP ${ip} создан: ${topicId}`);
         return topicId;
@@ -115,7 +138,7 @@ app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает! Сортировка по IP' });
 });
 
-// Отправка сообщения (ключ - IP)
+// Отправка сообщения
 app.post('/send', async (req, res) => {
     const { userId, site, ip, text, imageBase64 } = req.body;
     
@@ -125,24 +148,36 @@ app.post('/send', async (req, res) => {
         return res.status(400).json({ ok: false, error: 'ip required' });
     }
     
-    // Обновляем статус по IP
-    const status = ipStatus.get(ip) || { online: true, lastActive: Date.now(), site: site, userId: userId };
+    // Обновляем статус
+    let status = ipStatus.get(ip);
+    if (!status) {
+        status = {
+            online: true,
+            lastActive: Date.now(),
+            site: site,
+            userId: userId,
+            pinnedMessageId: null,
+            lastPinnedText: null
+        };
+    }
+    
     status.online = true;
     status.lastActive = Date.now();
     status.site = site || status.site;
     status.userId = userId || status.userId;
     ipStatus.set(ip, status);
     
-    // Получаем или создаём топик для этого IP
+    // Получаем или создаём топик
     let topicId = ipTopics.get(ip);
     if (!topicId) {
         topicId = await createTopicForIp(ip, site, userId);
         if (!topicId) {
             return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
         }
+    } else {
+        // Только обновляем статус (без создания нового сообщения)
+        await updatePinnedMessage(ip, topicId, site, userId);
     }
-    
-    await updatePinnedMessage(ip, topicId, site, userId);
     
     try {
         if (imageBase64) {
@@ -179,7 +214,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Обновление статуса по IP
+// Обновление статуса активности
 app.post('/updateStatus', async (req, res) => {
     const { userId, site, ip, isOnline, isActive } = req.body;
     
@@ -187,15 +222,28 @@ app.post('/updateStatus', async (req, res) => {
         return res.status(400).json({ ok: false, error: 'ip required' });
     }
     
-    const status = ipStatus.get(ip) || { online: false, lastActive: Date.now(), site: site, userId: userId };
+    let status = ipStatus.get(ip);
+    if (!status) {
+        status = {
+            online: isOnline !== false,
+            lastActive: Date.now(),
+            site: site,
+            userId: userId,
+            pinnedMessageId: null,
+            lastPinnedText: null
+        };
+    }
+    
+    const wasOnline = status.online;
     status.online = isOnline !== false;
     if (isActive) status.lastActive = Date.now();
     status.site = site || status.site;
     status.userId = userId || status.userId;
     ipStatus.set(ip, status);
     
+    // Обновляем закреплённое сообщение только если изменился статус онлайн
     const topicId = ipTopics.get(ip);
-    if (topicId) {
+    if (topicId && wasOnline !== status.online) {
         await updatePinnedMessage(ip, topicId, site, userId);
     }
     
@@ -215,7 +263,6 @@ app.get('/getUpdates', async (req, res) => {
             for (const update of data.result) {
                 const msg = update.message;
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
-                    // Находим IP по topicId
                     let userIp = null;
                     for (let [ip, tid] of ipTopics.entries()) {
                         if (tid === msg.message_thread_id) {
@@ -245,6 +292,6 @@ app.get('/getUpdates', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 Сортировка по IP адресу`);
+    console.log(`📡 Сортировка по IP адресу (без спама)`);
     console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}\n`);
 });
