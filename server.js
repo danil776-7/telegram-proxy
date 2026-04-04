@@ -10,8 +10,8 @@ const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003765383331; // ID группы (отрицательный!)
 
 // Хранилища
-const userTopics = new Map(); // userId -> topicId
-const userStatus = new Map(); // userId -> { online, lastActive, ip, site }
+const userTopics = new Map();
+const userStatus = new Map();
 
 // ========== ФУНКЦИИ ДЛЯ TELEGRAM API ==========
 async function callTelegram(method, params) {
@@ -24,7 +24,7 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
-// Обновление закреплённого сообщения с информацией о пользователе
+// Обновление закреплённого сообщения
 async function updatePinnedMessage(userId, topicId, site, ip) {
     const status = userStatus.get(userId) || { 
         online: false, 
@@ -44,18 +44,16 @@ async function updatePinnedMessage(userId, topicId, site, ip) {
     `;
     
     try {
-        // Отправляем сообщение с информацией
         const sent = await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,
+            chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
             message_thread_id: topicId,
             text: text,
             parse_mode: 'Markdown'
         });
         
-        // Закрепляем его
         if (sent.ok) {
             await callTelegram('pinChatMessage', {
-                chat_id: GROUP_CHAT_ID,
+                chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
                 message_thread_id: topicId,
                 message_id: sent.result.message_id
             });
@@ -65,13 +63,13 @@ async function updatePinnedMessage(userId, topicId, site, ip) {
     }
 }
 
-// Создание нового топика для пользователя
+// Создание нового топика
 async function createUserTopic(userId, site, ip) {
     try {
         console.log(`📝 Создаём топик для пользователя: ${userId}`);
         
         const topic = await callTelegram('createForumTopic', {
-            chat_id: GROUP_CHAT_ID,
+            chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
             name: `👤 ${userId.substring(0, 25)}`
         });
         
@@ -82,15 +80,13 @@ async function createUserTopic(userId, site, ip) {
         const topicId = topic.result.message_thread_id;
         userTopics.set(userId, topicId);
         
-        // Отправляем приветственное сообщение
         await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,
+            chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
             message_thread_id: topicId,
             text: `🔔 **Новый пользователь на сайте!**\n\n🆔 **ID:** \`${userId}\`\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip || 'не определён'}\n⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
             parse_mode: 'Markdown'
         });
         
-        // Создаём закреплённое сообщение со статусом
         await updatePinnedMessage(userId, topicId, site, ip);
         
         console.log(`✅ Топик создан: ${topicId}`);
@@ -104,7 +100,6 @@ async function createUserTopic(userId, site, ip) {
 
 // ========== API ENDPOINTS ==========
 
-// Проверка работы сервера
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает!', groupId: GROUP_CHAT_ID });
 });
@@ -114,12 +109,12 @@ app.post('/send', async (req, res) => {
     const { userId, site, ip, text, imageBase64 } = req.body;
     
     console.log(`📨 Получено сообщение от ${userId}`);
+    console.log(`📡 Отправляем в группу: ${GROUP_CHAT_ID}`);
     
     if (!userId) {
         return res.status(400).json({ ok: false, error: 'userId required' });
     }
     
-    // Обновляем статус пользователя
     const status = userStatus.get(userId) || { online: true, lastActive: Date.now(), ip: ip, site: site };
     status.online = true;
     status.lastActive = Date.now();
@@ -127,7 +122,6 @@ app.post('/send', async (req, res) => {
     status.site = site || status.site;
     userStatus.set(userId, status);
     
-    // Получаем или создаём топик
     let topicId = userTopics.get(userId);
     if (!topicId) {
         topicId = await createUserTopic(userId, site, ip);
@@ -136,17 +130,15 @@ app.post('/send', async (req, res) => {
         }
     }
     
-    // Обновляем закреплённое сообщение
     await updatePinnedMessage(userId, topicId, site, ip);
     
     try {
         if (imageBase64) {
-            // Отправка изображения
             const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
             if (matches) {
                 const buffer = Buffer.from(matches[2], 'base64');
                 const formData = new FormData();
-                formData.append('chat_id', GROUP_CHAT_ID);
+                formData.append('chat_id', GROUP_CHAT_ID);  // ← ВАЖНО: используем GROUP_CHAT_ID
                 formData.append('message_thread_id', topicId);
                 formData.append('photo', new Blob([buffer]), 'image.jpg');
                 if (text) formData.append('caption', `💬 **Сообщение от пользователя:**\n\n${text}`);
@@ -156,20 +148,19 @@ app.post('/send', async (req, res) => {
                     body: formData
                 });
                 const data = await response.json();
-                console.log('✅ Изображение отправлено');
+                console.log('✅ Изображение отправлено в группу');
                 res.json(data);
             } else {
                 throw new Error('Invalid image format');
             }
         } else if (text) {
-            // Отправка текста
             const data = await callTelegram('sendMessage', {
-                chat_id: GROUP_CHAT_ID,
+                chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
                 message_thread_id: topicId,
                 text: `💬 **Сообщение от пользователя:**\n\n${text}`,
                 parse_mode: 'Markdown'
             });
-            console.log('✅ Сообщение отправлено');
+            console.log('✅ Сообщение отправлено в группу');
             res.json(data);
         } else {
             res.status(400).json({ ok: false, error: 'No text or image' });
@@ -180,7 +171,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Обновление статуса активности
+// Обновление статуса
 app.post('/updateStatus', async (req, res) => {
     const { userId, site, ip, isOnline, isActive } = req.body;
     
@@ -203,7 +194,7 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// Получение ответов от поддержки
+// Получение ответов
 app.get('/getUpdates', async (req, res) => {
     const { offset } = req.query;
     
@@ -217,7 +208,6 @@ app.get('/getUpdates', async (req, res) => {
             for (const update of data.result) {
                 const msg = update.message;
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
-                    // Находим userId по topicId
                     let userId = null;
                     for (let [uid, tid] of userTopics.entries()) {
                         if (tid === msg.message_thread_id) {
@@ -246,7 +236,6 @@ app.get('/getUpdates', async (req, res) => {
     }
 });
 
-// Keep-alive для бесплатного тарифа
 setInterval(() => {
     console.log('💓 Сервер активен, время:', new Date().toISOString());
 }, 4 * 60 * 1000);
