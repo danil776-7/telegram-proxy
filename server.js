@@ -2,7 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-app.use(cors());
+// Настройки CORS - разрешаем всё для GitHub Pages
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Обрабатываем preflight запросы
+app.options('*', cors());
+
 app.use(express.json({ limit: '10mb' }));
 
 // ========== КОНФИГУРАЦИЯ ==========
@@ -45,7 +54,7 @@ async function updatePinnedMessage(userId, topicId, site, ip) {
     
     try {
         const sent = await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
+            chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
             text: text,
             parse_mode: 'Markdown'
@@ -53,7 +62,7 @@ async function updatePinnedMessage(userId, topicId, site, ip) {
         
         if (sent.ok) {
             await callTelegram('pinChatMessage', {
-                chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
+                chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
                 message_id: sent.result.message_id
             });
@@ -69,7 +78,7 @@ async function createUserTopic(userId, site, ip) {
         console.log(`📝 Создаём топик для пользователя: ${userId}`);
         
         const topic = await callTelegram('createForumTopic', {
-            chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
+            chat_id: GROUP_CHAT_ID,
             name: `👤 ${userId.substring(0, 25)}`
         });
         
@@ -81,7 +90,7 @@ async function createUserTopic(userId, site, ip) {
         userTopics.set(userId, topicId);
         
         await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
+            chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
             text: `🔔 **Новый пользователь на сайте!**\n\n🆔 **ID:** \`${userId}\`\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip || 'не определён'}\n⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
             parse_mode: 'Markdown'
@@ -101,11 +110,14 @@ async function createUserTopic(userId, site, ip) {
 // ========== API ENDPOINTS ==========
 
 app.get('/', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     res.json({ status: 'ok', message: 'Telegram Proxy работает!', groupId: GROUP_CHAT_ID });
 });
 
 // Отправка сообщения от пользователя
 app.post('/send', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    
     const { userId, site, ip, text, imageBase64 } = req.body;
     
     console.log(`📨 Получено сообщение от ${userId}`);
@@ -138,7 +150,7 @@ app.post('/send', async (req, res) => {
             if (matches) {
                 const buffer = Buffer.from(matches[2], 'base64');
                 const formData = new FormData();
-                formData.append('chat_id', GROUP_CHAT_ID);  // ← ВАЖНО: используем GROUP_CHAT_ID
+                formData.append('chat_id', GROUP_CHAT_ID);
                 formData.append('message_thread_id', topicId);
                 formData.append('photo', new Blob([buffer]), 'image.jpg');
                 if (text) formData.append('caption', `💬 **Сообщение от пользователя:**\n\n${text}`);
@@ -155,7 +167,7 @@ app.post('/send', async (req, res) => {
             }
         } else if (text) {
             const data = await callTelegram('sendMessage', {
-                chat_id: GROUP_CHAT_ID,  // ← ВАЖНО: используем GROUP_CHAT_ID
+                chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
                 text: `💬 **Сообщение от пользователя:**\n\n${text}`,
                 parse_mode: 'Markdown'
@@ -173,6 +185,8 @@ app.post('/send', async (req, res) => {
 
 // Обновление статуса
 app.post('/updateStatus', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    
     const { userId, site, ip, isOnline, isActive } = req.body;
     
     if (!userId) {
@@ -196,6 +210,8 @@ app.post('/updateStatus', async (req, res) => {
 
 // Получение ответов
 app.get('/getUpdates', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    
     const { offset } = req.query;
     
     try {
