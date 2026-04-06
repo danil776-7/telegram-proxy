@@ -44,8 +44,9 @@ async function updatePinnedMessage(ip, topicId) {
     const lastActiveStr = status.lastActive ? new Date(status.lastActive).toLocaleString('ru-RU') : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
+    const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
     
-    const text = `🧑‍💻 **Пользователь:** ${status.userId}\n${siteStr}📡 **IP:** ${ip}\n${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
+    const text = `🧑‍💻 **Пользователь:** ${status.userId}\n${siteStr}📡 **IP:** ${ip}\n${regionStr}${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
     
     try {
         if (status.pinnedMessageId) {
@@ -76,7 +77,7 @@ async function updatePinnedMessage(ip, topicId) {
     } catch (e) { console.error('Ошибка обновления:', e.message); }
 }
 
-async function createTopicForIp(ip, site, userId, phone = null) {
+async function createTopicForIp(ip, site, userId, phone = null, region = null) {
     try {
         const shortSite = site?.replace(/^https?:\/\//, '').replace(/\/$/, '').substring(0, 30) || 'unknown';
         const topic = await callTelegram('createForumTopic', {
@@ -94,13 +95,16 @@ async function createTopicForIp(ip, site, userId, phone = null) {
             site,
             userId,
             phone,
+            region,
             pinnedMessageId: null
         });
+        
+        const regionText = region ? `📍 **Регион:** ${region}\n` : '';
         
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
+            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${regionText}${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
             parse_mode: 'Markdown'
         });
         
@@ -119,7 +123,7 @@ app.get('/', (req, res) => {
 
 app.post('/register', async (req, res) => {
     console.log('📞 Регистрация:', req.body);
-    const { userId, site, ip, phone } = req.body;
+    const { userId, site, ip, phone, region } = req.body;
     
     if (!ip || !phone) {
         return res.status(400).json({ ok: false, error: 'ip and phone required' });
@@ -128,11 +132,12 @@ app.post('/register', async (req, res) => {
     try {
         let status = ipStatus.get(ip);
         if (!status) {
-            status = { online: true, lastActive: Date.now(), site, userId, phone, pinnedMessageId: null };
+            status = { online: true, lastActive: Date.now(), site, userId, phone, region, pinnedMessageId: null };
         }
         status.phone = phone;
         status.userId = userId;
         status.site = site;
+        if (region) status.region = region;
         ipStatus.set(ip, status);
         
         let topicId = ipTopics.get(ip);
@@ -156,24 +161,25 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/send', async (req, res) => {
-    const { userId, site, ip, text, imageBase64 } = req.body;
+    const { userId, site, ip, text, imageBase64, region } = req.body;
     console.log('📨 Отправка сообщения от:', userId);
     
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
     let status = ipStatus.get(ip);
     if (!status) {
-        status = { online: true, lastActive: Date.now(), site, userId, phone: null, pinnedMessageId: null };
+        status = { online: true, lastActive: Date.now(), site, userId, phone: null, region, pinnedMessageId: null };
     }
     status.online = true;
     status.lastActive = Date.now();
     status.site = site || status.site;
     status.userId = userId || status.userId;
+    if (region) status.region = region;
     ipStatus.set(ip, status);
     
     let topicId = ipTopics.get(ip);
     if (!topicId) {
-        topicId = await createTopicForIp(ip, site, userId, status.phone);
+        topicId = await createTopicForIp(ip, site, userId, status.phone, status.region);
         if (!topicId) return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
     } else {
         await updatePinnedMessage(ip, topicId);
