@@ -448,7 +448,7 @@
                         localStorage.setItem('user_country', userCountry);
                     }
                     
-                    const locationText = `${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}${userGeo.region ? ' (' + userGeo.region + ')' : ''}`;
+                    const locationText = `${userGeo.countryName}${userGeo.region ? ', ' + userGeo.region : ''}${userGeo.city ? ', ' + userGeo.city : ''}`;
                     setStatus(`🟢 ${locationText}`, 'online');
                     return true;
                 }
@@ -471,10 +471,11 @@
                     } else {
                         userGeo.countryCode = 'RU';
                         userGeo.countryName = 'Россия';
+                        userGeo.region = 'Москва';
                     }
                     userGeo.phoneCode = getPhoneCodeByCountryCode(userGeo.countryCode);
                     if (!userCountry) userCountry = userGeo.countryCode;
-                    setStatus(`🟢 ${userGeo.countryName}`, 'online');
+                    setStatus(`🟢 ${userGeo.countryName}${userGeo.region ? ', ' + userGeo.region : ''}`, 'online');
                 })
                 .catch(() => setStatus('🟢 Онлайн', 'online'));
             
@@ -616,7 +617,7 @@
                         site, 
                         ip: userGeo.ip, 
                         phone, 
-                        region: userGeo.region || userGeo.city || userGeo.countryName 
+                        region: `${userGeo.countryName}${userGeo.region ? ', ' + userGeo.region : ''}`
                     })
                 });
                 
@@ -655,7 +656,7 @@
                 `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} (${c.example})</option>`
             ).join('');
             
-            const detectedText = userGeo.countryName ? `📍 Определено: ${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}${userGeo.region ? ' (' + userGeo.region + ')' : ''}` : '';
+            const detectedText = userGeo.countryName ? `📍 Определено: ${userGeo.countryName}${userGeo.region ? ', ' + userGeo.region : ''}` : '';
             
             const overlay = document.createElement('div');
             overlay.className = 'phone-overlay';
@@ -775,7 +776,7 @@
                         ip: userGeo.ip, 
                         text, 
                         imageBase64,
-                        region: userGeo.region || userGeo.city || userGeo.countryName
+                        region: `${userGeo.countryName}${userGeo.region ? ', ' + userGeo.region : ''}`
                     })
                 });
                 const data = await response.json();
