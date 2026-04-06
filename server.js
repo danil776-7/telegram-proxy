@@ -259,6 +259,8 @@ app.get('/getUpdates', async (req, res) => {
         const response = await fetch(url);
         const data = await response.json();
         
+        console.log('📨 getUpdates ответ:', data.ok ? 'OK' : 'ERROR');
+        
         if (data.ok && data.result) {
             const filtered = [];
             for (const update of data.result) {
@@ -266,6 +268,8 @@ app.get('/getUpdates', async (req, res) => {
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
                     const topicId = msg.message_thread_id;
                     const userIp = topicToIp.get(topicId);
+                    
+                    console.log(`📨 Сообщение в топике ${topicId}, IP: ${userIp}, от бота: ${msg.from?.is_bot}`);
                     
                     if (userIp && (!ip || userIp === ip) && msg.from && msg.from.is_bot === false) {
                         const messageData = {
@@ -297,7 +301,7 @@ app.get('/getUpdates', async (req, res) => {
                 }
             }
             data.result = filtered;
-            console.log(`📨 Найдено ${filtered.length} новых сообщений`);
+            console.log(`📨 Найдено ${filtered.length} новых сообщений для отправки в виджет`);
         }
         res.json(data);
     } catch (error) {
