@@ -48,7 +48,6 @@
             text-align: left;
         }
         
-        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -234,7 +233,6 @@
         .status.online { background: #d4edda; color: #155724; }
         .status.error { background: #f8d7da; color: #721c24; }
         .status.sending { background: #fff3cd; color: #856404; }
-        .status.blocked { background: #f8d7da; color: #721c24; }
         
         .phone-overlay {
             position: absolute;
@@ -383,27 +381,20 @@
 <script>
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
-    // ========== ДАННЫЕ СТРАН ==========
+    // Данные стран
     const countries = [
-        { code: 'RU', name: '🇷🇺 Россия', mask: '+7 (___) ___-__-__', pattern: /^7\d{10}$/, example: '+71234567890' },
-        { code: 'UA', name: '🇺🇦 Украина', mask: '+380 (__) ___-__-__', pattern: /^380\d{9}$/, example: '+380123456789' },
-        { code: 'KZ', name: '🇰🇿 Казахстан', mask: '+7 (___) ___-__-__', pattern: /^7\d{10}$/, example: '+77123456789' },
-        { code: 'BY', name: '🇧🇾 Беларусь', mask: '+375 (__) ___-__-__', pattern: /^375\d{9}$/, example: '+375123456789' },
-        { code: 'US', name: '🇺🇸 США', mask: '+1 (___) ___-____', pattern: /^1\d{10}$/, example: '+12345678901' },
-        { code: 'GB', name: '🇬🇧 Великобритания', mask: '+44 (__) ____-____', pattern: /^44\d{10}$/, example: '+441234567890' },
-        { code: 'DE', name: '🇩🇪 Германия', mask: '+49 (___) ______', pattern: /^49\d{10}$/, example: '+491234567890' },
-        { code: 'FR', name: '🇫🇷 Франция', mask: '+33 (__) __-__-__', pattern: /^33\d{9}$/, example: '+33123456789' },
-        { code: 'IT', name: '🇮🇹 Италия', mask: '+39 (__) ____-____', pattern: /^39\d{10}$/, example: '+391234567890' },
-        { code: 'ES', name: '🇪🇸 Испания', mask: '+34 (__) __-__-__', pattern: /^34\d{9}$/, example: '+34123456789' }
+        { code: 'RU', name: '🇷🇺 Россия', example: '+71234567890', pattern: /^7\d{10}$/ },
+        { code: 'UA', name: '🇺🇦 Украина', example: '+380123456789', pattern: /^380\d{9}$/ },
+        { code: 'KZ', name: '🇰🇿 Казахстан', example: '+77123456789', pattern: /^7\d{10}$/ },
+        { code: 'BY', name: '🇧🇾 Беларусь', example: '+375123456789', pattern: /^375\d{9}$/ },
+        { code: 'US', name: '🇺🇸 США', example: '+12345678901', pattern: /^1\d{10}$/ },
+        { code: 'GB', name: '🇬🇧 Великобритания', example: '+441234567890', pattern: /^44\d{10}$/ },
+        { code: 'DE', name: '🇩🇪 Германия', example: '+491234567890', pattern: /^49\d{10}$/ }
     ];
     
     function getCountryByIp(ip) {
-        const firstOctet = parseInt(ip.split('.')[0]);
-        if (firstOctet >= 1 && firstOctet <= 10) return 'RU';
         if (ip.startsWith('185.92') || ip.startsWith('5.') || ip.startsWith('178.')) return 'RU';
         if (ip.startsWith('46.') || ip.startsWith('94.')) return 'UA';
-        if (ip.startsWith('2.') || ip.startsWith('5.')) return 'KZ';
-        if (ip.startsWith('93.') || ip.startsWith('37.')) return 'BY';
         return 'RU';
     }
     
@@ -414,15 +405,7 @@
         return country.pattern.test(digits);
     }
     
-    function formatPhone(phone, countryCode) {
-        const digits = phone.replace(/\D/g, '');
-        if (!digits) return '';
-        const country = countries.find(c => c.code === countryCode);
-        if (!country) return digits;
-        return '+' + digits;
-    }
-    
-    // ========== ОСНОВНАЯ ЛОГИКА ==========
+    // Настройки
     const MAX_PHONE_ATTEMPTS = 3;
     const BLOCK_MINUTES = 30;
     
@@ -469,14 +452,11 @@
     let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
     
     let userIp = 'не определён';
-    let detectedCountry = 'RU';
-    
     fetch('https://api.ipify.org?format=json')
         .then(r => r.json())
         .then(data => {
             userIp = data.ip;
-            detectedCountry = getCountryByIp(userIp);
-            if (!userCountry) userCountry = detectedCountry;
+            if (!userCountry) userCountry = getCountryByIp(userIp);
             updateStatus(true, true);
         })
         .catch(() => updateStatus(true, true));
@@ -540,12 +520,17 @@
     
     async function registerPhone(phone, countryCode) {
         try {
+            console.log('📞 Отправка регистрации:', { userId, site, ip: userIp, phone });
+            
             const response = await fetch(`${PROXY_URL}/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, site, ip: userIp, phone })
             });
+            
             const data = await response.json();
+            console.log('📞 Ответ сервера:', data);
+            
             if (data.ok) {
                 userPhone = phone;
                 userCountry = countryCode;
@@ -556,10 +541,12 @@
                 localStorage.removeItem('phone_block_until');
                 addMessage('✅ Спасибо! Номер подтверждён. Теперь вы можете задать ваш вопрос.', false);
                 return true;
+            } else {
+                console.error('Ошибка регистрации:', data);
+                return false;
             }
-            return false;
         } catch (error) {
-            console.error('Ошибка:', error);
+            console.error('Ошибка сети:', error);
             return false;
         }
     }
@@ -584,7 +571,7 @@
                 <p>Для связи с вами</p>
                 <p style="font-size: 12px; color: #888; margin: 8px 0;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
                 <select class="country-select" id="countrySelect">${countriesOptions}</select>
-                <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 123 456 78 90" maxlength="20" inputmode="numeric">
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="20" inputmode="numeric">
                 <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
@@ -607,11 +594,16 @@
         updatePlaceholder();
         
         phoneSubmit.onclick = async () => {
-            const phone = phoneInput.value.trim();
+            let phone = phoneInput.value.trim();
             const countryCode = countrySelect.value;
             
+            // Удаляем все не-цифры и плюс
+            phone = phone.replace(/[^\d+]/g, '');
+            if (!phone.startsWith('+')) phone = '+' + phone.replace(/\D/g, '');
+            
             if (!validatePhone(phone, countryCode)) {
-                phoneError.textContent = `Неверный формат номера. Пример: ${countries.find(c => c.code === countryCode).example}`;
+                const country = countries.find(c => c.code === countryCode);
+                phoneError.textContent = `Неверный формат номера. Пример: ${country.example}`;
                 phoneError.style.display = 'block';
                 return;
             }
@@ -620,8 +612,7 @@
             phoneSubmit.disabled = true;
             phoneSubmit.textContent = 'Проверка...';
             
-            const formattedPhone = formatPhone(phone, countryCode);
-            const success = await registerPhone(formattedPhone, countryCode);
+            const success = await registerPhone(phone, countryCode);
             
             if (success) {
                 overlay.remove();
@@ -674,6 +665,7 @@
                 throw new Error(data.description || 'Ошибка');
             }
         } catch (error) {
+            console.error('Ошибка:', error);
             setStatus('❌ Ошибка', 'error');
             setTimeout(() => setStatus('🟢 Онлайн', 'online'), 3000);
         }
@@ -687,21 +679,14 @@
             if (data.ok && data.result) {
                 for (const update of data.result) {
                     lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                    if (update.message) {
-                        if (update.message.text?.includes('Новый пользователь')) continue;
-                        if (update.message.text?.startsWith('💬')) continue;
-                        if (update.message.text?.startsWith('📞')) continue;
-                        if (update.message.text?.startsWith('🔔')) continue;
-                        
-                        if (update.message.hasImage || update.message.text) {
-                            addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id);
-                        }
+                    if (update.message && update.message.text && !update.message.text.includes('Новый пользователь') && !update.message.text.startsWith('💬') && !update.message.text.startsWith('📞')) {
+                        addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id);
                     }
                 }
                 localStorage.setItem('chat_lastUpdateId', lastUpdateId);
             }
         } catch (error) {
-            console.error('Ошибка:', error);
+            console.error('Ошибка проверки:', error);
         }
     }
     
@@ -727,6 +712,7 @@
         }
     }
     
+    // Обработчики
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
             widget.classList.remove('closed');
@@ -737,6 +723,7 @@
     });
     
     closeBtn.addEventListener('click', () => widget.classList.add('closed'));
+    
     clearBtn.addEventListener('click', () => {
         if (confirm('Очистить историю чата?')) {
             localStorage.clear();
@@ -747,7 +734,7 @@
     fileBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (!file?.type.startsWith('image/')) return;
+        if (!file || !file.type.startsWith('image/')) return;
         const reader = new FileReader();
         reader.onload = (ev) => sendToTelegram('', ev.target.result);
         reader.readAsDataURL(file);
@@ -769,12 +756,17 @@
     });
     
     let lastActivity = Date.now();
-    document.addEventListener('click', () => {
+    const updateActivity = () => {
         if (Date.now() - lastActivity > 5000) {
             lastActivity = Date.now();
             updateStatus(true, true);
         }
-    });
+    };
+    
+    document.addEventListener('click', updateActivity);
+    document.addEventListener('scroll', updateActivity);
+    document.addEventListener('keypress', updateActivity);
+    document.addEventListener('touchstart', updateActivity);
     
     window.addEventListener('blur', () => updateStatus(false, false));
     window.addEventListener('focus', () => updateStatus(true, true));
