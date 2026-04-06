@@ -271,6 +271,8 @@
             margin-bottom: 16px;
             text-align: center;
             background: #f8f9fa;
+            font-family: monospace;
+            letter-spacing: 1px;
         }
         
         .phone-input:focus {
@@ -352,7 +354,7 @@
     <div class="note">
         <strong>📌 Как это работает:</strong><br>
         1️⃣ Нажмите на виджет в правом нижнем углу<br>
-        2️⃣ Укажите ваш номер телефона<br>
+        2️⃣ Укажите ваш номер телефона (12 символов, например +71234567890)<br>
         3️⃣ Напишите сообщение или отправьте фото<br>
         4️⃣ Мы ответим вам в Telegram, а вы увидите ответ здесь
     </div>
@@ -381,15 +383,15 @@
 <script>
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
-    // Данные стран
+    // Данные стран с правилами валидации
     const countries = [
-        { code: 'RU', name: '🇷🇺 Россия', example: '+71234567890', pattern: /^7\d{10}$/ },
-        { code: 'UA', name: '🇺🇦 Украина', example: '+380123456789', pattern: /^380\d{9}$/ },
-        { code: 'KZ', name: '🇰🇿 Казахстан', example: '+77123456789', pattern: /^7\d{10}$/ },
-        { code: 'BY', name: '🇧🇾 Беларусь', example: '+375123456789', pattern: /^375\d{9}$/ },
-        { code: 'US', name: '🇺🇸 США', example: '+12345678901', pattern: /^1\d{10}$/ },
-        { code: 'GB', name: '🇬🇧 Великобритания', example: '+441234567890', pattern: /^44\d{10}$/ },
-        { code: 'DE', name: '🇩🇪 Германия', example: '+491234567890', pattern: /^49\d{10}$/ }
+        { code: 'RU', name: '🇷🇺 Россия', example: '+71234567890', pattern: /^7\d{10}$/, length: 11 },
+        { code: 'UA', name: '🇺🇦 Украина', example: '+380123456789', pattern: /^380\d{9}$/, length: 12 },
+        { code: 'KZ', name: '🇰🇿 Казахстан', example: '+77123456789', pattern: /^7\d{10}$/, length: 11 },
+        { code: 'BY', name: '🇧🇾 Беларусь', example: '+375123456789', pattern: /^375\d{9}$/, length: 12 },
+        { code: 'US', name: '🇺🇸 США', example: '+12345678901', pattern: /^1\d{10}$/, length: 11 },
+        { code: 'GB', name: '🇬🇧 Великобритания', example: '+441234567890', pattern: /^44\d{10}$/, length: 12 },
+        { code: 'DE', name: '🇩🇪 Германия', example: '+491234567890', pattern: /^49\d{10}$/, length: 12 }
     ];
     
     function getCountryByIp(ip) {
@@ -401,11 +403,27 @@
     function validatePhone(phone, countryCode) {
         const country = countries.find(c => c.code === countryCode);
         if (!country) return false;
-        const digits = phone.replace(/\D/g, '');
+        // Удаляем всё кроме цифр
+        let digits = phone.replace(/\D/g, '');
+        // Проверяем длину и соответствие паттерну
         return country.pattern.test(digits);
     }
     
-    // Настройки
+    function formatPhoneInput(rawValue, countryCode) {
+        // Удаляем всё кроме цифр и плюса
+        let cleaned = rawValue.replace(/[^\d+]/g, '');
+        // Если нет плюса в начале, добавляем
+        if (!cleaned.startsWith('+')) {
+            cleaned = '+' + cleaned.replace(/\D/g, '');
+        }
+        // Ограничиваем длину (максимум 15 символов)
+        if (cleaned.length > 15) {
+            cleaned = cleaned.substring(0, 15);
+        }
+        return cleaned;
+    }
+    
+    // Настройки лимита попыток
     const MAX_PHONE_ATTEMPTS = 3;
     const BLOCK_MINUTES = 30;
     
@@ -435,7 +453,7 @@
     }
     
     function getRemainingAttempts() {
-        return MAX_PHONE_ATTEMPTS - phoneAttempts;
+        return Math.max(0, MAX_PHONE_ATTEMPTS - phoneAttempts);
     }
     
     let userId = localStorage.getItem('chat_user_id');
@@ -554,13 +572,14 @@
     function showPhoneForm() {
         if (isPhoneBlocked()) {
             const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
-            addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
+            addMessage(`⛔ Превышено количество попыток (${MAX_PHONE_ATTEMPTS}). Попробуйте через ${remaining} минут.`, false);
+            setStatus(`⛔ Блокировка ${remaining} мин`, 'error');
             return;
         }
         
         const remainingAttempts = getRemainingAttempts();
         const countriesOptions = countries.map(c => 
-            `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name}</option>`
+            `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} (${c.example})</option>`
         ).join('');
         
         const overlay = document.createElement('div');
@@ -569,9 +588,9 @@
             <div class="phone-card">
                 <h4>📞 Укажите номер телефона</h4>
                 <p>Для связи с вами</p>
-                <p style="font-size: 12px; color: #888; margin: 8px 0;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
+                <p style="font-size: 12px; color: #e67e22; margin: 8px 0;">⚠️ Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
                 <select class="country-select" id="countrySelect">${countriesOptions}</select>
-                <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="20" inputmode="numeric">
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="15" inputmode="numeric">
                 <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
@@ -593,17 +612,36 @@
         countrySelect.addEventListener('change', updatePlaceholder);
         updatePlaceholder();
         
+        // Обработка ввода с ограничением длины
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value;
+            // Удаляем всё кроме цифр и плюса
+            let cleaned = value.replace(/[^\d+]/g, '');
+            if (!cleaned.startsWith('+')) {
+                cleaned = '+' + cleaned.replace(/\D/g, '');
+            }
+            // Ограничиваем длину до 15 символов
+            if (cleaned.length > 15) {
+                cleaned = cleaned.substring(0, 15);
+            }
+            e.target.value = cleaned;
+        });
+        
         phoneSubmit.onclick = async () => {
             let phone = phoneInput.value.trim();
             const countryCode = countrySelect.value;
+            const country = countries.find(c => c.code === countryCode);
             
-            // Удаляем все не-цифры и плюс
-            phone = phone.replace(/[^\d+]/g, '');
-            if (!phone.startsWith('+')) phone = '+' + phone.replace(/\D/g, '');
+            // Проверка на пустоту
+            if (!phone || phone === '+') {
+                phoneError.textContent = `Введите номер телефона в формате ${country.example}`;
+                phoneError.style.display = 'block';
+                return;
+            }
             
+            // Валидация номера
             if (!validatePhone(phone, countryCode)) {
-                const country = countries.find(c => c.code === countryCode);
-                phoneError.textContent = `Неверный формат номера. Пример: ${country.example}`;
+                phoneError.textContent = `Неверный формат номера. Используйте формат: ${country.example} (всего ${country.length} цифр после +)`;
                 phoneError.style.display = 'block';
                 return;
             }
@@ -622,17 +660,23 @@
                 phoneSubmit.textContent = 'Продолжить';
                 
                 if (isNowBlocked) {
-                    phoneError.textContent = `Превышено количество попыток. Доступ через ${BLOCK_MINUTES} минут.`;
+                    phoneError.textContent = `❌ Превышено количество попыток (${MAX_PHONE_ATTEMPTS}). Доступ будет восстановлен через ${BLOCK_MINUTES} минут.`;
                     phoneError.style.display = 'block';
                     phoneSubmit.disabled = true;
                     setTimeout(() => {
                         overlay.remove();
-                        addMessage(`⛔ Превышено количество попыток. Попробуйте через ${BLOCK_MINUTES} минут.`, false);
+                        addMessage(`⛔ Превышено количество попыток ввода номера (${MAX_PHONE_ATTEMPTS}). Попробуйте через ${BLOCK_MINUTES} минут.`, false);
                     }, 2000);
                 } else {
                     const remaining = getRemainingAttempts();
-                    phoneError.textContent = `Неверный номер. Осталось попыток: ${remaining}`;
+                    phoneError.textContent = `❌ Неверный номер. Осталось попыток: ${remaining} из ${MAX_PHONE_ATTEMPTS}`;
                     phoneError.style.display = 'block';
+                    
+                    // Обновляем текст с оставшимися попытками
+                    const attemptsText = overlay.querySelector('.phone-card p:nth-of-type(2)');
+                    if (attemptsText) {
+                        attemptsText.innerHTML = `⚠️ Осталось попыток: ${remaining} из ${MAX_PHONE_ATTEMPTS}`;
+                    }
                 }
             }
         };
@@ -679,7 +723,10 @@
             if (data.ok && data.result) {
                 for (const update of data.result) {
                     lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                    if (update.message && update.message.text && !update.message.text.includes('Новый пользователь') && !update.message.text.startsWith('💬') && !update.message.text.startsWith('📞')) {
+                    if (update.message && update.message.text && 
+                        !update.message.text.includes('Новый пользователь') && 
+                        !update.message.text.startsWith('💬') && 
+                        !update.message.text.startsWith('📞')) {
                         addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id);
                     }
                 }
@@ -718,6 +765,9 @@
             widget.classList.remove('closed');
             if (isPhoneRequired && !isPhoneBlocked()) {
                 setTimeout(() => showPhoneForm(), 100);
+            } else if (isPhoneBlocked()) {
+                const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
+                addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
             }
         }
     });
