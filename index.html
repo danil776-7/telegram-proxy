@@ -332,19 +332,11 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
-        /* Адаптация для компьютера */
         @media (min-width: 768px) {
-            .chat-widget {
-                width: 450px;
-                height: 700px;
-            }
-            .message {
-                max-width: 75%;
-                font-size: 16px;
-            }
+            .chat-widget { width: 450px; height: 700px; }
+            .message { max-width: 75%; font-size: 16px; }
         }
         
-        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -580,12 +572,16 @@
                 }
                 return false;
             } catch (error) {
-                console.error('Ошибка:', error);
+                console.error('Ошибка регистрации:', error);
                 return false;
             }
         }
         
         function showPhoneForm() {
+            // Удаляем старый оверлей если есть
+            const oldOverlay = document.querySelector('.phone-overlay');
+            if (oldOverlay) oldOverlay.remove();
+            
             if (isPhoneBlocked()) {
                 const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
                 addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
@@ -630,12 +626,10 @@
             // Жёсткое ограничение 12 символов
             phoneInput.addEventListener('input', function(e) {
                 let value = e.target.value;
-                // Удаляем всё кроме цифр и плюса
                 let cleaned = value.replace(/[^\d+]/g, '');
                 if (!cleaned.startsWith('+')) {
                     cleaned = '+' + cleaned.replace(/\D/g, '');
                 }
-                // Ограничиваем до 12 символов
                 if (cleaned.length > 12) {
                     cleaned = cleaned.substring(0, 12);
                 }
