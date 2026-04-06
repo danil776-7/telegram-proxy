@@ -47,7 +47,6 @@
             text-align: left;
         }
         
-        /* ========== ВИДЖЕТ ЧАТА ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -62,7 +61,6 @@
             overflow: hidden;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         
         .chat-widget.closed {
@@ -91,9 +89,7 @@
             gap: 8px;
         }
         
-        .chat-header h3 span {
-            font-size: 20px;
-        }
+        .chat-header h3 span { font-size: 20px; }
         
         .header-buttons {
             display: flex;
@@ -210,10 +206,7 @@
             transition: transform 0.1s;
         }
         
-        .file-btn {
-            background: #6c757d;
-        }
-        
+        .file-btn { background: #6c757d; }
         .send-btn:active, .file-btn:active { transform: scale(0.96); }
         
         .status {
@@ -233,7 +226,6 @@
         .status.sending { background: #fff3cd; color: #856404; }
         .status.blocked { background: #f8d7da; color: #721c24; }
         
-        /* Запрос телефона */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -258,10 +250,7 @@
             max-width: 320px;
         }
         
-        .phone-card h4 {
-            margin-bottom: 16px;
-            color: #333;
-        }
+        .phone-card h4 { margin-bottom: 16px; color: #333; }
         
         .phone-input {
             width: 100%;
@@ -312,9 +301,7 @@
             color: white;
         }
         
-        .chat-widget.closed .open-icon {
-            display: flex;
-        }
+        .chat-widget.closed .open-icon { display: flex; }
         
         @media (max-width: 480px) {
             .chat-widget {
@@ -373,16 +360,14 @@
     // ========== ЛИМИТ НА ВВОД НОМЕРА ==========
     const MAX_PHONE_ATTEMPTS = 3;
     const BLOCK_MINUTES = 30;
+    const MAX_PHONE_LENGTH = 15;  // ЛИМИТ НА КОЛИЧЕСТВО СИМВОЛОВ
     
     let phoneAttempts = parseInt(localStorage.getItem('phone_attempts') || '0');
     let blockUntil = parseInt(localStorage.getItem('phone_block_until') || '0');
     
     function isPhoneBlocked() {
-        if (blockUntil > Date.now()) {
-            return true;
-        }
+        if (blockUntil > Date.now()) return true;
         if (blockUntil && blockUntil < Date.now()) {
-            // Снимаем блокировку
             localStorage.removeItem('phone_block_until');
             localStorage.removeItem('phone_attempts');
             phoneAttempts = 0;
@@ -394,13 +379,12 @@
     function incrementPhoneAttempt() {
         phoneAttempts++;
         localStorage.setItem('phone_attempts', phoneAttempts);
-        
         if (phoneAttempts >= MAX_PHONE_ATTEMPTS) {
             blockUntil = Date.now() + (BLOCK_MINUTES * 60 * 1000);
             localStorage.setItem('phone_block_until', blockUntil);
-            return true; // заблокирован
+            return true;
         }
-        return false; // ещё есть попытки
+        return false;
     }
     
     function getRemainingAttempts() {
@@ -434,7 +418,6 @@
     
     const site = window.location.hostname;
     
-    // DOM элементы
     const widget = document.getElementById('chatWidget');
     const closeBtn = document.querySelector('.close-btn');
     const clearBtn = document.getElementById('clearBtn');
@@ -502,7 +485,6 @@
                 userPhone = phone;
                 localStorage.setItem('user_phone', phone);
                 isPhoneRequired = false;
-                // Сбрасываем попытки при успешной регистрации
                 localStorage.removeItem('phone_attempts');
                 localStorage.removeItem('phone_block_until');
                 addMessage('✅ Спасибо! Теперь вы можете задать ваш вопрос.', false);
@@ -515,7 +497,6 @@
     }
     
     function showPhoneForm() {
-        // Проверяем блокировку
         if (isPhoneBlocked()) {
             const remaining = getBlockTimeRemaining();
             addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
@@ -530,9 +511,10 @@
         overlay.innerHTML = `
             <div class="phone-card">
                 <h4>📞 Укажите номер телефона</h4>
-                <p style="font-size: 13px; color: #666; margin-bottom: 16px;">Для связи с вами</p>
+                <p style="font-size: 13px; color: #666; margin-bottom: 8px;">Для связи с вами</p>
                 <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
-                <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 900 123-45-67">
+                <p style="font-size: 11px; color: #999; margin-bottom: 8px;">Максимум ${MAX_PHONE_LENGTH} символов</p>
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 900 123-45-67" maxlength="${MAX_PHONE_LENGTH}">
                 <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
@@ -544,12 +526,19 @@
         const phoneSubmit = document.getElementById('phoneSubmit');
         
         phoneSubmit.onclick = async () => {
-            const phone = phoneInput.value.trim();
+            let phone = phoneInput.value.trim();
             
-            // Простая валидация телефона
-            const phoneRegex = /^[\+\d][\d\(\)\-\s]{5,20}$/;
-            if (!phone || !phoneRegex.test(phone)) {
-                phoneError.textContent = 'Введите корректный номер телефона';
+            // Проверка длины
+            if (phone.length < 5 || phone.length > MAX_PHONE_LENGTH) {
+                phoneError.textContent = `Номер должен содержать от 5 до ${MAX_PHONE_LENGTH} символов`;
+                phoneError.style.display = 'block';
+                return;
+            }
+            
+            // Удаляем все не-цифры для валидации, кроме +
+            const cleanPhone = phone.replace(/[^\d+]/g, '');
+            if (cleanPhone.length < 5 || cleanPhone.length > MAX_PHONE_LENGTH) {
+                phoneError.textContent = `Введите корректный номер телефона (${MAX_PHONE_LENGTH} символов максимум)`;
                 phoneError.style.display = 'block';
                 return;
             }
@@ -571,7 +560,6 @@
                     phoneError.textContent = `Превышено количество попыток. Доступ будет восстановлен через ${BLOCK_MINUTES} минут.`;
                     phoneError.style.display = 'block';
                     phoneSubmit.disabled = true;
-                    
                     setTimeout(() => {
                         overlay.remove();
                         addMessage(`⛔ Превышено количество попыток ввода номера. Попробуйте через ${BLOCK_MINUTES} минут.`, false);
@@ -581,8 +569,7 @@
                     phoneError.textContent = `Неверный номер. Осталось попыток: ${remaining}`;
                     phoneError.style.display = 'block';
                     
-                    // Обновляем текст с оставшимися попытками в заголовке
-                    const attemptsText = overlay.querySelector('.phone-card p:first-of-type');
+                    const attemptsText = overlay.querySelector('.phone-card p:nth-of-type(2)');
                     if (attemptsText) {
                         attemptsText.textContent = `Осталось попыток: ${remaining} из ${MAX_PHONE_ATTEMPTS}`;
                     }
@@ -677,7 +664,6 @@
         }
     }
     
-    // Обработчики событий
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
             widget.classList.remove('closed');
@@ -691,9 +677,7 @@
         }
     });
     
-    closeBtn.addEventListener('click', () => {
-        widget.classList.add('closed');
-    });
+    closeBtn.addEventListener('click', () => { widget.classList.add('closed'); });
     
     clearBtn.addEventListener('click', () => {
         if (confirm('Очистить всю историю чата?')) {
@@ -728,7 +712,6 @@
         }
     });
     
-    // Активность
     let lastActivityTime = Date.now();
     const updateActivity = () => {
         const now = Date.now();
@@ -747,7 +730,6 @@
     window.addEventListener('focus', () => updateStatus(true, true));
     window.addEventListener('beforeunload', () => updateStatus(false, false));
     
-    // Запуск
     loadHistory();
     setInterval(() => updateStatus(true, true), 30000);
     setInterval(checkReplies, 5000);
