@@ -2,57 +2,79 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Чат с поддержкой</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
+            padding: 16px;
         }
+        
         .content {
             text-align: center;
-            padding: 40px;
+            padding: 32px 20px;
             background: white;
             border-radius: 28px;
             max-width: 500px;
-            margin: 20px;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
         }
-        h1 { font-size: 28px; margin-bottom: 16px; }
-        p { color: #666; }
+        
+        h1 { 
+            font-size: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+        
+        p { color: #666; line-height: 1.5; font-size: 16px; }
+        
         .note {
             margin-top: 24px;
             padding: 16px;
-            background: #f0f0f0;
+            background: #f8f9fa;
             border-radius: 16px;
             font-size: 13px;
+            color: #666;
+            text-align: left;
         }
+        
         .chat-widget {
             position: fixed;
             bottom: 20px;
             right: 20px;
             width: 400px;
-            height: 600px;
+            height: 650px;
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 40px);
             background: white;
             border-radius: 28px;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1000;
         }
+        
         .chat-widget.closed {
             width: 60px;
             height: 60px;
             border-radius: 30px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             cursor: pointer;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
         }
+        
         .chat-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -60,17 +82,48 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-shrink: 0;
         }
-        .close-btn {
-            background: none;
+        
+        .chat-header h3 {
+            font-size: 17px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .header-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .clear-btn, .close-btn {
+            background: rgba(255,255,255,0.2);
             border: none;
             color: white;
-            font-size: 24px;
             cursor: pointer;
-            width: 40px;
-            height: 40px;
+            padding: 6px 12px;
             border-radius: 20px;
+            font-size: 14px;
+            transition: background 0.2s;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        
+        .close-btn {
+            font-size: 24px;
+            padding: 0;
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+        }
+        
+        .clear-btn:active, .close-btn:active { background: rgba(255,255,255,0.4); }
+        
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -79,32 +132,63 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            -webkit-overflow-scrolling: touch;
         }
+        
         .message {
-            max-width: 80%;
-            padding: 10px 16px;
+            max-width: 85%;
+            padding: 12px 16px;
             border-radius: 20px;
+            word-wrap: break-word;
+            animation: fadeIn 0.2s ease;
             font-size: 15px;
             line-height: 1.4;
         }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         .user-message {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             align-self: flex-end;
+            border-bottom-right-radius: 4px;
         }
+        
         .bot-message {
             background: white;
             color: #1a1a2e;
             align-self: flex-start;
+            border-bottom-left-radius: 4px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
+        
+        .message img {
+            max-width: 200px;
+            border-radius: 12px;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+        
+        .message-time {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 4px;
+            text-align: right;
+        }
+        
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
             border-top: 1px solid #eef2f6;
             background: white;
             gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
         }
+        
         .chat-input {
             flex: 1;
             padding: 12px 16px;
@@ -112,19 +196,130 @@
             border-radius: 30px;
             outline: none;
             font-size: 16px;
+            transition: all 0.2s;
+            background: #f8f9fa;
         }
-        .send-btn {
+        
+        .chat-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.2);
+            background: white;
+        }
+        
+        .send-btn, .file-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             color: white;
-            padding: 12px 20px;
+            padding: 12px 18px;
             border-radius: 30px;
             cursor: pointer;
             font-size: 16px;
+            transition: transform 0.1s;
+            min-width: 50px;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        
+        .file-btn { background: #6c757d; }
+        .send-btn:active, .file-btn:active { transform: scale(0.96); }
+        
+        .status {
+            font-size: 12px;
+            padding: 8px 14px;
+            text-align: center;
+            background: white;
+            border-radius: 20px;
+            margin-bottom: 8px;
+            width: fit-content;
+            align-self: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        
+        .status.online { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .status.sending { background: #fff3cd; color: #856404; }
+        
+        .phone-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            backdrop-filter: blur(4px);
+        }
+        
+        .phone-card {
+            background: white;
+            border-radius: 32px;
+            padding: 28px 24px;
+            margin: 20px;
+            text-align: center;
+            max-width: 340px;
+            width: calc(100% - 40px);
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        
+        .phone-card h4 { margin-bottom: 16px; color: #333; font-size: 22px; }
+        .phone-card p { font-size: 14px; margin-bottom: 8px; }
+        
+        .phone-input {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e0e4e8;
+            border-radius: 16px;
+            font-size: 18px;
+            margin-bottom: 16px;
+            text-align: center;
+            background: #f8f9fa;
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+        
+        .phone-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+        }
+        
+        .country-select {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 16px;
+            background: white;
+        }
+        
+        .phone-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 16px 24px;
+            border-radius: 40px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+        
+        .phone-submit:active { transform: scale(0.98); }
+        .phone-submit:disabled { opacity: 0.6; }
+        
+        .error-text { color: #dc3545; font-size: 13px; margin-bottom: 12px; }
+        
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
-        .chat-widget.closed .chat-input-area { display: none; }
+        .chat-widget.closed .chat-input-area,
+        .chat-widget.closed .phone-overlay { display: none; }
+        
         .open-icon {
             display: none;
             width: 100%;
@@ -134,18 +329,29 @@
             font-size: 28px;
             color: white;
         }
+        
         .chat-widget.closed .open-icon { display: flex; }
-        .status {
-            font-size: 12px;
-            padding: 8px 14px;
-            background: white;
-            border-radius: 20px;
-            width: fit-content;
-            align-self: center;
-        }
+        
         @media (max-width: 480px) {
-            .chat-widget { width: 100%; height: 100%; bottom: 0; right: 0; border-radius: 0; }
-            .chat-widget.closed { width: 60px; height: 60px; bottom: 20px; right: 20px; border-radius: 30px; }
+            .chat-widget {
+                width: 100%;
+                height: 100%;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+                max-width: 100vw;
+                max-height: 100vh;
+            }
+            .chat-widget.closed {
+                width: 60px;
+                height: 60px;
+                bottom: 20px;
+                right: 20px;
+                border-radius: 30px;
+            }
+            .message { max-width: 90%; font-size: 15px; }
+            .send-btn, .file-btn { padding: 10px 16px; min-width: 44px; min-height: 44px; }
+            .phone-card { margin: 16px; padding: 20px; }
         }
     </style>
 </head>
@@ -154,7 +360,11 @@
     <h1>💬 Чат с поддержкой</h1>
     <p>Напишите нам — мы ответим в Telegram</p>
     <div class="note">
-        📌 Нажмите на виджет справа, напишите сообщение — мы ответим в Telegram
+        <strong>📌 Как это работает:</strong><br>
+        1️⃣ Нажмите на виджет в правом нижнем углу<br>
+        2️⃣ Укажите ваш номер телефона<br>
+        3️⃣ Напишите сообщение или отправьте фото<br>
+        4️⃣ Мы ответим вам в Telegram, а вы увидите ответ здесь
     </div>
 </div>
 
@@ -162,14 +372,19 @@
     <div class="open-icon">💬</div>
     <div class="chat-header">
         <h3>💬 Поддержка</h3>
-        <button class="close-btn">×</button>
+        <div class="header-buttons">
+            <button class="clear-btn" id="clearBtn">🗑️</button>
+            <button class="close-btn">×</button>
+        </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status" id="status">🟢 Онлайн</div>
+        <div class="status online" id="status">🟢 Готов к работе</div>
     </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
+        <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
+        <input type="file" id="fileInput" accept="image/*" style="display: none;">
     </div>
 </div>
 
@@ -177,31 +392,118 @@
     (function() {
         const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
         
+        // ========== ДАННЫЕ СТРАН ==========
+        const countries = [
+            { code: 'RU', name: '🇷🇺 Россия', example: '+7 123 456 78 90', pattern: /^7\d{10}$/, length: 11 },
+            { code: 'UA', name: '🇺🇦 Украина', example: '+380 12 345 67 89', pattern: /^380\d{9}$/, length: 12 },
+            { code: 'KZ', name: '🇰🇿 Казахстан', example: '+7 123 456 78 90', pattern: /^7\d{10}$/, length: 11 },
+            { code: 'BY', name: '🇧🇾 Беларусь', example: '+375 12 345 67 89', pattern: /^375\d{9}$/, length: 12 },
+            { code: 'US', name: '🇺🇸 США', example: '+1 234 567 8901', pattern: /^1\d{10}$/, length: 11 },
+            { code: 'GB', name: '🇬🇧 Великобритания', example: '+44 12 3456 7890', pattern: /^44\d{10}$/, length: 12 }
+        ];
+        
+        function getCountryByIp(ip) {
+            if (ip.startsWith('185.92') || ip.startsWith('5.') || ip.startsWith('178.')) return 'RU';
+            if (ip.startsWith('46.') || ip.startsWith('94.')) return 'UA';
+            return 'RU';
+        }
+        
+        function validatePhone(phone, countryCode) {
+            const country = countries.find(c => c.code === countryCode);
+            if (!country) return false;
+            const digits = phone.replace(/\D/g, '');
+            return country.pattern.test(digits);
+        }
+        
+        function formatPhoneNumber(phone) {
+            let digits = phone.replace(/\D/g, '');
+            if (digits.length === 11 && digits.startsWith('7')) {
+                return '+' + digits;
+            }
+            return '+' + digits;
+        }
+        
+        // ========== НАСТРОЙКИ ==========
+        const MAX_PHONE_ATTEMPTS = 3;
+        const BLOCK_MINUTES = 30;
+        
+        let phoneAttempts = parseInt(localStorage.getItem('phone_attempts') || '0');
+        let blockUntil = parseInt(localStorage.getItem('phone_block_until') || '0');
+        
+        function isPhoneBlocked() {
+            if (blockUntil > Date.now()) return true;
+            if (blockUntil && blockUntil < Date.now()) {
+                localStorage.removeItem('phone_block_until');
+                localStorage.removeItem('phone_attempts');
+                phoneAttempts = 0;
+                return false;
+            }
+            return false;
+        }
+        
+        function incrementPhoneAttempt() {
+            phoneAttempts++;
+            localStorage.setItem('phone_attempts', phoneAttempts);
+            if (phoneAttempts >= MAX_PHONE_ATTEMPTS) {
+                blockUntil = Date.now() + (BLOCK_MINUTES * 60 * 1000);
+                localStorage.setItem('phone_block_until', blockUntil);
+                return true;
+            }
+            return false;
+        }
+        
+        function getRemainingAttempts() {
+            return Math.max(0, MAX_PHONE_ATTEMPTS - phoneAttempts);
+        }
+        
         let userId = localStorage.getItem('chat_user_id');
         if (!userId) {
             userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
             localStorage.setItem('chat_user_id', userId);
         }
         
-        let userIp = 'не определён';
-        fetch('https://api.ipify.org?format=json')
-            .then(r => r.json())
-            .then(data => userIp = data.ip)
-            .catch(() => {});
-        
-        const site = window.location.hostname;
+        let userPhone = localStorage.getItem('user_phone');
+        let userCountry = localStorage.getItem('user_country') || 'RU';
+        let isPhoneRequired = !userPhone;
         
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
         
+        let userIp = 'не определён';
+        fetch('https://api.ipify.org?format=json')
+            .then(r => r.json())
+            .then(data => { 
+                userIp = data.ip; 
+                if (!userCountry) userCountry = getCountryByIp(userIp);
+                updateStatus(true, true);
+            })
+            .catch(() => updateStatus(true, true));
+        
+        const site = window.location.hostname;
+        
         const widget = document.getElementById('chatWidget');
         const closeBtn = document.querySelector('.close-btn');
+        const clearBtn = document.getElementById('clearBtn');
         const messagesDiv = document.getElementById('chatMessages');
         const messageInput = document.getElementById('messageInput');
         const sendBtn = document.getElementById('sendBtn');
+        const fileBtn = document.getElementById('fileBtn');
+        const fileInput = document.getElementById('fileInput');
         const statusDiv = document.getElementById('status');
         
-        function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null) {
+        function updateStatus(isOnline = true, isActive = false) {
+            fetch(`${PROXY_URL}/updateStatus`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, site, ip: userIp, isOnline, isActive })
+            }).catch(console.error);
+        }
+        
+        function formatTime(date) {
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null, timestamp = null) {
             if (msgId && processedIds.has(msgId)) return;
             
             const div = document.createElement('div');
@@ -215,10 +517,19 @@
                 img.style.cursor = 'pointer';
                 img.onclick = () => window.open(imageUrl, '_blank');
                 div.appendChild(img);
-                if (text) div.appendChild(document.createTextNode(' ' + text));
+                if (text) {
+                    const textNode = document.createTextNode(' ' + text);
+                    div.appendChild(textNode);
+                }
             } else {
                 div.innerText = text;
             }
+            
+            const timeSpan = document.createElement('div');
+            timeSpan.className = 'message-time';
+            const msgDate = timestamp ? new Date(timestamp * 1000) : new Date();
+            timeSpan.innerText = formatTime(msgDate);
+            div.appendChild(timeSpan);
             
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
@@ -233,40 +544,177 @@
             localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
         }
         
-        function setStatus(text) {
-            if (statusDiv) statusDiv.innerHTML = text;
+        function setStatus(text, type = 'online') {
+            if (statusDiv) {
+                statusDiv.innerHTML = text;
+                statusDiv.className = `status ${type}`;
+            }
         }
         
-        async function sendToTelegram(text) {
-            if (!text) return;
-            addMessage(text, true);
-            setStatus('⏳ Отправка...');
+        async function registerPhone(phone, countryCode) {
+            try {
+                const response = await fetch(`${PROXY_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, site, ip: userIp, phone })
+                });
+                
+                const data = await response.json();
+                
+                if (data.ok) {
+                    userPhone = phone;
+                    userCountry = countryCode;
+                    localStorage.setItem('user_phone', phone);
+                    localStorage.setItem('user_country', countryCode);
+                    isPhoneRequired = false;
+                    localStorage.removeItem('phone_attempts');
+                    localStorage.removeItem('phone_block_until');
+                    addMessage('✅ Спасибо! Номер подтверждён. Теперь вы можете задать ваш вопрос.', false);
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Ошибка:', error);
+                return false;
+            }
+        }
+        
+        function showPhoneForm() {
+            if (isPhoneBlocked()) {
+                const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
+                addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
+                return;
+            }
+            
+            const remainingAttempts = getRemainingAttempts();
+            const countriesOptions = countries.map(c => 
+                `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} (${c.example})</option>`
+            ).join('');
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'phone-overlay';
+            overlay.innerHTML = `
+                <div class="phone-card">
+                    <h4>📞 Укажите номер телефона</h4>
+                    <p>Для связи с вами</p>
+                    <p style="font-size: 12px; color: #e67e22; margin: 8px 0;">⚠️ Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
+                    <select class="country-select" id="countrySelect">${countriesOptions}</select>
+                    <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="15" inputmode="numeric">
+                    <div id="phoneError" class="error-text" style="display: none;"></div>
+                    <button class="phone-submit" id="phoneSubmit">Продолжить</button>
+                </div>
+            `;
+            widget.appendChild(overlay);
+            
+            const countrySelect = document.getElementById('countrySelect');
+            const phoneInput = document.getElementById('phoneInput');
+            const phoneError = document.getElementById('phoneError');
+            const phoneSubmit = document.getElementById('phoneSubmit');
+            
+            function updatePlaceholder() {
+                const country = countries.find(c => c.code === countrySelect.value);
+                if (country) {
+                    phoneInput.placeholder = country.example;
+                }
+            }
+            
+            countrySelect.addEventListener('change', updatePlaceholder);
+            updatePlaceholder();
+            
+            phoneInput.addEventListener('input', function(e) {
+                let value = e.target.value;
+                let cleaned = value.replace(/[^\d+]/g, '');
+                if (!cleaned.startsWith('+')) {
+                    cleaned = '+' + cleaned.replace(/\D/g, '');
+                }
+                if (cleaned.length > 15) {
+                    cleaned = cleaned.substring(0, 15);
+                }
+                e.target.value = cleaned;
+            });
+            
+            phoneSubmit.onclick = async () => {
+                let phone = phoneInput.value.trim();
+                const countryCode = countrySelect.value;
+                const country = countries.find(c => c.code === countryCode);
+                
+                if (!phone || phone === '+') {
+                    phoneError.textContent = `Введите номер в формате ${country.example}`;
+                    phoneError.style.display = 'block';
+                    return;
+                }
+                
+                if (!validatePhone(phone, countryCode)) {
+                    phoneError.textContent = `Неверный формат. Пример: ${country.example}`;
+                    phoneError.style.display = 'block';
+                    return;
+                }
+                
+                phoneError.style.display = 'none';
+                phoneSubmit.disabled = true;
+                phoneSubmit.textContent = 'Проверка...';
+                
+                const formattedPhone = formatPhoneNumber(phone);
+                const success = await registerPhone(formattedPhone, countryCode);
+                
+                if (success) {
+                    overlay.remove();
+                } else {
+                    const isNowBlocked = incrementPhoneAttempt();
+                    phoneSubmit.disabled = false;
+                    phoneSubmit.textContent = 'Продолжить';
+                    
+                    if (isNowBlocked) {
+                        phoneError.textContent = `Превышено количество попыток. Доступ через ${BLOCK_MINUTES} минут.`;
+                        phoneError.style.display = 'block';
+                        phoneSubmit.disabled = true;
+                        setTimeout(() => {
+                            overlay.remove();
+                            addMessage(`⛔ Превышено количество попыток. Попробуйте через ${BLOCK_MINUTES} минут.`, false);
+                        }, 2000);
+                    } else {
+                        const remaining = getRemainingAttempts();
+                        phoneError.textContent = `Неверный номер. Осталось попыток: ${remaining}`;
+                        phoneError.style.display = 'block';
+                        
+                        const attemptsText = overlay.querySelector('.phone-card p:nth-of-type(2)');
+                        if (attemptsText) {
+                            attemptsText.innerHTML = `⚠️ Осталось попыток: ${remaining} из ${MAX_PHONE_ATTEMPTS}`;
+                        }
+                    }
+                }
+            };
+        }
+        
+        async function sendToTelegram(text, imageBase64 = null) {
+            if (isPhoneRequired) {
+                showPhoneForm();
+                return;
+            }
+            
+            if (!text && !imageBase64) return;
+            if (text) addMessage(text, true);
+            else if (imageBase64) addMessage('📷 Изображение', true, true, imageBase64);
+            
+            setStatus('⏳ Отправка...', 'sending');
+            updateStatus(true, true);
             
             try {
                 const response = await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        userId: userId,
-                        site: site,
-                        ip: userIp,
-                        text: text
-                    })
+                    body: JSON.stringify({ userId, site, ip: userIp, text, imageBase64 })
                 });
-                
                 const data = await response.json();
-                console.log('Ответ сервера:', data);
-                
                 if (data.ok) {
-                    setStatus('✅ Отправлено!');
-                    setTimeout(() => setStatus('🟢 Онлайн'), 2000);
+                    setStatus('✅ Отправлено!', 'online');
+                    setTimeout(() => setStatus('🟢 Онлайн', 'online'), 2000);
                 } else {
                     throw new Error(data.description || 'Ошибка');
                 }
             } catch (error) {
-                console.error('Ошибка:', error);
-                setStatus('❌ Ошибка');
-                setTimeout(() => setStatus('🟢 Онлайн'), 3000);
+                setStatus('❌ Ошибка', 'error');
+                setTimeout(() => setStatus('🟢 Онлайн', 'online'), 3000);
             }
         }
         
@@ -282,7 +730,7 @@
                             !update.message.text.includes('Новый пользователь') && 
                             !update.message.text.startsWith('💬') && 
                             !update.message.text.startsWith('📞')) {
-                            addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id);
+                            addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id, update.message.date);
                         }
                     }
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
@@ -305,11 +753,15 @@
                 } else {
                     div.innerText = msg.text;
                 }
+                const timeSpan = document.createElement('div');
+                timeSpan.className = 'message-time';
+                timeSpan.innerText = formatTime(new Date(msg.time));
+                div.appendChild(timeSpan);
                 messagesDiv.appendChild(div);
             });
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             
-            if (history.length === 0) {
+            if (history.length === 0 && !isPhoneRequired) {
                 setTimeout(() => {
                     addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
                 }, 500);
@@ -319,11 +771,35 @@
         widget.addEventListener('click', (e) => {
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
+                if (isPhoneRequired && !isPhoneBlocked()) {
+                    setTimeout(() => showPhoneForm(), 100);
+                }
             }
         });
         
         if (closeBtn) {
             closeBtn.addEventListener('click', () => widget.classList.add('closed'));
+        }
+        
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => {
+                if (confirm('Очистить историю чата?')) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            });
+        }
+        
+        if (fileBtn && fileInput) {
+            fileBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file || !file.type.startsWith('image/')) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => sendToTelegram('', ev.target.result);
+                reader.readAsDataURL(file);
+                fileInput.value = '';
+            });
         }
         
         if (sendBtn && messageInput) {
@@ -342,8 +818,30 @@
             });
         }
         
+        let lastActivity = Date.now();
+        const updateActivity = () => {
+            if (Date.now() - lastActivity > 5000) {
+                lastActivity = Date.now();
+                updateStatus(true, true);
+            }
+        };
+        
+        document.addEventListener('click', updateActivity);
+        document.addEventListener('scroll', updateActivity);
+        document.addEventListener('keypress', updateActivity);
+        document.addEventListener('touchstart', updateActivity);
+        
+        window.addEventListener('blur', () => updateStatus(false, false));
+        window.addEventListener('focus', () => updateStatus(true, true));
+        window.addEventListener('beforeunload', () => updateStatus(false, false));
+        
         loadHistory();
+        setInterval(() => updateStatus(true, true), 30000);
         setInterval(checkReplies, 5000);
+        
+        if (isPhoneRequired && !isPhoneBlocked()) {
+            setTimeout(() => showPhoneForm(), 500);
+        }
     })();
 </script>
 </body>
