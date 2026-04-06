@@ -24,7 +24,6 @@
             border-radius: 28px;
             max-width: 500px;
             width: 100%;
-            margin: 20px;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
         }
         
@@ -49,7 +48,7 @@
             text-align: left;
         }
         
-        /* ========== ВИДЖЕТ ЧАТА ========== */
+        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -94,8 +93,6 @@
             align-items: center;
             gap: 8px;
         }
-        
-        .chat-header h3 span { font-size: 22px; }
         
         .header-buttons {
             display: flex;
@@ -169,6 +166,13 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
+        .message img {
+            max-width: 200px;
+            border-radius: 12px;
+            margin-top: 8px;
+            cursor: pointer;
+        }
+        
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -232,7 +236,6 @@
         .status.sending { background: #fff3cd; color: #856404; }
         .status.blocked { background: #f8d7da; color: #721c24; }
         
-        /* Модальное окно для телефона */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -245,7 +248,6 @@
             justify-content: center;
             z-index: 20;
             backdrop-filter: blur(4px);
-            animation: fadeIn 0.2s ease;
         }
         
         .phone-card {
@@ -254,23 +256,13 @@
             padding: 28px 24px;
             margin: 20px;
             text-align: center;
-            animation: fadeIn 0.2s ease;
             max-width: 340px;
             width: calc(100% - 40px);
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
         }
         
-        .phone-card h4 { 
-            margin-bottom: 16px; 
-            color: #333; 
-            font-size: 22px;
-            font-weight: 600;
-        }
-        
-        .phone-card p {
-            font-size: 14px;
-            margin-bottom: 8px;
-        }
+        .phone-card h4 { margin-bottom: 16px; color: #333; font-size: 22px; }
+        .phone-card p { font-size: 14px; margin-bottom: 8px; }
         
         .phone-input {
             width: 100%;
@@ -280,14 +272,22 @@
             font-size: 18px;
             margin-bottom: 16px;
             text-align: center;
-            letter-spacing: 1px;
-            font-weight: 500;
             background: #f8f9fa;
         }
         
         .phone-input:focus {
             outline: none;
             border-color: #667eea;
+            background: white;
+        }
+        
+        .country-select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
             background: white;
         }
         
@@ -301,27 +301,17 @@
             font-weight: 600;
             cursor: pointer;
             width: 100%;
-            transition: transform 0.1s;
         }
         
         .phone-submit:active { transform: scale(0.98); }
-        .phone-submit:disabled {
-            opacity: 0.6;
-            transform: none;
-        }
+        .phone-submit:disabled { opacity: 0.6; }
         
-        .error-text {
-            color: #dc3545;
-            font-size: 13px;
-            margin-bottom: 12px;
-        }
+        .error-text { color: #dc3545; font-size: 13px; margin-bottom: 12px; }
         
         .chat-widget.closed .chat-header, 
         .chat-widget.closed .chat-messages,
         .chat-widget.closed .chat-input-area,
-        .chat-widget.closed .phone-overlay {
-            display: none;
-        }
+        .chat-widget.closed .phone-overlay { display: none; }
         
         .open-icon {
             display: none;
@@ -335,7 +325,6 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
-        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -353,28 +342,8 @@
                 right: 20px;
                 border-radius: 30px;
             }
-            .message {
-                max-width: 90%;
-                font-size: 15px;
-                padding: 10px 14px;
-            }
-            .chat-input {
-                font-size: 16px;
-                padding: 12px 14px;
-            }
-            .send-btn, .file-btn {
-                padding: 10px 16px;
-                min-width: 44px;
-                min-height: 44px;
-            }
-            .phone-card {
-                margin: 16px;
-                padding: 24px 20px;
-            }
-            .phone-input {
-                font-size: 20px;
-                padding: 14px;
-            }
+            .message { max-width: 90%; font-size: 15px; }
+            .send-btn, .file-btn { padding: 10px 16px; min-width: 44px; min-height: 44px; }
         }
     </style>
 </head>
@@ -385,7 +354,7 @@
     <div class="note">
         <strong>📌 Как это работает:</strong><br>
         1️⃣ Нажмите на виджет в правом нижнем углу<br>
-        2️⃣ Укажите ваш номер телефона для связи (максимум 3 попытки)<br>
+        2️⃣ Укажите ваш номер телефона<br>
         3️⃣ Напишите сообщение или отправьте фото<br>
         4️⃣ Мы ответим вам в Telegram, а вы увидите ответ здесь
     </div>
@@ -394,7 +363,7 @@
 <div class="chat-widget closed" id="chatWidget">
     <div class="open-icon">💬</div>
     <div class="chat-header">
-        <h3><span>💬</span> Поддержка</h3>
+        <h3>💬 Поддержка</h3>
         <div class="header-buttons">
             <button class="clear-btn" id="clearBtn">🗑️</button>
             <button class="close-btn">×</button>
@@ -414,25 +383,51 @@
 <script>
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
-    // ========== НАСТРОЙКИ ТЕЛЕФОНА ==========
+    // ========== ДАННЫЕ СТРАН ==========
+    const countries = [
+        { code: 'RU', name: '🇷🇺 Россия', mask: '+7 (___) ___-__-__', pattern: /^7\d{10}$/, example: '+71234567890' },
+        { code: 'UA', name: '🇺🇦 Украина', mask: '+380 (__) ___-__-__', pattern: /^380\d{9}$/, example: '+380123456789' },
+        { code: 'KZ', name: '🇰🇿 Казахстан', mask: '+7 (___) ___-__-__', pattern: /^7\d{10}$/, example: '+77123456789' },
+        { code: 'BY', name: '🇧🇾 Беларусь', mask: '+375 (__) ___-__-__', pattern: /^375\d{9}$/, example: '+375123456789' },
+        { code: 'US', name: '🇺🇸 США', mask: '+1 (___) ___-____', pattern: /^1\d{10}$/, example: '+12345678901' },
+        { code: 'GB', name: '🇬🇧 Великобритания', mask: '+44 (__) ____-____', pattern: /^44\d{10}$/, example: '+441234567890' },
+        { code: 'DE', name: '🇩🇪 Германия', mask: '+49 (___) ______', pattern: /^49\d{10}$/, example: '+491234567890' },
+        { code: 'FR', name: '🇫🇷 Франция', mask: '+33 (__) __-__-__', pattern: /^33\d{9}$/, example: '+33123456789' },
+        { code: 'IT', name: '🇮🇹 Италия', mask: '+39 (__) ____-____', pattern: /^39\d{10}$/, example: '+391234567890' },
+        { code: 'ES', name: '🇪🇸 Испания', mask: '+34 (__) __-__-__', pattern: /^34\d{9}$/, example: '+34123456789' }
+    ];
+    
+    function getCountryByIp(ip) {
+        const firstOctet = parseInt(ip.split('.')[0]);
+        if (firstOctet >= 1 && firstOctet <= 10) return 'RU';
+        if (ip.startsWith('185.92') || ip.startsWith('5.') || ip.startsWith('178.')) return 'RU';
+        if (ip.startsWith('46.') || ip.startsWith('94.')) return 'UA';
+        if (ip.startsWith('2.') || ip.startsWith('5.')) return 'KZ';
+        if (ip.startsWith('93.') || ip.startsWith('37.')) return 'BY';
+        return 'RU';
+    }
+    
+    function validatePhone(phone, countryCode) {
+        const country = countries.find(c => c.code === countryCode);
+        if (!country) return false;
+        const digits = phone.replace(/\D/g, '');
+        return country.pattern.test(digits);
+    }
+    
+    function formatPhone(phone, countryCode) {
+        const digits = phone.replace(/\D/g, '');
+        if (!digits) return '';
+        const country = countries.find(c => c.code === countryCode);
+        if (!country) return digits;
+        return '+' + digits;
+    }
+    
+    // ========== ОСНОВНАЯ ЛОГИКА ==========
     const MAX_PHONE_ATTEMPTS = 3;
     const BLOCK_MINUTES = 30;
     
     let phoneAttempts = parseInt(localStorage.getItem('phone_attempts') || '0');
     let blockUntil = parseInt(localStorage.getItem('phone_block_until') || '0');
-    
-    function formatPhoneNumber(input) {
-        let digits = input.replace(/\D/g, '');
-        if (digits.startsWith('8')) digits = '7' + digits.substring(1);
-        if (digits.length > 11) digits = digits.substring(0, 11);
-        if (digits.length >= 1) return '+' + digits;
-        return '+7';
-    }
-    
-    function validatePhone(phone) {
-        const digits = phone.replace(/\D/g, '');
-        return digits.length === 11 && digits.startsWith('7');
-    }
     
     function isPhoneBlocked() {
         if (blockUntil > Date.now()) return true;
@@ -460,13 +455,6 @@
         return MAX_PHONE_ATTEMPTS - phoneAttempts;
     }
     
-    function getBlockTimeRemaining() {
-        if (!blockUntil) return 0;
-        const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
-        return remaining > 0 ? remaining : 0;
-    }
-    // ========================================
-    
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
@@ -474,15 +462,23 @@
     }
     
     let userPhone = localStorage.getItem('user_phone');
+    let userCountry = localStorage.getItem('user_country') || 'RU';
     let isPhoneRequired = !userPhone;
     
     let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
     let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
     
     let userIp = 'не определён';
+    let detectedCountry = 'RU';
+    
     fetch('https://api.ipify.org?format=json')
         .then(r => r.json())
-        .then(data => { userIp = data.ip; updateStatus(true, true); })
+        .then(data => {
+            userIp = data.ip;
+            detectedCountry = getCountryByIp(userIp);
+            if (!userCountry) userCountry = detectedCountry;
+            updateStatus(true, true);
+        })
         .catch(() => updateStatus(true, true));
     
     const site = window.location.hostname;
@@ -542,7 +538,7 @@
         statusDiv.className = `status ${type}`;
     }
     
-    async function registerPhone(phone) {
+    async function registerPhone(phone, countryCode) {
         try {
             const response = await fetch(`${PROXY_URL}/register`, {
                 method: 'POST',
@@ -552,80 +548,70 @@
             const data = await response.json();
             if (data.ok) {
                 userPhone = phone;
+                userCountry = countryCode;
                 localStorage.setItem('user_phone', phone);
+                localStorage.setItem('user_country', countryCode);
                 isPhoneRequired = false;
                 localStorage.removeItem('phone_attempts');
                 localStorage.removeItem('phone_block_until');
-                addMessage('✅ Спасибо! Теперь вы можете задать ваш вопрос.', false);
+                addMessage('✅ Спасибо! Номер подтверждён. Теперь вы можете задать ваш вопрос.', false);
                 return true;
-            } else {
-                console.error('Ошибка регистрации:', data);
-                return false;
             }
+            return false;
         } catch (error) {
-            console.error('Ошибка регистрации:', error);
+            console.error('Ошибка:', error);
             return false;
         }
     }
     
     function showPhoneForm() {
         if (isPhoneBlocked()) {
-            const remaining = getBlockTimeRemaining();
+            const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
             addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
-            setStatus(`⛔ Блокировка ${remaining} мин`, 'blocked');
             return;
         }
         
         const remainingAttempts = getRemainingAttempts();
-        
-        // Удаляем старый оверлей, если есть
-        const oldOverlay = document.querySelector('.phone-overlay');
-        if (oldOverlay) oldOverlay.remove();
+        const countriesOptions = countries.map(c => 
+            `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name}</option>`
+        ).join('');
         
         const overlay = document.createElement('div');
         overlay.className = 'phone-overlay';
         overlay.innerHTML = `
             <div class="phone-card">
                 <h4>📞 Укажите номер телефона</h4>
-                <p style="font-size: 14px; color: #666; margin-bottom: 8px;">Для связи с вами</p>
-                <p style="font-size: 13px; color: #888; margin-bottom: 12px;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
-                <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="12" inputmode="numeric">
+                <p>Для связи с вами</p>
+                <p style="font-size: 12px; color: #888; margin: 8px 0;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
+                <select class="country-select" id="countrySelect">${countriesOptions}</select>
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 123 456 78 90" maxlength="20" inputmode="numeric">
                 <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
         `;
         widget.appendChild(overlay);
         
+        const countrySelect = document.getElementById('countrySelect');
         const phoneInput = document.getElementById('phoneInput');
         const phoneError = document.getElementById('phoneError');
         const phoneSubmit = document.getElementById('phoneSubmit');
         
-        // Устанавливаем начальное значение +7
-        phoneInput.value = '+7';
-        
-        // Обработка ввода
-        phoneInput.addEventListener('input', function(e) {
-            let oldValue = e.target.value;
-            let digits = oldValue.replace(/\D/g, '');
-            if (digits.startsWith('8')) digits = '7' + digits.substring(1);
-            if (digits.length > 11) digits = digits.substring(0, 11);
-            let formatted = '+' + digits;
-            if (formatted === '+') formatted = '+7';
-            e.target.value = formatted;
-        });
-        
-        // Блокируем удаление префикса +7
-        phoneInput.addEventListener('keydown', function(e) {
-            if (e.target.selectionStart < 2 && (e.key === 'Backspace' || e.key === 'Delete')) {
-                e.preventDefault();
+        function updatePlaceholder() {
+            const country = countries.find(c => c.code === countrySelect.value);
+            if (country) {
+                phoneInput.placeholder = country.example;
             }
-        });
+        }
+        
+        countrySelect.addEventListener('change', updatePlaceholder);
+        updatePlaceholder();
         
         phoneSubmit.onclick = async () => {
-            let phone = phoneInput.value.trim();
+            const phone = phoneInput.value.trim();
+            const countryCode = countrySelect.value;
             
-            if (!validatePhone(phone)) {
-                phoneError.textContent = 'Введите корректный номер в формате +71234567890 (12 символов)';
+            if (!validatePhone(phone, countryCode)) {
+                phoneError.textContent = `Неверный формат номера. Пример: ${countries.find(c => c.code === countryCode).example}`;
                 phoneError.style.display = 'block';
                 return;
             }
@@ -634,34 +620,28 @@
             phoneSubmit.disabled = true;
             phoneSubmit.textContent = 'Проверка...';
             
-            const success = await registerPhone(phone);
+            const formattedPhone = formatPhone(phone, countryCode);
+            const success = await registerPhone(formattedPhone, countryCode);
             
             if (success) {
                 overlay.remove();
-                // Показываем сообщение об успехе
-                addMessage('✅ Номер подтверждён! Теперь вы можете писать сообщения.', false);
             } else {
                 const isNowBlocked = incrementPhoneAttempt();
                 phoneSubmit.disabled = false;
                 phoneSubmit.textContent = 'Продолжить';
                 
                 if (isNowBlocked) {
-                    phoneError.textContent = `Превышено количество попыток. Доступ будет восстановлен через ${BLOCK_MINUTES} минут.`;
+                    phoneError.textContent = `Превышено количество попыток. Доступ через ${BLOCK_MINUTES} минут.`;
                     phoneError.style.display = 'block';
                     phoneSubmit.disabled = true;
                     setTimeout(() => {
                         overlay.remove();
-                        addMessage(`⛔ Превышено количество попыток ввода номера. Попробуйте через ${BLOCK_MINUTES} минут.`, false);
+                        addMessage(`⛔ Превышено количество попыток. Попробуйте через ${BLOCK_MINUTES} минут.`, false);
                     }, 2000);
                 } else {
                     const remaining = getRemainingAttempts();
                     phoneError.textContent = `Неверный номер. Осталось попыток: ${remaining}`;
                     phoneError.style.display = 'block';
-                    
-                    const attemptsText = overlay.querySelector('.phone-card p:nth-of-type(2)');
-                    if (attemptsText) {
-                        attemptsText.textContent = `Осталось попыток: ${remaining} из ${MAX_PHONE_ATTEMPTS}`;
-                    }
                 }
             }
         };
@@ -674,7 +654,6 @@
         }
         
         if (!text && !imageBase64) return;
-        
         if (text) addMessage(text, true);
         else if (imageBase64) addMessage('📷 Изображение', true, true, imageBase64);
         
@@ -687,9 +666,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, site, ip: userIp, text, imageBase64 })
             });
-            
             const data = await response.json();
-            
             if (data.ok) {
                 setStatus('✅ Отправлено!', 'online');
                 setTimeout(() => setStatus('🟢 Онлайн', 'online'), 2000);
@@ -697,7 +674,6 @@
                 throw new Error(data.description || 'Ошибка');
             }
         } catch (error) {
-            console.error('Ошибка:', error);
             setStatus('❌ Ошибка', 'error');
             setTimeout(() => setStatus('🟢 Онлайн', 'online'), 3000);
         }
@@ -712,8 +688,10 @@
                 for (const update of data.result) {
                     lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
                     if (update.message) {
-                        if (update.message.text && update.message.text.includes('Новый пользователь')) continue;
-                        if (update.message.text && update.message.text.startsWith('💬')) continue;
+                        if (update.message.text?.includes('Новый пользователь')) continue;
+                        if (update.message.text?.startsWith('💬')) continue;
+                        if (update.message.text?.startsWith('📞')) continue;
+                        if (update.message.text?.startsWith('🔔')) continue;
                         
                         if (update.message.hasImage || update.message.text) {
                             addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id);
@@ -723,7 +701,7 @@
                 localStorage.setItem('chat_lastUpdateId', lastUpdateId);
             }
         } catch (error) {
-            console.error('Ошибка проверки:', error);
+            console.error('Ошибка:', error);
         }
     }
     
@@ -735,8 +713,6 @@
             if (msg.isImage && msg.imageUrl) {
                 const img = document.createElement('img');
                 img.src = msg.imageUrl;
-                img.style.maxWidth = '200px';
-                img.style.borderRadius = '12px';
                 div.appendChild(img);
                 if (msg.text) div.appendChild(document.createTextNode(' ' + msg.text));
             } else {
@@ -747,9 +723,7 @@
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
         if (history.length === 0 && !isPhoneRequired) {
-            setTimeout(() => {
-                addMessage('Здравствуйте! Напишите ваш вопрос 😊', false);
-            }, 500);
+            setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос 😊', false), 500);
         }
     }
     
@@ -758,24 +732,14 @@
             widget.classList.remove('closed');
             if (isPhoneRequired && !isPhoneBlocked()) {
                 setTimeout(() => showPhoneForm(), 100);
-            } else if (isPhoneBlocked()) {
-                const remaining = getBlockTimeRemaining();
-                addMessage(`⛔ Доступ временно заблокирован. Попробуйте через ${remaining} минут.`, false);
-                setStatus(`⛔ Блокировка ${remaining} мин`, 'blocked');
             }
         }
     });
     
-    closeBtn.addEventListener('click', () => { widget.classList.add('closed'); });
-    
+    closeBtn.addEventListener('click', () => widget.classList.add('closed'));
     clearBtn.addEventListener('click', () => {
-        if (confirm('Очистить всю историю чата?')) {
-            localStorage.removeItem('chat_history');
-            localStorage.removeItem('chat_lastUpdateId');
-            localStorage.removeItem('chat_processedIds');
-            localStorage.removeItem('user_phone');
-            localStorage.removeItem('phone_attempts');
-            localStorage.removeItem('phone_block_until');
+        if (confirm('Очистить историю чата?')) {
+            localStorage.clear();
             location.reload();
         }
     });
@@ -783,7 +747,7 @@
     fileBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
-        if (!file || !file.type.startsWith('image/')) return;
+        if (!file?.type.startsWith('image/')) return;
         const reader = new FileReader();
         reader.onload = (ev) => sendToTelegram('', ev.target.result);
         reader.readAsDataURL(file);
@@ -804,19 +768,13 @@
         }
     });
     
-    let lastActivityTime = Date.now();
-    const updateActivity = () => {
-        const now = Date.now();
-        if (now - lastActivityTime > 5000) {
-            lastActivityTime = now;
+    let lastActivity = Date.now();
+    document.addEventListener('click', () => {
+        if (Date.now() - lastActivity > 5000) {
+            lastActivity = Date.now();
             updateStatus(true, true);
         }
-    };
-    
-    document.addEventListener('click', updateActivity);
-    document.addEventListener('scroll', updateActivity);
-    document.addEventListener('keypress', updateActivity);
-    document.addEventListener('touchstart', updateActivity);
+    });
     
     window.addEventListener('blur', () => updateStatus(false, false));
     window.addEventListener('focus', () => updateStatus(true, true));
@@ -828,10 +786,6 @@
     
     if (isPhoneRequired && !isPhoneBlocked()) {
         setTimeout(() => showPhoneForm(), 500);
-    } else if (isPhoneBlocked()) {
-        const remaining = getBlockTimeRemaining();
-        addMessage(`⛔ Превышено количество попыток ввода номера. Попробуйте через ${remaining} минут.`, false);
-        setStatus(`⛔ Блокировка ${remaining} мин`, 'blocked');
     }
 </script>
 </body>
