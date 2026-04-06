@@ -281,16 +281,6 @@
             background: white;
         }
         
-        .country-select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            margin-bottom: 12px;
-            font-size: 14px;
-            background: white;
-        }
-        
         .phone-submit {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -354,7 +344,7 @@
     <div class="note">
         <strong>📌 Как это работает:</strong><br>
         1️⃣ Нажмите на виджет в правом нижнем углу<br>
-        2️⃣ Укажите ваш номер телефона (12 символов, например +71234567890)<br>
+        2️⃣ Укажите ваш номер телефона (формат: +7XXXXXXXXXX, 12 символов)<br>
         3️⃣ Напишите сообщение или отправьте фото<br>
         4️⃣ Мы ответим вам в Telegram, а вы увидите ответ здесь
     </div>
@@ -383,49 +373,10 @@
 <script>
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
-    // Данные стран с правилами валидации
-    const countries = [
-        { code: 'RU', name: '🇷🇺 Россия', example: '+71234567890', pattern: /^7\d{10}$/, length: 11 },
-        { code: 'UA', name: '🇺🇦 Украина', example: '+380123456789', pattern: /^380\d{9}$/, length: 12 },
-        { code: 'KZ', name: '🇰🇿 Казахстан', example: '+77123456789', pattern: /^7\d{10}$/, length: 11 },
-        { code: 'BY', name: '🇧🇾 Беларусь', example: '+375123456789', pattern: /^375\d{9}$/, length: 12 },
-        { code: 'US', name: '🇺🇸 США', example: '+12345678901', pattern: /^1\d{10}$/, length: 11 },
-        { code: 'GB', name: '🇬🇧 Великобритания', example: '+441234567890', pattern: /^44\d{10}$/, length: 12 },
-        { code: 'DE', name: '🇩🇪 Германия', example: '+491234567890', pattern: /^49\d{10}$/, length: 12 }
-    ];
-    
-    function getCountryByIp(ip) {
-        if (ip.startsWith('185.92') || ip.startsWith('5.') || ip.startsWith('178.')) return 'RU';
-        if (ip.startsWith('46.') || ip.startsWith('94.')) return 'UA';
-        return 'RU';
-    }
-    
-    function validatePhone(phone, countryCode) {
-        const country = countries.find(c => c.code === countryCode);
-        if (!country) return false;
-        // Удаляем всё кроме цифр
-        let digits = phone.replace(/\D/g, '');
-        // Проверяем длину и соответствие паттерну
-        return country.pattern.test(digits);
-    }
-    
-    function formatPhoneInput(rawValue, countryCode) {
-        // Удаляем всё кроме цифр и плюса
-        let cleaned = rawValue.replace(/[^\d+]/g, '');
-        // Если нет плюса в начале, добавляем
-        if (!cleaned.startsWith('+')) {
-            cleaned = '+' + cleaned.replace(/\D/g, '');
-        }
-        // Ограничиваем длину (максимум 15 символов)
-        if (cleaned.length > 15) {
-            cleaned = cleaned.substring(0, 15);
-        }
-        return cleaned;
-    }
-    
-    // Настройки лимита попыток
+    // ========== НАСТРОЙКИ ТЕЛЕФОНА (ТОЛЬКО РОССИЯ) ==========
     const MAX_PHONE_ATTEMPTS = 3;
     const BLOCK_MINUTES = 30;
+    const PHONE_LENGTH = 12; // +7 + 10 цифр = 12 символов
     
     let phoneAttempts = parseInt(localStorage.getItem('phone_attempts') || '0');
     let blockUntil = parseInt(localStorage.getItem('phone_block_until') || '0');
@@ -456,6 +407,24 @@
         return Math.max(0, MAX_PHONE_ATTEMPTS - phoneAttempts);
     }
     
+    function validatePhone(phone) {
+        // Удаляем всё кроме цифр
+        let digits = phone.replace(/\D/g, '');
+        // Должно быть 11 цифр (7 + 10)
+        if (digits.length !== 11) return false;
+        // Должно начинаться с 7
+        if (!digits.startsWith('7')) return false;
+        return true;
+    }
+    
+    function formatPhoneForDisplay(phone) {
+        let digits = phone.replace(/\D/g, '');
+        if (digits.length === 11) {
+            return '+' + digits;
+        }
+        return phone;
+    }
+    
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
         userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
@@ -463,7 +432,6 @@
     }
     
     let userPhone = localStorage.getItem('user_phone');
-    let userCountry = localStorage.getItem('user_country') || 'RU';
     let isPhoneRequired = !userPhone;
     
     let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
@@ -472,11 +440,7 @@
     let userIp = 'не определён';
     fetch('https://api.ipify.org?format=json')
         .then(r => r.json())
-        .then(data => {
-            userIp = data.ip;
-            if (!userCountry) userCountry = getCountryByIp(userIp);
-            updateStatus(true, true);
-        })
+        .then(data => { userIp = data.ip; updateStatus(true, true); })
         .catch(() => updateStatus(true, true));
     
     const site = window.location.hostname;
@@ -536,7 +500,7 @@
         statusDiv.className = `status ${type}`;
     }
     
-    async function registerPhone(phone, countryCode) {
+    async function registerPhone(phone) {
         try {
             console.log('📞 Отправка регистрации:', { userId, site, ip: userIp, phone });
             
@@ -551,9 +515,7 @@
             
             if (data.ok) {
                 userPhone = phone;
-                userCountry = countryCode;
                 localStorage.setItem('user_phone', phone);
-                localStorage.setItem('user_country', countryCode);
                 isPhoneRequired = false;
                 localStorage.removeItem('phone_attempts');
                 localStorage.removeItem('phone_block_until');
@@ -578,9 +540,6 @@
         }
         
         const remainingAttempts = getRemainingAttempts();
-        const countriesOptions = countries.map(c => 
-            `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} (${c.example})</option>`
-        ).join('');
         
         const overlay = document.createElement('div');
         overlay.className = 'phone-overlay';
@@ -589,59 +548,61 @@
                 <h4>📞 Укажите номер телефона</h4>
                 <p>Для связи с вами</p>
                 <p style="font-size: 12px; color: #e67e22; margin: 8px 0;">⚠️ Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
-                <select class="country-select" id="countrySelect">${countriesOptions}</select>
-                <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="15" inputmode="numeric">
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="12" inputmode="numeric">
                 <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
         `;
         widget.appendChild(overlay);
         
-        const countrySelect = document.getElementById('countrySelect');
         const phoneInput = document.getElementById('phoneInput');
         const phoneError = document.getElementById('phoneError');
         const phoneSubmit = document.getElementById('phoneSubmit');
         
-        function updatePlaceholder() {
-            const country = countries.find(c => c.code === countrySelect.value);
-            if (country) {
-                phoneInput.placeholder = country.example;
-            }
-        }
+        // Устанавливаем +7 в начале
+        phoneInput.value = '+7';
         
-        countrySelect.addEventListener('change', updatePlaceholder);
-        updatePlaceholder();
-        
-        // Обработка ввода с ограничением длины
+        // Обработка ввода
         phoneInput.addEventListener('input', function(e) {
             let value = e.target.value;
+            
             // Удаляем всё кроме цифр и плюса
             let cleaned = value.replace(/[^\d+]/g, '');
+            
+            // Если нет плюса в начале, добавляем
             if (!cleaned.startsWith('+')) {
                 cleaned = '+' + cleaned.replace(/\D/g, '');
             }
-            // Ограничиваем длину до 15 символов
-            if (cleaned.length > 15) {
-                cleaned = cleaned.substring(0, 15);
+            
+            // Ограничиваем длину до 12 символов
+            if (cleaned.length > PHONE_LENGTH) {
+                cleaned = cleaned.substring(0, PHONE_LENGTH);
             }
+            
             e.target.value = cleaned;
+        });
+        
+        // Защита от удаления префикса +7
+        phoneInput.addEventListener('keydown', function(e) {
+            const cursorPos = e.target.selectionStart;
+            if (cursorPos < 2 && (e.key === 'Backspace' || e.key === 'Delete')) {
+                e.preventDefault();
+            }
         });
         
         phoneSubmit.onclick = async () => {
             let phone = phoneInput.value.trim();
-            const countryCode = countrySelect.value;
-            const country = countries.find(c => c.code === countryCode);
             
-            // Проверка на пустоту
-            if (!phone || phone === '+') {
-                phoneError.textContent = `Введите номер телефона в формате ${country.example}`;
+            // Проверка на пустоту или только +7
+            if (!phone || phone === '+7' || phone.length < 5) {
+                phoneError.textContent = `Введите номер телефона в формате +7XXXXXXXXXX (12 символов)`;
                 phoneError.style.display = 'block';
                 return;
             }
             
             // Валидация номера
-            if (!validatePhone(phone, countryCode)) {
-                phoneError.textContent = `Неверный формат номера. Используйте формат: ${country.example} (всего ${country.length} цифр после +)`;
+            if (!validatePhone(phone)) {
+                phoneError.textContent = `Неверный формат номера. Номер должен содержать 11 цифр после +7. Пример: +71234567890`;
                 phoneError.style.display = 'block';
                 return;
             }
@@ -650,7 +611,7 @@
             phoneSubmit.disabled = true;
             phoneSubmit.textContent = 'Проверка...';
             
-            const success = await registerPhone(phone, countryCode);
+            const success = await registerPhone(phone);
             
             if (success) {
                 overlay.remove();
@@ -660,7 +621,7 @@
                 phoneSubmit.textContent = 'Продолжить';
                 
                 if (isNowBlocked) {
-                    phoneError.textContent = `❌ Превышено количество попыток (${MAX_PHONE_ATTEMPTS}). Доступ будет восстановлен через ${BLOCK_MINUTES} минут.`;
+                    phoneError.textContent = `❌ Превышено количество попыток (${MAX_PHONE_ATTEMPTS}). Доступ через ${BLOCK_MINUTES} минут.`;
                     phoneError.style.display = 'block';
                     phoneSubmit.disabled = true;
                     setTimeout(() => {
