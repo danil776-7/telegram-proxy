@@ -113,8 +113,6 @@ async function createTopicForIp(ip, site, userId, phone = null) {
     }
 }
 
-// ========== API ==========
-
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
 });
@@ -248,7 +246,6 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// Получение обновлений из Telegram (текст + фото)
 app.get('/getUpdates', async (req, res) => {
     const { offset, ip } = req.query;
     try {
@@ -274,7 +271,6 @@ app.get('/getUpdates', async (req, res) => {
                             }
                         };
                         
-                        // Обработка фото
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
