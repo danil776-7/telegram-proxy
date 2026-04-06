@@ -332,6 +332,19 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
+        /* Адаптация для компьютера */
+        @media (min-width: 768px) {
+            .chat-widget {
+                width: 450px;
+                height: 700px;
+            }
+            .message {
+                max-width: 75%;
+                font-size: 16px;
+            }
+        }
+        
+        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -352,6 +365,7 @@
             .message { max-width: 90%; font-size: 15px; }
             .send-btn, .file-btn { padding: 10px 16px; min-width: 44px; min-height: 44px; }
             .phone-card { margin: 16px; padding: 20px; }
+            .phone-input { font-size: 16px; padding: 14px; }
         }
     </style>
 </head>
@@ -362,7 +376,7 @@
     <div class="note">
         <strong>📌 Как это работает:</strong><br>
         1️⃣ Нажмите на виджет в правом нижнем углу<br>
-        2️⃣ Укажите ваш номер телефона<br>
+        2️⃣ Укажите ваш номер телефона (12 символов)<br>
         3️⃣ Напишите сообщение или отправьте фото<br>
         4️⃣ Мы ответим вам в Telegram, а вы увидите ответ здесь
     </div>
@@ -392,14 +406,14 @@
     (function() {
         const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
         
-        // ========== ДАННЫЕ СТРАН ==========
+        // Данные стран
         const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', example: '+7 123 456 78 90', pattern: /^7\d{10}$/, length: 11 },
-            { code: 'UA', name: '🇺🇦 Украина', example: '+380 12 345 67 89', pattern: /^380\d{9}$/, length: 12 },
-            { code: 'KZ', name: '🇰🇿 Казахстан', example: '+7 123 456 78 90', pattern: /^7\d{10}$/, length: 11 },
-            { code: 'BY', name: '🇧🇾 Беларусь', example: '+375 12 345 67 89', pattern: /^375\d{9}$/, length: 12 },
-            { code: 'US', name: '🇺🇸 США', example: '+1 234 567 8901', pattern: /^1\d{10}$/, length: 11 },
-            { code: 'GB', name: '🇬🇧 Великобритания', example: '+44 12 3456 7890', pattern: /^44\d{10}$/, length: 12 }
+            { code: 'RU', name: '🇷🇺 Россия', example: '+71234567890', pattern: /^7\d{10}$/, length: 11 },
+            { code: 'UA', name: '🇺🇦 Украина', example: '+380123456789', pattern: /^380\d{9}$/, length: 12 },
+            { code: 'KZ', name: '🇰🇿 Казахстан', example: '+77123456789', pattern: /^7\d{10}$/, length: 11 },
+            { code: 'BY', name: '🇧🇾 Беларусь', example: '+375123456789', pattern: /^375\d{9}$/, length: 12 },
+            { code: 'US', name: '🇺🇸 США', example: '+12345678901', pattern: /^1\d{10}$/, length: 11 },
+            { code: 'GB', name: '🇬🇧 Великобритания', example: '+441234567890', pattern: /^44\d{10}$/, length: 12 }
         ];
         
         function getCountryByIp(ip) {
@@ -415,15 +429,7 @@
             return country.pattern.test(digits);
         }
         
-        function formatPhoneNumber(phone) {
-            let digits = phone.replace(/\D/g, '');
-            if (digits.length === 11 && digits.startsWith('7')) {
-                return '+' + digits;
-            }
-            return '+' + digits;
-        }
-        
-        // ========== НАСТРОЙКИ ==========
+        // Настройки лимита
         const MAX_PHONE_ATTEMPTS = 3;
         const BLOCK_MINUTES = 30;
         
@@ -599,7 +605,7 @@
                     <p>Для связи с вами</p>
                     <p style="font-size: 12px; color: #e67e22; margin: 8px 0;">⚠️ Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
                     <select class="country-select" id="countrySelect">${countriesOptions}</select>
-                    <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="15" inputmode="numeric">
+                    <input type="tel" class="phone-input" id="phoneInput" placeholder="+71234567890" maxlength="12" inputmode="numeric">
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Продолжить</button>
                 </div>
@@ -621,14 +627,17 @@
             countrySelect.addEventListener('change', updatePlaceholder);
             updatePlaceholder();
             
+            // Жёсткое ограничение 12 символов
             phoneInput.addEventListener('input', function(e) {
                 let value = e.target.value;
+                // Удаляем всё кроме цифр и плюса
                 let cleaned = value.replace(/[^\d+]/g, '');
                 if (!cleaned.startsWith('+')) {
                     cleaned = '+' + cleaned.replace(/\D/g, '');
                 }
-                if (cleaned.length > 15) {
-                    cleaned = cleaned.substring(0, 15);
+                // Ограничиваем до 12 символов
+                if (cleaned.length > 12) {
+                    cleaned = cleaned.substring(0, 12);
                 }
                 e.target.value = cleaned;
             });
@@ -654,8 +663,7 @@
                 phoneSubmit.disabled = true;
                 phoneSubmit.textContent = 'Проверка...';
                 
-                const formattedPhone = formatPhoneNumber(phone);
-                const success = await registerPhone(formattedPhone, countryCode);
+                const success = await registerPhone(phone, countryCode);
                 
                 if (success) {
                     overlay.remove();
