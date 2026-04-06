@@ -368,7 +368,7 @@
     <div class="note">
         <strong>📌 Как это работает:</strong><br>
         1️⃣ Нажмите на виджет в правом нижнем углу<br>
-        2️⃣ Автоматически определится ваша страна<br>
+        2️⃣ Автоматически определится ваша страна и регион<br>
         3️⃣ Укажите номер телефона<br>
         4️⃣ Напишите сообщение или отправьте фото — мы ответим в Telegram
     </div>
@@ -430,17 +430,17 @@
         
         async function detectGeo() {
             try {
-                const response = await fetch('https://ip-api.com/json/?fields=status,country,countryCode,region,regionName,city,query');
+                const response = await fetch('https://ipwho.is/');
                 const data = await response.json();
                 
-                if (data.status === 'success') {
+                if (data.success) {
                     userGeo = {
-                        ip: data.query,
-                        countryCode: data.countryCode,
+                        ip: data.ip,
+                        countryCode: data.country_code,
                         countryName: data.country,
-                        region: data.regionName,
+                        region: data.region,
                         city: data.city,
-                        phoneCode: getPhoneCodeByCountryCode(data.countryCode)
+                        phoneCode: getPhoneCodeByCountryCode(data.country_code)
                     };
                     
                     if (!userCountry) {
@@ -448,7 +448,8 @@
                         localStorage.setItem('user_country', userCountry);
                     }
                     
-                    setStatus(`🟢 ${userGeo.countryName}, ${userGeo.city || userGeo.region || ''}`, 'online');
+                    const locationText = `${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}${userGeo.region ? ' (' + userGeo.region + ')' : ''}`;
+                    setStatus(`🟢 ${locationText}`, 'online');
                     return true;
                 }
             } catch (error) {
@@ -462,9 +463,11 @@
                     if (data.ip.startsWith('185.92') || data.ip.startsWith('5.') || data.ip.startsWith('178.')) {
                         userGeo.countryCode = 'RU';
                         userGeo.countryName = 'Россия';
+                        userGeo.region = 'Центральный';
                     } else if (data.ip.startsWith('46.') || data.ip.startsWith('94.')) {
                         userGeo.countryCode = 'UA';
                         userGeo.countryName = 'Украина';
+                        userGeo.region = 'Киевская область';
                     } else {
                         userGeo.countryCode = 'RU';
                         userGeo.countryName = 'Россия';
@@ -608,7 +611,13 @@
                 const response = await fetch(`${PROXY_URL}/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, site, ip: userGeo.ip, phone })
+                    body: JSON.stringify({ 
+                        userId, 
+                        site, 
+                        ip: userGeo.ip, 
+                        phone, 
+                        region: userGeo.region || userGeo.city || userGeo.countryName 
+                    })
                 });
                 
                 const data = await response.json();
@@ -646,7 +655,7 @@
                 `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} (${c.example})</option>`
             ).join('');
             
-            const detectedText = userGeo.countryName ? `📍 Определено: ${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}` : '';
+            const detectedText = userGeo.countryName ? `📍 Определено: ${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}${userGeo.region ? ' (' + userGeo.region + ')' : ''}` : '';
             
             const overlay = document.createElement('div');
             overlay.className = 'phone-overlay';
@@ -760,7 +769,14 @@
                 const response = await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, site, ip: userGeo.ip, text, imageBase64 })
+                    body: JSON.stringify({ 
+                        userId, 
+                        site, 
+                        ip: userGeo.ip, 
+                        text, 
+                        imageBase64,
+                        region: userGeo.region || userGeo.city || userGeo.countryName
+                    })
                 });
                 const data = await response.json();
                 if (data.ok) {
