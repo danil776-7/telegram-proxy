@@ -2,13 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// Настройки CORS - разрешаем всё
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 
@@ -126,7 +120,7 @@ app.get('/', (req, res) => {
 });
 
 app.post('/register', async (req, res) => {
-    console.log('📞 Получен запрос на регистрацию:', req.body);
+    console.log('📞 Регистрация:', req.body);
     const { userId, site, ip, phone } = req.body;
     
     if (!ip || !phone) {
@@ -155,7 +149,7 @@ app.post('/register', async (req, res) => {
             });
         }
         
-        console.log('✅ Регистрация успешна для IP:', ip);
+        console.log('✅ Регистрация успешна');
         res.json({ ok: true });
     } catch (error) {
         console.error('Ошибка регистрации:', error);
@@ -165,6 +159,8 @@ app.post('/register', async (req, res) => {
 
 app.post('/send', async (req, res) => {
     const { userId, site, ip, text, imageBase64 } = req.body;
+    console.log('📨 Отправка сообщения от:', userId);
+    
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
     let status = ipStatus.get(ip);
@@ -202,7 +198,10 @@ app.post('/send', async (req, res) => {
                     body: formData
                 });
                 const data = await response.json();
+                console.log('✅ Фото отправлено:', data.ok);
                 res.json(data);
+            } else {
+                throw new Error('Invalid image format');
             }
         } else if (text) {
             const data = await callTelegram('sendMessage', {
@@ -211,6 +210,7 @@ app.post('/send', async (req, res) => {
                 text: `💬 **${userId}:**\n\n${text}`,
                 parse_mode: 'Markdown'
             });
+            console.log('✅ Сообщение отправлено:', data.ok);
             res.json(data);
         } else {
             res.status(400).json({ ok: false, error: 'No text or image' });
@@ -248,6 +248,7 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
+// Получение обновлений из Telegram (текст + фото)
 app.get('/getUpdates', async (req, res) => {
     const { offset, ip } = req.query;
     try {
@@ -267,12 +268,13 @@ app.get('/getUpdates', async (req, res) => {
                         const messageData = {
                             update_id: update.update_id,
                             message: {
-                                text: msg.text || '',
+                                text: msg.caption || msg.text || '',
                                 from: msg.from.first_name || 'Поддержка',
                                 date: msg.date
                             }
                         };
                         
+                        // Обработка фото
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -281,16 +283,19 @@ app.get('/getUpdates', async (req, res) => {
                                 if (fileData.ok) {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
+                                    console.log(`📸 Фото для ${userIp}: ${messageData.message.imageUrl}`);
                                 }
                             } catch (err) {
                                 console.error('Ошибка получения фото:', err);
                             }
                         }
+                        
                         filtered.push(messageData);
                     }
                 }
             }
             data.result = filtered;
+            console.log(`📨 Найдено ${filtered.length} новых сообщений`);
         }
         res.json(data);
     } catch (error) {
