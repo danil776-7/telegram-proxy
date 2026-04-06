@@ -23,27 +23,34 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
-async function updateTopicIcon(ip, topicId) {
+// Обновление иконки и названия топика
+async function updateTopicInfo(ip, topicId, site) {
     const status = ipStatus.get(ip);
     if (!status) return;
+    
     const iconEmoji = status.online ? '🟢' : '⚫️';
+    const shortSite = site?.replace(/^https?:\/\//, '').replace(/\/$/, '').substring(0, 30) || 'unknown';
+    
     try {
         await callTelegram('editForumTopic', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            name: `${iconEmoji} IP: ${ip}`
+            name: `${iconEmoji} ${shortSite}`,
+            icon_custom_emoji_id: null
         });
     } catch (e) { console.error('Ошибка иконки:', e.message); }
 }
 
+// Обновление закреплённого сообщения
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
     const lastActiveStr = status.lastActive ? new Date(status.lastActive).toLocaleString('ru-RU') : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
+    const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     
-    const text = `🧑‍💻 **Пользователь:** ${status.userId}\n🌐 **Сайт:** ${status.site}\n📡 **IP:** ${ip}\n${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
+    const text = `🧑‍💻 **Пользователь:** ${status.userId}\n${siteStr}📡 **IP:** ${ip}\n${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
     
     try {
         if (status.pinnedMessageId) {
@@ -76,9 +83,11 @@ async function updatePinnedMessage(ip, topicId) {
 
 async function createTopicForIp(ip, site, userId, phone = null) {
     try {
+        const shortSite = site?.replace(/^https?:\/\//, '').replace(/\/$/, '').substring(0, 30) || 'unknown';
+        
         const topic = await callTelegram('createForumTopic', {
             chat_id: GROUP_CHAT_ID,
-            name: `🟡 IP: ${ip}`
+            name: `🟡 ${shortSite}`
         });
         if (!topic.ok) throw new Error('Не удалось создать топик');
         
@@ -97,12 +106,12 @@ async function createTopicForIp(ip, site, userId, phone = null) {
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            text: `🔔 **Новый пользователь!**\n\n📡 **IP:** ${ip}\n🆔 **User ID:** ${userId}\n🌐 **Сайт:** ${site}\n${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
+            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
             parse_mode: 'Markdown'
         });
         
         await updatePinnedMessage(ip, topicId);
-        await updateTopicIcon(ip, topicId);
+        await updateTopicInfo(ip, topicId, site);
         return topicId;
     } catch (err) {
         console.error('Ошибка создания топика:', err);
@@ -120,14 +129,10 @@ app.post('/register', async (req, res) => {
     const { userId, site, ip, phone } = req.body;
     if (!ip || !phone) return res.status(400).json({ ok: false, error: 'ip and phone required' });
     
-    let status = ipStatus.get(ip) || {
-        online: true,
-        lastActive: Date.now(),
-        site,
-        userId,
-        phone,
-        pinnedMessageId: null
-    };
+    let status = ipStatus.get(ip);
+    if (!status) {
+        status = { online: true, lastActive: Date.now(), site, userId, phone, pinnedMessageId: null };
+    }
     status.phone = phone;
     status.userId = userId;
     status.site = site;
@@ -136,6 +141,7 @@ app.post('/register', async (req, res) => {
     let topicId = ipTopics.get(ip);
     if (topicId) {
         await updatePinnedMessage(ip, topicId);
+        await updateTopicInfo(ip, topicId, site);
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -151,14 +157,10 @@ app.post('/send', async (req, res) => {
     const { userId, site, ip, text, imageBase64 } = req.body;
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
-    let status = ipStatus.get(ip) || {
-        online: true,
-        lastActive: Date.now(),
-        site,
-        userId,
-        phone: null,
-        pinnedMessageId: null
-    };
+    let status = ipStatus.get(ip);
+    if (!status) {
+        status = { online: true, lastActive: Date.now(), site, userId, phone: null, pinnedMessageId: null };
+    }
     status.online = true;
     status.lastActive = Date.now();
     status.site = site || status.site;
@@ -171,7 +173,7 @@ app.post('/send', async (req, res) => {
         if (!topicId) return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
     } else {
         await updatePinnedMessage(ip, topicId);
-        await updateTopicIcon(ip, topicId);
+        await updateTopicInfo(ip, topicId, site);
     }
     
     try {
@@ -190,10 +192,7 @@ app.post('/send', async (req, res) => {
                     body: formData
                 });
                 const data = await response.json();
-                console.log('✅ Фото отправлено:', data.ok);
                 res.json(data);
-            } else {
-                throw new Error('Invalid image format');
             }
         } else if (text) {
             const data = await callTelegram('sendMessage', {
@@ -202,7 +201,6 @@ app.post('/send', async (req, res) => {
                 text: `💬 **${userId}:**\n\n${text}`,
                 parse_mode: 'Markdown'
             });
-            console.log('✅ Сообщение отправлено:', data.ok);
             res.json(data);
         } else {
             res.status(400).json({ ok: false, error: 'No text or image' });
@@ -217,14 +215,10 @@ app.post('/updateStatus', async (req, res) => {
     const { userId, site, ip, isOnline, isActive } = req.body;
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
-    let status = ipStatus.get(ip) || {
-        online: isOnline !== false,
-        lastActive: Date.now(),
-        site,
-        userId,
-        phone: null,
-        pinnedMessageId: null
-    };
+    let status = ipStatus.get(ip);
+    if (!status) {
+        status = { online: isOnline !== false, lastActive: Date.now(), site, userId, phone: null, pinnedMessageId: null };
+    }
     const wasOnline = status.online;
     status.online = isOnline !== false;
     if (isActive) status.lastActive = Date.now();
@@ -236,7 +230,7 @@ app.post('/updateStatus', async (req, res) => {
     if (topicId) {
         if (wasOnline !== status.online) {
             await updatePinnedMessage(ip, topicId);
-            await updateTopicIcon(ip, topicId);
+            await updateTopicInfo(ip, topicId, site);
         } else if (isActive) {
             await updatePinnedMessage(ip, topicId);
         }
@@ -259,7 +253,6 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const userIp = topicToIp.get(topicId);
                     
-                    // Проверяем, что сообщение от поддержки (не от бота) и для нужного IP
                     if (userIp && (!ip || userIp === ip) && msg.from && msg.from.is_bot === false) {
                         const messageData = {
                             update_id: update.update_id,
@@ -270,7 +263,6 @@ app.get('/getUpdates', async (req, res) => {
                             }
                         };
                         
-                        // Если есть фото
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -279,19 +271,16 @@ app.get('/getUpdates', async (req, res) => {
                                 if (fileData.ok) {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
-                                    console.log(`📸 Фото для IP ${userIp}: ${messageData.message.imageUrl}`);
                                 }
                             } catch (err) {
                                 console.error('Ошибка получения фото:', err);
                             }
                         }
-                        
                         filtered.push(messageData);
                     }
                 }
             }
             data.result = filtered;
-            console.log(`📨 Найдено ${filtered.length} новых сообщений для IP ${ip}`);
         }
         res.json(data);
     } catch (error) {
@@ -303,6 +292,5 @@ app.get('/getUpdates', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}`);
-    console.log(`📡 BOT_TOKEN: ${BOT_TOKEN.substring(0, 20)}...\n`);
+    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}\n`);
 });
