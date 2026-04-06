@@ -160,17 +160,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
-        .system-message {
-            background: #e8e8e8;
-            color: #555;
-            align-self: center;
-            font-size: 12px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            max-width: 90%;
-            text-align: center;
-        }
-        
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -254,12 +243,19 @@
         
         .phone-input {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             border: 1px solid #ddd;
             border-radius: 12px;
             font-size: 16px;
             margin-bottom: 12px;
-            text-align: center;
+            text-align: left;
+            letter-spacing: 0.5px;
+        }
+        
+        .phone-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102,126,234,0.2);
         }
         
         .phone-submit {
@@ -357,13 +353,51 @@
 <script>
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
     
-    // ========== ЛИМИТ НА ВВОД НОМЕРА ==========
+    // ========== НАСТРОЙКИ ТЕЛЕФОНА ==========
     const MAX_PHONE_ATTEMPTS = 3;
     const BLOCK_MINUTES = 30;
-    const MAX_PHONE_LENGTH = 15;  // ЛИМИТ НА КОЛИЧЕСТВО СИМВОЛОВ
     
     let phoneAttempts = parseInt(localStorage.getItem('phone_attempts') || '0');
     let blockUntil = parseInt(localStorage.getItem('phone_block_until') || '0');
+    
+    // Функция форматирования номера телефона
+    function formatPhoneNumber(input) {
+        // Удаляем все не-цифры
+        let digits = input.replace(/\D/g, '');
+        
+        // Если начинается с 8, заменяем на +7
+        if (digits.startsWith('8')) {
+            digits = '7' + digits.substring(1);
+        }
+        
+        // Ограничиваем 11 цифрами (7 + 10 цифр)
+        if (digits.length > 11) {
+            digits = digits.substring(0, 11);
+        }
+        
+        let formatted = '+7';
+        
+        if (digits.length > 1) {
+            let rest = digits.substring(1);
+            if (rest.length >= 1) formatted += ' ' + rest.substring(0, 3);
+            if (rest.length >= 4) formatted += ' ' + rest.substring(3, 6);
+            if (rest.length >= 7) formatted += ' ' + rest.substring(6, 8);
+            if (rest.length >= 9) formatted += ' ' + rest.substring(8, 10);
+        }
+        
+        return formatted.trim();
+    }
+    
+    function validatePhone(phone) {
+        // Очищаем от пробелов и не-цифр, оставляем только цифры
+        const digits = phone.replace(/\D/g, '');
+        // Должно быть 11 цифр (7 + 10)
+        return digits.length === 11 && digits.startsWith('7');
+    }
+    
+    function getRawPhoneDigits(phone) {
+        return phone.replace(/\D/g, '');
+    }
     
     function isPhoneBlocked() {
         if (blockUntil > Date.now()) return true;
@@ -513,8 +547,7 @@
                 <h4>📞 Укажите номер телефона</h4>
                 <p style="font-size: 13px; color: #666; margin-bottom: 8px;">Для связи с вами</p>
                 <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
-                <p style="font-size: 11px; color: #999; margin-bottom: 8px;">Максимум ${MAX_PHONE_LENGTH} символов</p>
-                <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 900 123-45-67" maxlength="${MAX_PHONE_LENGTH}">
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 123 456 78 90" maxlength="18">
                 <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
@@ -525,20 +558,60 @@
         const phoneError = document.getElementById('phoneError');
         const phoneSubmit = document.getElementById('phoneSubmit');
         
+        // Устанавливаем начальное значение +7
+        phoneInput.value = '+7';
+        
+        // Обработка ввода с маской
+        phoneInput.addEventListener('input', function(e) {
+            let cursorPos = e.target.selectionStart;
+            let oldValue = e.target.value;
+            
+            // Сохраняем только цифры
+            let digits = oldValue.replace(/\D/g, '');
+            
+            // Если начинается с 8, заменяем на 7
+            if (digits.startsWith('8')) {
+                digits = '7' + digits.substring(1);
+            }
+            
+            // Ограничиваем 11 цифрами
+            if (digits.length > 11) {
+                digits = digits.substring(0, 11);
+            }
+            
+            // Форматируем
+            let formatted = '+7';
+            if (digits.length > 1) {
+                let rest = digits.substring(1);
+                if (rest.length >= 1) formatted += ' ' + rest.substring(0, 3);
+                if (rest.length >= 4) formatted += ' ' + rest.substring(3, 6);
+                if (rest.length >= 7) formatted += ' ' + rest.substring(6, 8);
+                if (rest.length >= 9) formatted += ' ' + rest.substring(8, 10);
+            }
+            
+            e.target.value = formatted;
+            
+            // Восстанавливаем позицию курсора
+            let newCursorPos = cursorPos;
+            if (oldValue.length !== formatted.length) {
+                newCursorPos = formatted.length;
+            }
+            e.target.setSelectionRange(newCursorPos, newCursorPos);
+        });
+        
+        // Блокируем удаление префикса +7
+        phoneInput.addEventListener('keydown', function(e) {
+            if (e.target.selectionStart < 2 && (e.key === 'Backspace' || e.key === 'Delete')) {
+                e.preventDefault();
+            }
+        });
+        
         phoneSubmit.onclick = async () => {
             let phone = phoneInput.value.trim();
             
-            // Проверка длины
-            if (phone.length < 5 || phone.length > MAX_PHONE_LENGTH) {
-                phoneError.textContent = `Номер должен содержать от 5 до ${MAX_PHONE_LENGTH} символов`;
-                phoneError.style.display = 'block';
-                return;
-            }
-            
-            // Удаляем все не-цифры для валидации, кроме +
-            const cleanPhone = phone.replace(/[^\d+]/g, '');
-            if (cleanPhone.length < 5 || cleanPhone.length > MAX_PHONE_LENGTH) {
-                phoneError.textContent = `Введите корректный номер телефона (${MAX_PHONE_LENGTH} символов максимум)`;
+            // Проверяем валидность
+            if (!validatePhone(phone)) {
+                phoneError.textContent = 'Введите корректный номер телефона в формате +7 XXX XXX XX XX';
                 phoneError.style.display = 'block';
                 return;
             }
