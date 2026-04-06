@@ -7,7 +7,6 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        /* Основной стиль страницы */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -75,7 +74,6 @@
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
         }
         
-        /* Шапка виджета */
         .chat-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -126,7 +124,6 @@
         
         .clear-btn:hover, .close-btn:hover { background: rgba(255,255,255,0.3); }
         
-        /* Область сообщений */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -167,15 +164,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
-        .message img {
-            max-width: 200px;
-            max-height: 200px;
-            border-radius: 12px;
-            margin-top: 6px;
-            cursor: pointer;
-        }
-        
-        /* Системное сообщение (запрос телефона) */
         .system-message {
             background: #e8e8e8;
             color: #555;
@@ -187,7 +175,6 @@
             text-align: center;
         }
         
-        /* Поле ввода */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -229,7 +216,6 @@
         
         .send-btn:active, .file-btn:active { transform: scale(0.96); }
         
-        /* Статус */
         .status {
             font-size: 11px;
             padding: 6px 10px;
@@ -245,6 +231,7 @@
         .status.online { background: #d4edda; color: #155724; }
         .status.error { background: #f8d7da; color: #721c24; }
         .status.sending { background: #fff3cd; color: #856404; }
+        .status.blocked { background: #f8d7da; color: #721c24; }
         
         /* Запрос телефона */
         .phone-overlay {
@@ -268,6 +255,7 @@
             margin: 20px;
             text-align: center;
             animation: fadeIn 0.2s ease;
+            max-width: 320px;
         }
         
         .phone-card h4 {
@@ -281,7 +269,7 @@
             border: 1px solid #ddd;
             border-radius: 12px;
             font-size: 16px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
             text-align: center;
         }
         
@@ -294,6 +282,17 @@
             font-size: 16px;
             cursor: pointer;
             width: 100%;
+        }
+        
+        .phone-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .error-text {
+            color: #dc3545;
+            font-size: 12px;
+            margin-bottom: 12px;
         }
         
         .chat-widget.closed .chat-header, 
@@ -317,7 +316,6 @@
             display: flex;
         }
         
-        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -333,10 +331,6 @@
                 right: 20px;
                 border-radius: 28px;
             }
-            .message img {
-                max-width: 150px;
-                max-height: 150px;
-            }
         }
     </style>
 </head>
@@ -347,7 +341,7 @@
     <div class="note">
         <strong>📌 Как это работает:</strong><br>
         1️⃣ Нажмите на виджет в правом нижнем углу<br>
-        2️⃣ Укажите ваш номер телефона для связи<br>
+        2️⃣ Укажите ваш номер телефона для связи (максимум 3 попытки)<br>
         3️⃣ Напишите сообщение или отправьте фото<br>
         4️⃣ Мы ответим вам в Telegram, а вы увидите ответ здесь
     </div>
@@ -375,6 +369,50 @@
 
 <script>
     const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
+    
+    // ========== ЛИМИТ НА ВВОД НОМЕРА ==========
+    const MAX_PHONE_ATTEMPTS = 3;
+    const BLOCK_MINUTES = 30;
+    
+    let phoneAttempts = parseInt(localStorage.getItem('phone_attempts') || '0');
+    let blockUntil = parseInt(localStorage.getItem('phone_block_until') || '0');
+    
+    function isPhoneBlocked() {
+        if (blockUntil > Date.now()) {
+            return true;
+        }
+        if (blockUntil && blockUntil < Date.now()) {
+            // Снимаем блокировку
+            localStorage.removeItem('phone_block_until');
+            localStorage.removeItem('phone_attempts');
+            phoneAttempts = 0;
+            return false;
+        }
+        return false;
+    }
+    
+    function incrementPhoneAttempt() {
+        phoneAttempts++;
+        localStorage.setItem('phone_attempts', phoneAttempts);
+        
+        if (phoneAttempts >= MAX_PHONE_ATTEMPTS) {
+            blockUntil = Date.now() + (BLOCK_MINUTES * 60 * 1000);
+            localStorage.setItem('phone_block_until', blockUntil);
+            return true; // заблокирован
+        }
+        return false; // ещё есть попытки
+    }
+    
+    function getRemainingAttempts() {
+        return MAX_PHONE_ATTEMPTS - phoneAttempts;
+    }
+    
+    function getBlockTimeRemaining() {
+        if (!blockUntil) return 0;
+        const remaining = Math.ceil((blockUntil - Date.now()) / 60000);
+        return remaining > 0 ? remaining : 0;
+    }
+    // ========================================
     
     let userId = localStorage.getItem('chat_user_id');
     if (!userId) {
@@ -407,7 +445,6 @@
     const fileInput = document.getElementById('fileInput');
     const statusDiv = document.getElementById('status');
     
-    // Функции
     function updateStatus(isOnline = true, isActive = false) {
         fetch(`${PROXY_URL}/updateStatus`, {
             method: 'POST',
@@ -453,7 +490,6 @@
         statusDiv.className = `status ${type}`;
     }
     
-    // Отправка номера телефона
     async function registerPhone(phone) {
         try {
             const response = await fetch(`${PROXY_URL}/register`, {
@@ -466,6 +502,9 @@
                 userPhone = phone;
                 localStorage.setItem('user_phone', phone);
                 isPhoneRequired = false;
+                // Сбрасываем попытки при успешной регистрации
+                localStorage.removeItem('phone_attempts');
+                localStorage.removeItem('phone_block_until');
                 addMessage('✅ Спасибо! Теперь вы можете задать ваш вопрос.', false);
                 return true;
             }
@@ -475,27 +514,79 @@
         return false;
     }
     
-    // Показ формы ввода телефона
     function showPhoneForm() {
+        // Проверяем блокировку
+        if (isPhoneBlocked()) {
+            const remaining = getBlockTimeRemaining();
+            addMessage(`⛔ Превышено количество попыток. Попробуйте через ${remaining} минут.`, false);
+            setStatus(`⛔ Блокировка ${remaining} мин`, 'blocked');
+            return;
+        }
+        
+        const remainingAttempts = getRemainingAttempts();
+        
         const overlay = document.createElement('div');
         overlay.className = 'phone-overlay';
         overlay.innerHTML = `
             <div class="phone-card">
                 <h4>📞 Укажите номер телефона</h4>
                 <p style="font-size: 13px; color: #666; margin-bottom: 16px;">Для связи с вами</p>
+                <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Осталось попыток: ${remainingAttempts} из ${MAX_PHONE_ATTEMPTS}</p>
                 <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 900 123-45-67">
+                <div id="phoneError" class="error-text" style="display: none;"></div>
                 <button class="phone-submit" id="phoneSubmit">Продолжить</button>
             </div>
         `;
         widget.appendChild(overlay);
         
-        document.getElementById('phoneSubmit').onclick = async () => {
-            const phone = document.getElementById('phoneInput').value.trim();
-            if (phone) {
+        const phoneInput = document.getElementById('phoneInput');
+        const phoneError = document.getElementById('phoneError');
+        const phoneSubmit = document.getElementById('phoneSubmit');
+        
+        phoneSubmit.onclick = async () => {
+            const phone = phoneInput.value.trim();
+            
+            // Простая валидация телефона
+            const phoneRegex = /^[\+\d][\d\(\)\-\s]{5,20}$/;
+            if (!phone || !phoneRegex.test(phone)) {
+                phoneError.textContent = 'Введите корректный номер телефона';
+                phoneError.style.display = 'block';
+                return;
+            }
+            
+            phoneError.style.display = 'none';
+            phoneSubmit.disabled = true;
+            phoneSubmit.textContent = 'Проверка...';
+            
+            const success = await registerPhone(phone);
+            
+            if (success) {
                 overlay.remove();
-                await registerPhone(phone);
             } else {
-                alert('Введите номер телефона');
+                const isNowBlocked = incrementPhoneAttempt();
+                phoneSubmit.disabled = false;
+                phoneSubmit.textContent = 'Продолжить';
+                
+                if (isNowBlocked) {
+                    phoneError.textContent = `Превышено количество попыток. Доступ будет восстановлен через ${BLOCK_MINUTES} минут.`;
+                    phoneError.style.display = 'block';
+                    phoneSubmit.disabled = true;
+                    
+                    setTimeout(() => {
+                        overlay.remove();
+                        addMessage(`⛔ Превышено количество попыток ввода номера. Попробуйте через ${BLOCK_MINUTES} минут.`, false);
+                    }, 2000);
+                } else {
+                    const remaining = getRemainingAttempts();
+                    phoneError.textContent = `Неверный номер. Осталось попыток: ${remaining}`;
+                    phoneError.style.display = 'block';
+                    
+                    // Обновляем текст с оставшимися попытками в заголовке
+                    const attemptsText = overlay.querySelector('.phone-card p:first-of-type');
+                    if (attemptsText) {
+                        attemptsText.textContent = `Осталось попыток: ${remaining} из ${MAX_PHONE_ATTEMPTS}`;
+                    }
+                }
             }
         };
     }
@@ -590,8 +681,12 @@
     widget.addEventListener('click', (e) => {
         if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
             widget.classList.remove('closed');
-            if (isPhoneRequired) {
+            if (isPhoneRequired && !isPhoneBlocked()) {
                 setTimeout(() => showPhoneForm(), 100);
+            } else if (isPhoneBlocked()) {
+                const remaining = getBlockTimeRemaining();
+                addMessage(`⛔ Доступ временно заблокирован. Попробуйте через ${remaining} минут.`, false);
+                setStatus(`⛔ Блокировка ${remaining} мин`, 'blocked');
             }
         }
     });
@@ -657,8 +752,12 @@
     setInterval(() => updateStatus(true, true), 30000);
     setInterval(checkReplies, 5000);
     
-    if (isPhoneRequired) {
+    if (isPhoneRequired && !isPhoneBlocked()) {
         setTimeout(() => showPhoneForm(), 500);
+    } else if (isPhoneBlocked()) {
+        const remaining = getBlockTimeRemaining();
+        addMessage(`⛔ Превышено количество попыток ввода номера. Попробуйте через ${remaining} минут.`, false);
+        setStatus(`⛔ Блокировка ${remaining} мин`, 'blocked');
     }
 </script>
 </body>
