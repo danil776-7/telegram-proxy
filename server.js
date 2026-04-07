@@ -259,7 +259,7 @@ app.get('/getUpdates', async (req, res) => {
         const response = await fetch(url);
         const data = await response.json();
         
-        console.log('📨 getUpdates ответ:', data.ok ? 'OK' : 'ERROR');
+        console.log('📨 getUpdates ответ:', data.ok ? 'OK' : 'ERROR', 'количество:', data.result?.length || 0);
         
         if (data.ok && data.result) {
             const filtered = [];
@@ -269,30 +269,41 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const userIp = topicToIp.get(topicId);
                     
-                    console.log(`📨 Сообщение в топике ${topicId}, IP: ${userIp}, от бота: ${msg.from?.is_bot}`);
+                    console.log(`📨 Сообщение в топике ${topicId}, IP: ${userIp}, от бота: ${msg.from?.is_bot}, есть фото: ${!!msg.photo}`);
                     
-                    if (userIp && (!ip || userIp === ip) && msg.from && msg.from.is_bot === false) {
+                    // Пропускаем сообщения от бота
+                    if (msg.from && msg.from.is_bot) continue;
+                    
+                    if (userIp && (!ip || userIp === ip)) {
                         const messageData = {
                             update_id: update.update_id,
                             message: {
                                 text: msg.caption || msg.text || '',
-                                from: msg.from.first_name || 'Поддержка',
+                                from: msg.from?.first_name || 'Поддержка',
                                 date: msg.date
                             }
                         };
                         
+                        // Обработка фото - получаем ссылку на файл
                         if (msg.photo && msg.photo.length > 0) {
                             try {
+                                // Берем самое большое фото (последнее в массиве)
                                 const photo = msg.photo[msg.photo.length - 1];
+                                console.log(`📸 Получено фото, file_id: ${photo.file_id}`);
+                                
                                 const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
                                 const fileData = await fileResponse.json();
+                                
                                 if (fileData.ok) {
-                                    messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                                    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                                    messageData.message.imageUrl = fileUrl;
                                     messageData.message.hasImage = true;
-                                    console.log(`📸 Фото для ${userIp}: ${messageData.message.imageUrl}`);
+                                    console.log(`📸 Ссылка на фото: ${fileUrl}`);
+                                } else {
+                                    console.error('Ошибка получения файла:', fileData);
                                 }
                             } catch (err) {
-                                console.error('Ошибка получения фото:', err);
+                                console.error('Ошибка обработки фото:', err);
                             }
                         }
                         
@@ -301,7 +312,7 @@ app.get('/getUpdates', async (req, res) => {
                 }
             }
             data.result = filtered;
-            console.log(`📨 Найдено ${filtered.length} новых сообщений для отправки в виджет`);
+            console.log(`📨 Отправлено ${filtered.length} сообщений в виджет`);
         }
         res.json(data);
     } catch (error) {
