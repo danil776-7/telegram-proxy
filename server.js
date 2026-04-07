@@ -9,6 +9,26 @@ app.use(express.json({ limit: '50mb' }));
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003765383331;
 
+// Функция для форматирования времени в московское время (UTC+3)
+function getMoscowTime() {
+    const now = new Date();
+    // Устанавливаем московское время (UTC+3)
+    const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
+    return moscowTime;
+}
+
+function formatMoscowTime(date) {
+    return date.toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
 const ipTopics = new Map();
 const topicToIp = new Map();
 const ipStatus = new Map();
@@ -41,7 +61,9 @@ async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveStr = status.lastActive ? new Date(status.lastActive).toLocaleString('ru-RU') : 'неизвестно';
+    const moscowNow = getMoscowTime();
+    const lastActiveDate = status.lastActive ? new Date(status.lastActive) : moscowNow;
+    const lastActiveStr = formatMoscowTime(lastActiveDate);
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
@@ -100,11 +122,12 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         });
         
         const regionText = region ? `📍 **Регион:** ${region}\n` : '';
+        const moscowTime = formatMoscowTime(getMoscowTime());
         
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${regionText}${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
+            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${regionText}${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${moscowTime}`,
             parse_mode: 'Markdown'
         });
         
@@ -269,9 +292,6 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const userIp = topicToIp.get(topicId);
                     
-                    console.log(`📨 Сообщение в топике ${topicId}, IP: ${userIp}, от бота: ${msg.from?.is_bot}, есть фото: ${!!msg.photo}`);
-                    
-                    // Пропускаем сообщения от бота
                     if (msg.from && msg.from.is_bot) continue;
                     
                     if (userIp && (!ip || userIp === ip)) {
@@ -284,23 +304,14 @@ app.get('/getUpdates', async (req, res) => {
                             }
                         };
                         
-                        // Обработка фото - получаем ссылку на файл
                         if (msg.photo && msg.photo.length > 0) {
                             try {
-                                // Берем самое большое фото (последнее в массиве)
                                 const photo = msg.photo[msg.photo.length - 1];
-                                console.log(`📸 Получено фото, file_id: ${photo.file_id}`);
-                                
                                 const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
                                 const fileData = await fileResponse.json();
-                                
                                 if (fileData.ok) {
-                                    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-                                    messageData.message.imageUrl = fileUrl;
+                                    messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
-                                    console.log(`📸 Ссылка на фото: ${fileUrl}`);
-                                } else {
-                                    console.error('Ошибка получения файла:', fileData);
                                 }
                             } catch (err) {
                                 console.error('Ошибка обработки фото:', err);
@@ -312,7 +323,6 @@ app.get('/getUpdates', async (req, res) => {
                 }
             }
             data.result = filtered;
-            console.log(`📨 Отправлено ${filtered.length} сообщений в виджет`);
         }
         res.json(data);
     } catch (error) {
@@ -324,5 +334,6 @@ app.get('/getUpdates', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}\n`);
+    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}`);
+    console.log(`🕐 Часовой пояс: Europe/Moscow (UTC+3)\n`);
 });
