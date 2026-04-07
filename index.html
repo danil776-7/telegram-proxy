@@ -165,11 +165,16 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
+        /* Адаптация фото под любые устройства */
         .message img {
-            max-width: 200px;
+            max-width: 100%;
+            max-height: 300px;
+            width: auto;
+            height: auto;
             border-radius: 12px;
             margin-top: 8px;
             cursor: pointer;
+            object-fit: contain;
         }
         
         .message-time {
@@ -332,11 +337,14 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
+        /* Адаптация для компьютера */
         @media (min-width: 768px) {
             .chat-widget { width: 450px; height: 700px; }
             .message { max-width: 75%; font-size: 16px; }
+            .message img { max-height: 350px; }
         }
         
+        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -355,6 +363,7 @@
                 border-radius: 30px;
             }
             .message { max-width: 90%; font-size: 15px; }
+            .message img { max-height: 200px; }
             .send-btn, .file-btn { padding: 10px 16px; min-width: 44px; min-height: 44px; }
             .phone-card { margin: 16px; padding: 20px; }
             .phone-input { font-size: 16px; padding: 14px; }
@@ -568,9 +577,13 @@
             if (isImage && imageUrl) {
                 const img = document.createElement('img');
                 img.src = imageUrl;
-                img.style.maxWidth = '200px';
+                img.style.maxWidth = '100%';
+                img.style.maxHeight = '300px';
+                img.style.width = 'auto';
+                img.style.height = 'auto';
                 img.style.borderRadius = '12px';
                 img.style.cursor = 'pointer';
+                img.style.objectFit = 'contain';
                 img.onclick = () => window.open(imageUrl, '_blank');
                 div.appendChild(img);
                 if (text) {
@@ -800,11 +813,23 @@
                 if (data.ok && data.result) {
                     for (const update of data.result) {
                         lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                        if (update.message && update.message.text && 
-                            !update.message.text.includes('Новый пользователь') && 
-                            !update.message.text.startsWith('💬') && 
-                            !update.message.text.startsWith('📞')) {
-                            addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id, update.message.date);
+                        if (update.message && (update.message.text || update.message.hasImage)) {
+                            if (update.message.text && (
+                                update.message.text.includes('Новый пользователь') || 
+                                update.message.text.startsWith('💬') || 
+                                update.message.text.startsWith('📞')
+                            )) {
+                                continue;
+                            }
+                            
+                            addMessage(
+                                update.message.text || '📷 Изображение', 
+                                false, 
+                                update.message.hasImage || false, 
+                                update.message.imageUrl || null, 
+                                update.update_id, 
+                                update.message.date
+                            );
                         }
                     }
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
@@ -822,6 +847,14 @@
                 if (msg.isImage && msg.imageUrl) {
                     const img = document.createElement('img');
                     img.src = msg.imageUrl;
+                    img.style.maxWidth = '100%';
+                    img.style.maxHeight = '300px';
+                    img.style.width = 'auto';
+                    img.style.height = 'auto';
+                    img.style.borderRadius = '12px';
+                    img.style.cursor = 'pointer';
+                    img.style.objectFit = 'contain';
+                    img.onclick = () => window.open(msg.imageUrl, '_blank');
                     div.appendChild(img);
                     if (msg.text) div.appendChild(document.createTextNode(' ' + msg.text));
                 } else {
