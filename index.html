@@ -38,7 +38,7 @@
         
         p { color: #666; line-height: 1.5; font-size: 16px; }
         
-        /* ========== НОВЫЙ ДИЗАЙН ВИДЖЕТА ========== */
+        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -55,7 +55,6 @@
             overflow: hidden;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1000;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         }
         
         .chat-widget.closed {
@@ -67,7 +66,6 @@
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
         }
         
-        /* Шапка виджета */
         .chat-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -115,7 +113,6 @@
         
         .clear-btn:hover, .close-btn:hover { background: rgba(255,255,255,0.3); }
         
-        /* Область сообщений */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -157,20 +154,6 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         
-        .operator-message {
-            background: #e8f4fd;
-            color: #1a1a2e;
-            align-self: flex-start;
-            border-bottom-left-radius: 4px;
-        }
-        
-        .operator-name {
-            font-size: 11px;
-            color: #667eea;
-            margin-bottom: 4px;
-            font-weight: 500;
-        }
-        
         .message img {
             max-width: 100%;
             max-height: 200px;
@@ -189,7 +172,6 @@
             text-align: right;
         }
         
-        /* Поле ввода */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -307,6 +289,32 @@
             display: flex;
             align-items: center;
             gap: 4px;
+            position: relative;
+        }
+        
+        .country-select-dropdown {
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 30;
+            margin-bottom: 8px;
+            min-width: 180px;
+        }
+        
+        .country-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 14px;
+        }
+        
+        .country-option:hover {
+            background: #f5f7fb;
         }
         
         .phone-input {
@@ -357,6 +365,7 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
+        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -376,7 +385,11 @@
             }
             .message { max-width: 90%; font-size: 14px; }
             .message img { max-height: 150px; }
+            .phone-card { padding: 24px 16px; }
             .phone-card h4 { font-size: 20px; }
+            .phone-input-wrapper { padding: 2px 8px; }
+            .country-code { font-size: 16px; padding: 8px 4px; }
+            .phone-input { font-size: 16px; }
         }
     </style>
 </head>
@@ -491,61 +504,37 @@
         const fileInput = document.getElementById('fileInput');
         const statusDiv = document.getElementById('status');
         
-        // Функция очистки чата
         function clearChat() {
             if (confirm('Очистить всю историю чата?')) {
-                // Очищаем сообщения на экране
                 const messages = messagesDiv.querySelectorAll('.message');
                 messages.forEach(msg => msg.remove());
-                
-                // Очищаем localStorage
                 localStorage.removeItem('chat_history');
                 localStorage.removeItem('chat_lastUpdateId');
                 localStorage.removeItem('chat_processedIds');
-                
-                // Сбрасываем переменные
                 lastUpdateId = 0;
                 processedIds.clear();
-                
-                // Добавляем приветственное сообщение
                 addMessage('Чат очищен. Задайте, пожалуйста, ваш вопрос 😊', false);
-                
-                console.log('🧹 Чат очищен');
             }
         }
         
-        // Кнопка очистки
-        if (clearBtn) {
-            clearBtn.addEventListener('click', clearChat);
-        }
+        if (clearBtn) clearBtn.addEventListener('click', clearChat);
         
         function formatTime(date) {
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
         
-        function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null, timestamp = null, operatorName = null) {
+        function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null, timestamp = null) {
             if (msgId && processedIds.has(msgId)) return;
             
             const div = document.createElement('div');
-            if (operatorName && !isUser) {
-                div.className = `message operator-message`;
-                const nameSpan = document.createElement('div');
-                nameSpan.className = 'operator-name';
-                nameSpan.innerText = operatorName;
-                div.appendChild(nameSpan);
-            } else {
-                div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            }
+            div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
             
             if (isImage && imageUrl) {
                 const img = document.createElement('img');
                 img.src = imageUrl;
                 img.onclick = () => window.open(imageUrl, '_blank');
                 div.appendChild(img);
-                if (text) {
-                    const textNode = document.createTextNode(' ' + text);
-                    div.appendChild(textNode);
-                }
+                if (text) div.appendChild(document.createTextNode(' ' + text));
             } else {
                 div.innerText = text;
             }
@@ -608,7 +597,7 @@
                     <h4>Чат с поддержкой</h4>
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
                     <div class="phone-input-wrapper">
-                        <span class="country-code" id="countryCode">${getPhoneCodeByCountryCode(userCountry)}</span>
+                        <span class="country-code" id="countryCode">${getPhoneCodeByCountryCode(userCountry)} ▼</span>
                         <input type="tel" class="phone-input" id="phoneInput" placeholder="(00) 000 00 00" maxlength="15" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
@@ -618,14 +607,45 @@
             `;
             widget.appendChild(overlay);
             
+            const countryCodeSpan = document.getElementById('countryCode');
             const phoneInput = document.getElementById('phoneInput');
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
-            const countryCodeSpan = document.getElementById('countryCode');
+            
+            // Создаём выпадающий список для выбора страны
+            const dropdown = document.createElement('div');
+            dropdown.className = 'country-select-dropdown';
+            dropdown.style.display = 'none';
+            
+            countries.forEach(country => {
+                const option = document.createElement('div');
+                option.className = 'country-option';
+                option.innerHTML = `${country.name} ${country.phoneCode}`;
+                option.onclick = () => {
+                    countryCodeSpan.innerHTML = `${country.phoneCode} ▼`;
+                    dropdown.style.display = 'none';
+                    phoneInput.focus();
+                };
+                dropdown.appendChild(option);
+            });
+            
+            countryCodeSpan.parentNode.style.position = 'relative';
+            countryCodeSpan.parentNode.appendChild(dropdown);
+            
+            countryCodeSpan.onclick = (e) => {
+                e.stopPropagation();
+                const isVisible = dropdown.style.display === 'block';
+                dropdown.style.display = isVisible ? 'none' : 'block';
+            };
+            
+            document.addEventListener('click', () => {
+                dropdown.style.display = 'none';
+            });
             
             phoneSubmit.onclick = async () => {
                 let phone = phoneInput.value.trim();
-                const country = countries.find(c => c.phoneCode === countryCodeSpan.innerText);
+                const selectedCode = countryCodeSpan.innerText.replace('▼', '').trim();
+                const country = countries.find(c => c.phoneCode === selectedCode);
                 
                 if (!phone || phone.length < 5) {
                     phoneError.textContent = 'Неверно указан номер телефона';
@@ -633,7 +653,7 @@
                     return;
                 }
                 
-                const fullPhone = countryCodeSpan.innerText + phone.replace(/\D/g, '');
+                const fullPhone = selectedCode + phone.replace(/\D/g, '');
                 if (!validatePhone(fullPhone, country.code)) {
                     phoneError.textContent = 'Неверно указан номер телефона';
                     phoneError.style.display = 'block';
@@ -697,7 +717,7 @@
                             if (update.message.text && (update.message.text.includes('Новый пользователь') || update.message.text.startsWith('💬') || update.message.text.includes('changed the topic name'))) {
                                 continue;
                             }
-                            addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id, update.message.date, update.message.from);
+                            addMessage(update.message.text || '📷 Изображение', false, update.message.hasImage || false, update.message.imageUrl || null, update.update_id, update.message.date);
                         }
                     }
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
