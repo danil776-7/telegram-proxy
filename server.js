@@ -4,14 +4,13 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
-// === НАСТРОЙКИ CORS (РАЗРЕШАЕМ ВСЁ) ===
+// Настройки CORS - разрешаем всё
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.options('*', cors());
-
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -19,6 +18,7 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
+// Функция для форматирования времени из timestamp Telegram в Московское время
 function formatTelegramTime(timestamp) {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString('ru-RU', {
@@ -44,10 +44,12 @@ function getCurrentTime() {
     });
 }
 
-const ipTopics = new Map();
-const topicToIp = new Map();
-const ipStatus = new Map();
+// Хранилища
+const ipTopics = new Map();      // ip -> topicId
+const topicToIp = new Map();     // topicId -> ip
+const ipStatus = new Map();      // ip -> { online, lastActive, site, userId, phone, region, pinnedMessageId }
 
+// Загрузка данных из файла
 function loadData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
@@ -55,7 +57,9 @@ function loadData() {
             console.log('📂 Данные загружены из файла');
             return data;
         }
-    } catch (err) {}
+    } catch (err) {
+        console.error('Ошибка загрузки данных:', err);
+    }
     return { ipTopics: {}, topicToIp: {}, ipStatus: {} };
 }
 
@@ -67,10 +71,13 @@ function saveData() {
             ipStatus: Object.fromEntries(ipStatus)
         };
         fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-        console.log('💾 Данные сохранены');
-    } catch (err) {}
+        console.log('💾 Данные сохранены в файл');
+    } catch (err) {
+        console.error('Ошибка сохранения данных:', err);
+    }
 }
 
+// Загружаем сохранённые данные
 const savedData = loadData();
 for (const [ip, topicId] of Object.entries(savedData.ipTopics || {})) ipTopics.set(ip, topicId);
 for (const [topicId, ip] of Object.entries(savedData.topicToIp || {})) topicToIp.set(parseInt(topicId), ip);
@@ -78,6 +85,7 @@ for (const [ip, status] of Object.entries(savedData.ipStatus || {})) ipStatus.se
 
 console.log(`📊 Загружено ${ipTopics.size} связей IP->топик`);
 
+// Функции для работы с Telegram API
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
     const response = await fetch(url, {
@@ -88,6 +96,7 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
+// Обновление иконки и названия топика
 async function updateTopicInfo(ip, topicId, site) {
     const status = ipStatus.get(ip);
     if (!status) return;
@@ -99,9 +108,10 @@ async function updateTopicInfo(ip, topicId, site) {
             message_thread_id: topicId,
             name: `${iconEmoji} ${shortSite}`
         });
-    } catch (e) {}
+    } catch (e) { console.error('Ошибка иконки:', e.message); }
 }
 
+// Обновление ОДНОГО закреплённого сообщения (вся информация в одном месте)
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
@@ -140,15 +150,18 @@ async function updatePinnedMessage(ip, topicId) {
         }
         ipStatus.set(ip, status);
         saveData();
-    } catch (e) {
+    } catch (e) { 
+        console.error('Ошибка обновления:', e.message);
         if (e.message?.includes('message to edit not found')) {
             status.pinnedMessageId = null;
             ipStatus.set(ip, status);
             saveData();
+            await updatePinnedMessage(ip, topicId);
         }
     }
 }
 
+// Создание нового топика для пользователя
 async function createTopicForIp(ip, site, userId, phone = null, region = null) {
     try {
         const shortSite = site?.replace(/^https?:\/\//, '').replace(/\/$/, '').substring(0, 30) || 'unknown';
@@ -187,18 +200,22 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         await updateTopicInfo(ip, topicId, site);
         return topicId;
     } catch (err) {
+        console.error('Ошибка создания топика:', err);
         return null;
     }
 }
 
-// === ВСЕ ЭНДПОИНТЫ С ЯВНЫМ УКАЗАНИЕМ CORS ===
+// ========== API ENDPOINTS ==========
+
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.json({ status: 'ok', message: 'Telegram Proxy работает!', topics: ipTopics.size });
 });
 
+// Регистрация номера телефона
 app.post('/register', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
+    console.log('📞 Регистрация:', req.body);
     const { userId, site, ip, phone, region } = req.body;
     
     if (!ip || !phone) {
@@ -223,15 +240,19 @@ app.post('/register', async (req, res) => {
             await updateTopicInfo(ip, topicId, site);
         }
         
+        console.log('✅ Регистрация успешна');
         res.json({ ok: true });
     } catch (error) {
+        console.error('Ошибка регистрации:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
 
+// Отправка сообщения от пользователя
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, text, imageBase64, region } = req.body;
+    console.log('📨 Отправка сообщения от:', userId, 'IP:', ip);
     
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
@@ -249,9 +270,11 @@ app.post('/send', async (req, res) => {
     
     let topicId = ipTopics.get(ip);
     if (!topicId) {
+        console.log(`🆕 Создаём новый топик для IP: ${ip}`);
         topicId = await createTopicForIp(ip, site, userId, status.phone, status.region);
         if (!topicId) return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
     } else {
+        console.log(`📌 Используем существующий топик для IP: ${ip}`);
         await updatePinnedMessage(ip, topicId);
         await updateTopicInfo(ip, topicId, site);
     }
@@ -272,7 +295,10 @@ app.post('/send', async (req, res) => {
                     body: formData
                 });
                 const data = await response.json();
+                console.log('✅ Фото отправлено:', data.ok);
                 res.json(data);
+            } else {
+                throw new Error('Invalid image format');
             }
         } else if (text) {
             const data = await callTelegram('sendMessage', {
@@ -281,15 +307,18 @@ app.post('/send', async (req, res) => {
                 text: `💬 **${userId}:**\n\n${text}`,
                 parse_mode: 'Markdown'
             });
+            console.log('✅ Сообщение отправлено:', data.ok);
             res.json(data);
         } else {
             res.status(400).json({ ok: false, error: 'No text or image' });
         }
     } catch (error) {
+        console.error('Ошибка отправки:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
 
+// Обновление статуса активности
 app.post('/updateStatus', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, isOnline, isActive } = req.body;
@@ -315,6 +344,7 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
+// Получение ответов из Telegram (текст + фото)
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { offset, ip } = req.query;
@@ -339,6 +369,7 @@ app.get('/getUpdates', async (req, res) => {
                         }
                     }
                     
+                    // Пропускаем сообщения от бота и системные сообщения
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && (msg.text.includes('changed the topic name') || msg.text.includes('закрепил') || msg.text.includes('переименовал'))) continue;
                     
@@ -352,6 +383,7 @@ app.get('/getUpdates', async (req, res) => {
                             }
                         };
                         
+                        // Обработка фото
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -362,7 +394,9 @@ app.get('/getUpdates', async (req, res) => {
                                     messageData.message.hasImage = true;
                                     console.log('📸 Фото получено:', messageData.message.imageUrl);
                                 }
-                            } catch (err) {}
+                            } catch (err) {
+                                console.error('Ошибка фото:', err);
+                            }
                         }
                         
                         filtered.push(messageData);
@@ -382,5 +416,6 @@ app.get('/getUpdates', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}\n`);
+    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}`);
+    console.log(`📂 Данные сохраняются в файл: ${DATA_FILE}\n`);
 });
