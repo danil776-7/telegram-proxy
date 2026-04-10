@@ -554,31 +554,34 @@
         }
         
         async function registerPhone(phone) {
-            try {
-                const response = await fetch(`${PROXY_URL}/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId, 
-                        site: window.location.hostname, 
-                        ip: userGeo.ip, 
-                        phone,
-                        region: `${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}`
-                    })
-                });
-                const data = await response.json();
-                if (data.ok) {
-                    userPhone = phone;
-                    localStorage.setItem('user_phone', phone);
-                    isPhoneRequired = false;
-                    addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
-                    return true;
-                }
-                return false;
-            } catch (error) {
-                return false;
-            }
+    console.log('📞 Регистрация телефона:', phone);
+    try {
+        const response = await fetch(`${PROXY_URL}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                userId, 
+                site: window.location.hostname, 
+                ip: userGeo.ip, 
+                phone,
+                region: `${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}`
+            })
+        });
+        const data = await response.json();
+        console.log('📞 Ответ сервера:', data);
+        if (data.ok) {
+            userPhone = phone;
+            localStorage.setItem('user_phone', phone);
+            isPhoneRequired = false;
+            addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
+            return true;
         }
+        return false;
+    } catch (error) {
+        console.error('Ошибка регистрации:', error);
+        return false;
+    }
+}
         
         function showPhoneForm() {
             const oldOverlay = document.querySelector('.phone-overlay');
