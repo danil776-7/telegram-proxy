@@ -4,8 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+// Настройки CORS - разрешаем всё
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Обрабатываем preflight запросы
 app.options('*', cors());
+
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -88,7 +96,6 @@ async function updateTopicInfo(ip, topicId, site) {
     } catch (e) { console.error('Ошибка иконки:', e.message); }
 }
 
-// ОДНО закреплённое сообщение (обновляется, не создаёт новое)
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
@@ -102,8 +109,6 @@ async function updatePinnedMessage(ip, topicId) {
     
     try {
         if (status.pinnedMessageId) {
-            // Редактируем существующее закреплённое сообщение
-            console.log(`📝 Редактируем сообщение ${status.pinnedMessageId} для IP ${ip}`);
             await callTelegram('editMessageText', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -112,8 +117,6 @@ async function updatePinnedMessage(ip, topicId) {
                 parse_mode: 'Markdown'
             });
         } else {
-            // Создаём новое только один раз
-            console.log(`🆕 Создаём новое закреплённое сообщение для IP ${ip}`);
             const sent = await callTelegram('sendMessage', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -127,19 +130,16 @@ async function updatePinnedMessage(ip, topicId) {
                     message_thread_id: topicId,
                     message_id: sent.result.message_id
                 });
-                console.log(`✅ Закреплено сообщение ${status.pinnedMessageId}`);
             }
         }
         ipStatus.set(ip, status);
         saveData();
     } catch (e) { 
-        console.error('❌ Ошибка обновления закреплённого сообщения:', e.message);
-        // Если редактирование не удалось (сообщение удалено), сбрасываем ID
+        console.error('Ошибка обновления:', e.message);
         if (e.message.includes('message to edit not found')) {
             status.pinnedMessageId = null;
             ipStatus.set(ip, status);
             saveData();
-            // Повторяем попытку
             await updatePinnedMessage(ip, topicId);
         }
     }
@@ -172,7 +172,6 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         const regionText = region ? `📍 **Регион:** ${region}\n` : '';
         const currentTime = getLocalTime();
         
-        // Приветственное сообщение (только один раз)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -188,6 +187,8 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         return null;
     }
 }
+
+// ========== API ==========
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -317,7 +318,6 @@ app.post('/updateStatus', async (req, res) => {
     
     const topicId = ipTopics.get(ip);
     if (topicId && wasOnline !== status.online) {
-        // Обновляем только если изменился статус (онлайн/офлайн)
         await updatePinnedMessage(ip, topicId);
         await updateTopicInfo(ip, topicId, site);
     }
@@ -346,11 +346,8 @@ app.get('/getUpdates', async (req, res) => {
                         }
                     }
                     
-                    // Пропускаем сообщения от бота и системные сообщения
                     if (msg.from && msg.from.is_bot) continue;
-                    if (msg.text && msg.text.includes('changed the topic name')) continue;
-                    if (msg.text && msg.text.includes('закрепил')) continue;
-                    if (msg.text && msg.text.includes('переименовал')) continue;
+                    if (msg.text && (msg.text.includes('changed the topic name') || msg.text.includes('закрепил') || msg.text.includes('переименовал'))) continue;
                     
                     if (userIp && (!ip || userIp === ip)) {
                         const messageData = {
