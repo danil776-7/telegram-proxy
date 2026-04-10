@@ -547,41 +547,46 @@
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
+            let currentMaxDigits = getMaxDigits(countrySelect.value);
+            
             function updateMaxLength() {
-                const country = countries.find(c => c.code === countrySelect.value);
-                if (country) {
-                    phoneInput.maxLength = country.maxDigits;
-                    phoneInput.placeholder = `${country.maxDigits} цифр`;
-                }
+                currentMaxDigits = getMaxDigits(countrySelect.value);
+                phoneInput.placeholder = `${currentMaxDigits} цифр`;
+                // Очищаем поле при смене страны
+                phoneInput.value = '';
+                phoneError.style.display = 'none';
             }
             
             countrySelect.addEventListener('change', updateMaxLength);
             updateMaxLength();
             
+            // Жёсткое ограничение ввода
             phoneInput.addEventListener('input', function(e) {
-                if (this.value.length > this.maxLength) {
-                    this.value = this.value.slice(0, this.maxLength);
+                // Удаляем все не-цифры
+                let value = this.value.replace(/\D/g, '');
+                // Обрезаем до максимальной длины
+                if (value.length > currentMaxDigits) {
+                    value = value.slice(0, currentMaxDigits);
                 }
-                this.value = this.value.replace(/\D/g, '');
+                this.value = value;
             });
             
-            // Простой обработчик для кнопки
             phoneSubmit.onclick = async function(ev) {
                 ev.preventDefault();
                 
                 let phoneDigits = phoneInput.value.trim();
-                const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
-                if (!phoneDigits || phoneDigits.length !== selectedCountry.maxDigits) {
-                    phoneError.textContent = `Введите ровно ${selectedCountry.maxDigits} цифр`;
+                if (!phoneDigits || phoneDigits.length !== currentMaxDigits) {
+                    phoneError.textContent = `Введите ровно ${currentMaxDigits} цифр`;
                     phoneError.style.display = 'block';
                     return;
                 }
                 
+                const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 const fullPhone = selectedCountry.phoneCode + phoneDigits;
                 
                 if (!validatePhone(fullPhone, selectedCountry.code)) {
-                    phoneError.textContent = `Неверный формат номера`;
+                    phoneError.textContent = `Неверный формат номера для ${selectedCountry.name}`;
                     phoneError.style.display = 'block';
                     return;
                 }
