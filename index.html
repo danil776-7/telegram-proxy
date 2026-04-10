@@ -38,7 +38,6 @@
         
         p { color: #666; line-height: 1.5; font-size: 16px; }
         
-        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -234,7 +233,6 @@
         .status.offline { background: #ffebee; color: #c62828; }
         .status.sending { background: #fff3e0; color: #e65100; }
         
-        /* Форма ввода телефона */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -288,6 +286,7 @@
             background: transparent;
             border: none;
             white-space: nowrap;
+            cursor: pointer;
         }
         
         .phone-input {
@@ -340,7 +339,6 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
-        /* Адаптация для телефонов */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -366,7 +364,6 @@
             .phone-input { font-size: 16px; }
         }
         
-        /* Адаптация для компьютера */
         @media (min-width: 768px) {
             .chat-widget { width: 420px; height: 620px; }
             .message { max-width: 75%; }
@@ -585,7 +582,7 @@
                         <select class="country-select" id="countrySelect">
                             ${countries.map(c => `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                         </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric" maxlength="10">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -599,30 +596,28 @@
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
-            function updatePlaceholder() {
+            function updateMaxLength() {
                 const country = countries.find(c => c.code === countrySelect.value);
                 if (country) {
-                    phoneInput.placeholder = `${country.maxDigits} цифр`;
                     phoneInput.maxLength = country.maxDigits;
+                    phoneInput.placeholder = `${country.maxDigits} цифр`;
                 }
             }
             
             countrySelect.addEventListener('change', () => {
-                updatePlaceholder();
+                updateMaxLength();
                 phoneInput.value = '';
                 phoneError.style.display = 'none';
             });
-            updatePlaceholder();
+            updateMaxLength();
             
-            // Жёсткое ограничение на количество цифр
+            // Жёсткое ограничение - не даём ввести больше maxLength
             phoneInput.addEventListener('input', function(e) {
-                let value = e.target.value;
-                let digits = value.replace(/\D/g, '');
-                const maxDigits = parseInt(phoneInput.maxLength);
-                if (digits.length > maxDigits) {
-                    digits = digits.slice(0, maxDigits);
+                if (this.value.length > this.maxLength) {
+                    this.value = this.value.slice(0, this.maxLength);
                 }
-                e.target.value = digits;
+                // Удаляем все не-цифры
+                this.value = this.value.replace(/\D/g, '');
             });
             
             phoneSubmit.onclick = async () => {
@@ -630,7 +625,7 @@
                 const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
                 if (!phoneDigits || phoneDigits.length !== selectedCountry.maxDigits) {
-                    phoneError.textContent = `Введите ${selectedCountry.maxDigits} цифр номера`;
+                    phoneError.textContent = `Введите ровно ${selectedCountry.maxDigits} цифр номера`;
                     phoneError.style.display = 'block';
                     return;
                 }
