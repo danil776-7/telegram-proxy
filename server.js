@@ -13,30 +13,16 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Функция для получения текущего времени в любом часовом поясе
-function getLocalTime(timeZone = 'Europe/Moscow') {
+function getLocalTime() {
     const now = new Date();
     return now.toLocaleString('ru-RU', {
-        timeZone: timeZone,
+        timeZone: 'Europe/Moscow',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
-    });
-}
-
-// Функция для форматирования времени из timestamp Telegram
-function formatTelegramTime(timestamp, timeZone = 'Europe/Moscow') {
-    const date = new Date(timestamp * 1000);
-    return date.toLocaleString('ru-RU', {
-        timeZone: timeZone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
     });
 }
 
@@ -88,7 +74,6 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
-// Обновление иконки и названия топика (без спама в чат)
 async function updateTopicInfo(ip, topicId, site) {
     const status = ipStatus.get(ip);
     if (!status) return;
@@ -103,12 +88,12 @@ async function updateTopicInfo(ip, topicId, site) {
     } catch (e) { console.error('Ошибка иконки:', e.message); }
 }
 
-// Обновление ОДНОГО закреплённого сообщения (вся информация в одном месте)
+// ОДНО закреплённое сообщение (обновляется, не создаёт новое)
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveStr = status.lastActive ? formatTelegramTime(Math.floor(status.lastActive / 1000)) : 'неизвестно';
+    const lastActiveStr = status.lastActive ? new Date(status.lastActive).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
@@ -117,6 +102,7 @@ async function updatePinnedMessage(ip, topicId) {
     
     try {
         if (status.pinnedMessageId) {
+            // Редактируем существующее сообщение
             await callTelegram('editMessageText', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -125,6 +111,7 @@ async function updatePinnedMessage(ip, topicId) {
                 parse_mode: 'Markdown'
             });
         } else {
+            // Создаём новое только один раз
             const sent = await callTelegram('sendMessage', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -316,13 +303,10 @@ app.post('/updateStatus', async (req, res) => {
     saveData();
     
     const topicId = ipTopics.get(ip);
-    if (topicId) {
-        if (wasOnline !== status.online) {
-            await updatePinnedMessage(ip, topicId);
-            await updateTopicInfo(ip, topicId, site);
-        } else if (isActive) {
-            await updatePinnedMessage(ip, topicId);
-        }
+    if (topicId && wasOnline !== status.online) {
+        // Обновляем только если изменился статус (онлайн/офлайн)
+        await updatePinnedMessage(ip, topicId);
+        await updateTopicInfo(ip, topicId, site);
     }
     res.json({ ok: true });
 });
@@ -349,9 +333,10 @@ app.get('/getUpdates', async (req, res) => {
                         }
                     }
                     
-                    // Пропускаем сообщения от бота и системные сообщения о смене темы
+                    // Пропускаем сообщения от бота и системные сообщения
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && msg.text.includes('changed the topic name')) continue;
+                    if (msg.text && msg.text.includes('закрепил')) continue;
                     
                     if (userIp && (!ip || userIp === ip)) {
                         const messageData = {
