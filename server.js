@@ -4,16 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
-// Настройки CORS - разрешаем всё
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Обрабатываем preflight запросы
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.options('*', cors());
-
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -21,21 +13,30 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-function getMoscowTime() {
+// Функция для получения текущего времени в любом часовом поясе
+function getLocalTime(timeZone = 'Europe/Moscow') {
     const now = new Date();
-    const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
-    return moscowTime;
-}
-
-function formatMoscowTime(date) {
-    return date.toLocaleString('ru-RU', {
-        timeZone: 'Europe/Moscow',
+    return now.toLocaleString('ru-RU', {
+        timeZone: timeZone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit'
+    });
+}
+
+// Функция для форматирования времени из timestamp Telegram
+function formatTelegramTime(timestamp, timeZone = 'Europe/Moscow') {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString('ru-RU', {
+        timeZone: timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
     });
 }
 
@@ -87,6 +88,7 @@ async function callTelegram(method, params) {
     return response.json();
 }
 
+// Обновление иконки и названия топика (без спама в чат)
 async function updateTopicInfo(ip, topicId, site) {
     const status = ipStatus.get(ip);
     if (!status) return;
@@ -101,12 +103,12 @@ async function updateTopicInfo(ip, topicId, site) {
     } catch (e) { console.error('Ошибка иконки:', e.message); }
 }
 
+// Обновление ОДНОГО закреплённого сообщения (вся информация в одном месте)
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveDate = status.lastActive ? new Date(status.lastActive) : getMoscowTime();
-    const lastActiveStr = formatMoscowTime(lastActiveDate);
+    const lastActiveStr = status.lastActive ? formatTelegramTime(Math.floor(status.lastActive / 1000)) : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
@@ -168,8 +170,9 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         saveData();
         
         const regionText = region ? `📍 **Регион:** ${region}\n` : '';
-        const currentTime = formatMoscowTime(getMoscowTime());
+        const currentTime = getLocalTime();
         
+        // Приветственное сообщение (только один раз)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -185,8 +188,6 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         return null;
     }
 }
-
-// ========== API ==========
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -348,6 +349,7 @@ app.get('/getUpdates', async (req, res) => {
                         }
                     }
                     
+                    // Пропускаем сообщения от бота и системные сообщения о смене темы
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && msg.text.includes('changed the topic name')) continue;
                     
