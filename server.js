@@ -102,7 +102,8 @@ async function updatePinnedMessage(ip, topicId) {
     
     try {
         if (status.pinnedMessageId) {
-            // Редактируем существующее сообщение
+            // Редактируем существующее закреплённое сообщение
+            console.log(`📝 Редактируем сообщение ${status.pinnedMessageId} для IP ${ip}`);
             await callTelegram('editMessageText', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -112,6 +113,7 @@ async function updatePinnedMessage(ip, topicId) {
             });
         } else {
             // Создаём новое только один раз
+            console.log(`🆕 Создаём новое закреплённое сообщение для IP ${ip}`);
             const sent = await callTelegram('sendMessage', {
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
@@ -125,11 +127,22 @@ async function updatePinnedMessage(ip, topicId) {
                     message_thread_id: topicId,
                     message_id: sent.result.message_id
                 });
+                console.log(`✅ Закреплено сообщение ${status.pinnedMessageId}`);
             }
         }
         ipStatus.set(ip, status);
         saveData();
-    } catch (e) { console.error('Ошибка обновления:', e.message); }
+    } catch (e) { 
+        console.error('❌ Ошибка обновления закреплённого сообщения:', e.message);
+        // Если редактирование не удалось (сообщение удалено), сбрасываем ID
+        if (e.message.includes('message to edit not found')) {
+            status.pinnedMessageId = null;
+            ipStatus.set(ip, status);
+            saveData();
+            // Повторяем попытку
+            await updatePinnedMessage(ip, topicId);
+        }
+    }
 }
 
 async function createTopicForIp(ip, site, userId, phone = null, region = null) {
@@ -337,6 +350,7 @@ app.get('/getUpdates', async (req, res) => {
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && msg.text.includes('changed the topic name')) continue;
                     if (msg.text && msg.text.includes('закрепил')) continue;
+                    if (msg.text && msg.text.includes('переименовал')) continue;
                     
                     if (userIp && (!ip || userIp === ip)) {
                         const messageData = {
