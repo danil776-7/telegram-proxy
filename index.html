@@ -372,7 +372,6 @@
 
 <script>
     (function() {
-        // ⚠️ НОВАЯ ССЫЛКА НА RENDER ⚠️
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
@@ -397,7 +396,7 @@
         let userPhone = localStorage.getItem('user_phone');
         let isPhoneRequired = !userPhone;
         
-        let userGeo = { ip: '', countryCode: 'NL', countryName: 'Нидерланды', region: 'Noord-Holland', city: 'Amsterdam' };
+        let userGeo = { ip: '', countryCode: 'RU', countryName: 'Россия', region: '', city: '' };
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         
         async function detectGeo() {
@@ -412,7 +411,6 @@
                         region: data.region,
                         city: data.city
                     };
-                    console.log('📍 Геолокация:', userGeo.countryName, userGeo.city);
                 }
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
@@ -491,7 +489,7 @@
                         ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" ${c.code === userGeo.countryCode ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                     </select>
                     <div class="phone-input-wrapper">
-                        <div class="phone-code-display" id="phoneCodeDisplay">${countries.find(c => c.code === userGeo.countryCode)?.phoneCode || '+31'}</div>
+                        <div class="phone-code-display" id="phoneCodeDisplay">${countries.find(c => c.code === userGeo.countryCode)?.phoneCode || '+7'}</div>
                         <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
@@ -595,14 +593,15 @@
                         if (update.update_id > lastUpdateId) lastUpdateId = update.update_id;
                         if (update.message && update.message.text && 
                             !update.message.text.includes('Новый пользователь') && 
-                            !update.message.text.startsWith('💬') &&
-                            !update.message.text.includes('changed the topic name')) {
+                            !update.message.text.startsWith('💬')) {
                             addMessage(update.message.text, false);
                         }
                     }
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                 }
-            } catch (error) {}
+            } catch (error) {
+                console.error('Ошибка проверки:', error);
+            }
         }
         
         function loadHistory() {
