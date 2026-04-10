@@ -13,7 +13,6 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Функция для форматирования времени из timestamp Telegram в Московское время
 function formatTelegramTime(timestamp) {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString('ru-RU', {
@@ -314,6 +313,8 @@ app.get('/getUpdates', async (req, res) => {
         const response = await fetch(url);
         const data = await response.json();
         
+        console.log('📨 getUpdates ответ:', data.ok ? 'OK' : 'ERROR', 'результатов:', data.result?.length || 0);
+        
         if (data.ok && data.result) {
             const filtered = [];
             for (const update of data.result) {
@@ -349,6 +350,7 @@ app.get('/getUpdates', async (req, res) => {
                                 if (fileData.ok) {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
+                                    console.log('📸 Фото получено:', messageData.message.imageUrl);
                                 }
                             } catch (err) {}
                         }
@@ -358,9 +360,11 @@ app.get('/getUpdates', async (req, res) => {
                 }
             }
             data.result = filtered;
+            console.log('📨 Отправлено в виджет:', filtered.length);
         }
         res.json(data);
     } catch (error) {
+        console.error('Ошибка getUpdates:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
