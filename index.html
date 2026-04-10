@@ -396,12 +396,9 @@
         let userPhone = localStorage.getItem('user_phone');
         let isPhoneRequired = !userPhone;
         
-        let userGeo = { ip: '', countryCode: 'RU', countryName: 'Россия', region: '', city: '' };
-        
-        // Сохраняем lastUpdateId в localStorage
+        let userGeo = { ip: '', countryCode: 'NL', countryName: 'Нидерланды', region: 'Noord-Holland', city: 'Amsterdam' };
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         
-        // Определение геолокации
         async function detectGeo() {
             try {
                 const response = await fetch('https://ipapi.co/json/');
@@ -414,7 +411,7 @@
                         region: data.region,
                         city: data.city
                     };
-                    console.log('📍 Геолокация определена:', userGeo.countryName, userGeo.city);
+                    console.log('📍 Геолокация:', userGeo.countryName, userGeo.city);
                 }
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
@@ -440,7 +437,6 @@
             div.innerText = text;
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
             history.push({ text, isUser, time: Date.now() });
             localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
@@ -494,7 +490,7 @@
                         ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" ${c.code === userGeo.countryCode ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                     </select>
                     <div class="phone-input-wrapper">
-                        <div class="phone-code-display" id="phoneCodeDisplay">${countries.find(c => c.code === userGeo.countryCode)?.phoneCode || '+7'}</div>
+                        <div class="phone-code-display" id="phoneCodeDisplay">${countries.find(c => c.code === userGeo.countryCode)?.phoneCode || '+31'}</div>
                         <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
@@ -563,13 +559,10 @@
                 showPhoneForm();
                 return;
             }
-            
             if (!text && !imageBase64) return;
             if (text) addMessage(text, true);
             else if (imageBase64) addMessage('📷 Изображение', true);
-            
             setStatus('⏳ Отправка...');
-            
             try {
                 const response = await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
@@ -584,11 +577,8 @@
                     })
                 });
                 const data = await response.json();
-                if (data.ok) {
-                    setStatus('🟢 Онлайн');
-                } else {
-                    throw new Error();
-                }
+                if (data.ok) setStatus('🟢 Онлайн');
+                else throw new Error();
             } catch (error) {
                 setStatus('🔴 Ошибка');
                 setTimeout(() => setStatus('🟢 Онлайн'), 3000);
@@ -601,27 +591,17 @@
                 const data = await response.json();
                 if (data.ok && data.result) {
                     for (const update of data.result) {
-                        // Обновляем lastUpdateId
-                        if (update.update_id > lastUpdateId) {
-                            lastUpdateId = update.update_id;
-                        }
+                        if (update.update_id > lastUpdateId) lastUpdateId = update.update_id;
                         if (update.message && update.message.text && 
                             !update.message.text.includes('Новый пользователь') && 
                             !update.message.text.startsWith('💬') &&
                             !update.message.text.includes('changed the topic name')) {
                             addMessage(update.message.text, false);
                         }
-                        // Если есть фото
-                        if (update.message && update.message.hasImage && update.message.imageUrl) {
-                            addMessage('📷 Изображение от поддержки', false);
-                        }
                     }
-                    // Сохраняем lastUpdateId
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                 }
-            } catch (error) {
-                console.error('Ошибка проверки:', error);
-            }
+            } catch (error) {}
         }
         
         function loadHistory() {
@@ -640,9 +620,7 @@
         widget.onclick = (e) => {
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
-                if (isPhoneRequired) {
-                    setTimeout(() => showPhoneForm(), 100);
-                }
+                if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
             }
         };
         
@@ -679,9 +657,7 @@
         setInterval(checkReplies, 5000);
         
         detectGeo().then(() => {
-            if (isPhoneRequired) {
-                setTimeout(() => showPhoneForm(), 500);
-            }
+            if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
         });
     })();
 </script>
