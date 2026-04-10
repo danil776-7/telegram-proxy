@@ -1,5 +1,5 @@
 {
-  "name": "tg-proxy-final",
+  "name": "tg-proxy-clean",
   "version": "1.0.0",
   "scripts": {
     "start": "node server.js"
