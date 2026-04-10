@@ -367,7 +367,6 @@
 
 <script>
     (function() {
-        // ВАЖНО: ЗАМЕНИ НА СВОЙ URL
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
@@ -391,12 +390,12 @@
         
         let userPhone = localStorage.getItem('user_phone');
         let isPhoneRequired = !userPhone;
+        let isRegistered = !!userPhone;
         
         let userIp = '';
         let userCountry = 'NL';
         let userCountryName = 'Нидерланды';
         let userCity = 'Amsterdam';
-        let userRegion = 'Noord-Holland';
         
         async function detectGeo() {
             try {
@@ -406,7 +405,6 @@
                     userIp = data.ip;
                     userCountry = data.country_code;
                     userCountryName = data.country_name;
-                    userRegion = data.region;
                     userCity = data.city;
                     console.log('📍 Геолокация:', userCountryName, userCity);
                 }
@@ -456,7 +454,8 @@
         }
         
         async function registerPhone(phone) {
-            console.log('📞 Отправка регистрации:', { userId, ip: userIp, phone, region: `${userCountryName}, ${userCity}` });
+            console.log('📞 РЕГИСТРАЦИЯ телефона:', phone);
+            setStatus('⏳ Регистрация...');
             
             try {
                 const response = await fetch(`${PROXY_URL}/register`, {
@@ -472,16 +471,22 @@
                 });
                 const data = await response.json();
                 console.log('📞 Ответ сервера:', data);
+                
                 if (data.ok) {
                     userPhone = phone;
                     localStorage.setItem('user_phone', phone);
                     isPhoneRequired = false;
+                    isRegistered = true;
+                    setStatus('🟢 Онлайн');
                     addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
                     return true;
+                } else {
+                    setStatus('❌ Ошибка регистрации');
+                    return false;
                 }
-                return false;
             } catch (error) {
                 console.error('Ошибка:', error);
+                setStatus('❌ Ошибка');
                 return false;
             }
         }
@@ -569,7 +574,7 @@
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
-            if (isPhoneRequired) {
+            if (!isRegistered) {
                 showPhoneForm();
                 return;
             }
@@ -636,7 +641,7 @@
                 div.appendChild(timeSpan);
                 messagesDiv.appendChild(div);
             });
-            if (history.length === 0 && !isPhoneRequired) {
+            if (history.length === 0 && isRegistered) {
                 setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false), 500);
             }
         }
@@ -644,7 +649,7 @@
         widget.onclick = (e) => {
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
-                if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
+                if (!isRegistered) setTimeout(() => showPhoneForm(), 100);
             }
         };
         
@@ -681,7 +686,7 @@
         setInterval(checkReplies, 5000);
         
         detectGeo().then(() => {
-            if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
+            if (!isRegistered) setTimeout(() => showPhoneForm(), 500);
         });
     })();
 </script>
