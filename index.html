@@ -224,7 +224,6 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
-        /* ========== ФОРМА ВВОДА ТЕЛЕФОНА (АККУРАТНАЯ) ========== */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -265,10 +264,12 @@
             align-items: center;
             justify-content: center;
             margin-bottom: 16px;
+            gap: 8px;
+            flex-wrap: wrap;
         }
 
         .country-select {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 500;
             color: #333;
             padding: 14px 12px;
@@ -276,7 +277,6 @@
             border: 1px solid #e0e4e8;
             border-radius: 12px;
             cursor: pointer;
-            margin-right: 8px;
         }
 
         .phone-input {
@@ -291,7 +291,7 @@
             background: #f8f9fa;
             outline: none;
             transition: all 0.2s;
-            max-width: 200px;
+            min-width: 150px;
         }
 
         .phone-input:focus {
@@ -340,7 +340,7 @@
             .phone-card { padding: 20px 16px; }
             .phone-card h4 { font-size: 22px; }
             .country-select { font-size: 14px; padding: 10px 8px; }
-            .phone-input { font-size: 16px; letter-spacing: 1px; max-width: 160px; }
+            .phone-input { font-size: 16px; letter-spacing: 1px; min-width: 120px; }
             .phone-submit { padding: 12px 20px; font-size: 15px; }
         }
     </style>
@@ -595,7 +595,11 @@
                 }
             });
             
-            phoneSubmit.onclick = async function() {
+            // Обработчик для кнопки - используем touchstart для телефонов
+            const handleSubmit = async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
                 const phoneDigits = phoneInput.value.trim();
                 const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
@@ -627,6 +631,10 @@
                     phoneError.style.display = 'block';
                 }
             };
+            
+            // Добавляем оба типа событий для надёжности
+            phoneSubmit.addEventListener('click', handleSubmit);
+            phoneSubmit.addEventListener('touchstart', handleSubmit);
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
