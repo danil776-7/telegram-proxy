@@ -22,6 +22,8 @@
             --bot-message-color: #1a1a2e;
             --operator-message-bg: #e8f4fd;
             --operator-message-color: #1a1a2e;
+            --info-message-bg: #fff3e0;
+            --info-message-color: #e65100;
             --input-bg: #f8f9fa;
             --input-border: #e0e4e8;
             --input-focus: #667eea;
@@ -52,6 +54,8 @@
             --bot-message-color: #e0e0e0;
             --operator-message-bg: #1a3a5c;
             --operator-message-color: #e0e0e0;
+            --info-message-bg: #3a3a1a;
+            --info-message-color: #ffd700;
             --input-bg: #2a2a3a;
             --input-border: #3a3a4a;
             --input-focus: #667eea;
@@ -255,6 +259,17 @@
             color: var(--operator-message-color);
             align-self: flex-start;
             border-bottom-left-radius: 4px;
+        }
+        
+        .info-message {
+            background: var(--info-message-bg);
+            color: var(--info-message-color);
+            align-self: center;
+            border-radius: 20px;
+            font-size: 12px;
+            padding: 8px 16px;
+            max-width: 90%;
+            text-align: center;
         }
         
         .operator-name {
@@ -546,6 +561,7 @@
         let userGeo = { ip: '', countryCode: 'NL', countryName: 'Нидерланды', region: 'Noord-Holland', city: 'Amsterdam' };
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
+        let infoMessageSent = false;
         
         async function detectGeo() {
             try {
@@ -579,11 +595,13 @@
         const fileInput = document.getElementById('fileInput');
         const statusDiv = document.getElementById('status');
         
-        function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null, timestamp = null, operatorName = null) {
+        function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null, timestamp = null, operatorName = null, isInfo = false) {
             if (msgId && processedIds.has(msgId)) return;
             
             const div = document.createElement('div');
-            if (operatorName && !isUser) {
+            if (isInfo) {
+                div.className = 'message info-message';
+            } else if (operatorName && !isUser) {
                 div.className = 'message operator-message';
                 const nameSpan = document.createElement('div');
                 nameSpan.className = 'operator-name';
@@ -618,7 +636,7 @@
             }
             
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, isImage, imageUrl, time: Date.now(), id: msgId });
+            history.push({ text, isUser, isImage, imageUrl, time: Date.now(), id: msgId, isInfo });
             localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
         }
         
@@ -631,6 +649,25 @@
         
         function formatTime(date) {
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        // Показываем информационное сообщение с данными пользователя
+        function showUserInfoMessage() {
+            if (infoMessageSent) return;
+            
+            const currentTime = new Date();
+            const timeStr = currentTime.toLocaleString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+                day: '2-digit',
+                month: '2-digit',
+                hour12: false
+            });
+            
+            const infoText = `🖥️ **Информация о вас**\n\n📍 **IP-адрес:** ${userGeo.ip}\n🌍 **Геолокация:** ${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}${userGeo.region ? ' (' + userGeo.region + ')' : ''}\n📞 **Телефон:** ${userPhone || 'не указан'}\n🕐 **Время подключения:** ${timeStr}`;
+            
+            addMessage(infoText, false, false, null, null, null, null, true);
+            infoMessageSent = true;
         }
         
         async function registerPhone(phone) {
@@ -652,6 +689,7 @@
                     localStorage.setItem('user_phone', phone);
                     isPhoneRequired = false;
                     addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
+                    showUserInfoMessage();
                     return true;
                 }
                 return false;
@@ -673,10 +711,12 @@
                     <h4>Чат с поддержкой</h4>
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
                     <p style="font-size: 12px; color: #888; margin-bottom: 8px;">${detectedText}</p>
-                    <select class="country-select" id="countrySelect">
-                        ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" ${c.code === userGeo.countryCode ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
-                    </select>
-                    <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric" maxlength="10">
+                    <div class="phone-input-wrapper">
+                        <select class="country-select" id="countrySelect">
+                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" ${c.code === userGeo.countryCode ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
+                        </select>
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric" maxlength="10">
+                    </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
                     <p style="font-size: 11px; color: #999; margin-top: 16px;">Нажимая кнопку "Начать чат", вы соглашаетесь с обработкой персональных данных</p>
@@ -809,7 +849,11 @@
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
             history.forEach(msg => {
                 const div = document.createElement('div');
-                div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+                if (msg.isInfo) {
+                    div.className = 'message info-message';
+                } else {
+                    div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+                }
                 if (msg.isImage && msg.imageUrl) {
                     const img = document.createElement('img');
                     img.src = msg.imageUrl;
@@ -826,7 +870,12 @@
                 messagesDiv.appendChild(div);
             });
             if (history.length === 0 && !isPhoneRequired) {
-                setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false), 500);
+                setTimeout(() => {
+                    addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
+                    if (userPhone) showUserInfoMessage();
+                }, 500);
+            } else if (userPhone && !infoMessageSent && !isPhoneRequired) {
+                setTimeout(() => showUserInfoMessage(), 500);
             }
         }
         
@@ -834,6 +883,7 @@
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
                 if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
+                else if (userPhone && !infoMessageSent) setTimeout(() => showUserInfoMessage(), 200);
             }
         };
         
@@ -871,6 +921,7 @@
         
         detectGeo().then(() => {
             if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
+            else if (userPhone) setTimeout(() => showUserInfoMessage(), 600);
         });
     })();
 </script>
