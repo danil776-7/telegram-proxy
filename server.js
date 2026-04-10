@@ -4,16 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
-// Настройки CORS - разрешаем всё
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Обрабатываем preflight запросы
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.options('*', cors());
-
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -21,7 +13,20 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-function getLocalTime() {
+// Функция для форматирования времени из timestamp Telegram в Московское время
+function formatTelegramTime(timestamp) {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getCurrentTime() {
     const now = new Date();
     return now.toLocaleString('ru-RU', {
         timeZone: 'Europe/Moscow',
@@ -45,9 +50,7 @@ function loadData() {
             console.log('📂 Данные загружены из файла');
             return data;
         }
-    } catch (err) {
-        console.error('Ошибка загрузки данных:', err);
-    }
+    } catch (err) {}
     return { ipTopics: {}, topicToIp: {}, ipStatus: {} };
 }
 
@@ -59,18 +62,13 @@ function saveData() {
             ipStatus: Object.fromEntries(ipStatus)
         };
         fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-        console.log('💾 Данные сохранены в файл');
-    } catch (err) {
-        console.error('Ошибка сохранения данных:', err);
-    }
+    } catch (err) {}
 }
 
 const savedData = loadData();
 for (const [ip, topicId] of Object.entries(savedData.ipTopics || {})) ipTopics.set(ip, topicId);
 for (const [topicId, ip] of Object.entries(savedData.topicToIp || {})) topicToIp.set(parseInt(topicId), ip);
 for (const [ip, status] of Object.entries(savedData.ipStatus || {})) ipStatus.set(ip, status);
-
-console.log(`📊 Загружено ${ipTopics.size} связей IP->топик`);
 
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
@@ -93,14 +91,14 @@ async function updateTopicInfo(ip, topicId, site) {
             message_thread_id: topicId,
             name: `${iconEmoji} ${shortSite}`
         });
-    } catch (e) { console.error('Ошибка иконки:', e.message); }
+    } catch (e) {}
 }
 
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveStr = status.lastActive ? new Date(status.lastActive).toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' }) : 'неизвестно';
+    const lastActiveStr = status.lastActive ? formatTelegramTime(Math.floor(status.lastActive / 1000)) : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
@@ -134,13 +132,11 @@ async function updatePinnedMessage(ip, topicId) {
         }
         ipStatus.set(ip, status);
         saveData();
-    } catch (e) { 
-        console.error('Ошибка обновления:', e.message);
-        if (e.message.includes('message to edit not found')) {
+    } catch (e) {
+        if (e.message?.includes('message to edit not found')) {
             status.pinnedMessageId = null;
             ipStatus.set(ip, status);
             saveData();
-            await updatePinnedMessage(ip, topicId);
         }
     }
 }
@@ -170,7 +166,7 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         saveData();
         
         const regionText = region ? `📍 **Регион:** ${region}\n` : '';
-        const currentTime = getLocalTime();
+        const currentTime = getCurrentTime();
         
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
@@ -183,12 +179,9 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         await updateTopicInfo(ip, topicId, site);
         return topicId;
     } catch (err) {
-        console.error('Ошибка создания топика:', err);
         return null;
     }
 }
-
-// ========== API ==========
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -197,7 +190,6 @@ app.get('/', (req, res) => {
 
 app.post('/register', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    console.log('📞 Регистрация:', req.body);
     const { userId, site, ip, phone, region } = req.body;
     
     if (!ip || !phone) {
@@ -222,10 +214,8 @@ app.post('/register', async (req, res) => {
             await updateTopicInfo(ip, topicId, site);
         }
         
-        console.log('✅ Регистрация успешна');
         res.json({ ok: true });
     } catch (error) {
-        console.error('Ошибка регистрации:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
@@ -233,7 +223,6 @@ app.post('/register', async (req, res) => {
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, text, imageBase64, region } = req.body;
-    console.log('📨 Отправка сообщения от:', userId, 'IP:', ip);
     
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
@@ -251,11 +240,9 @@ app.post('/send', async (req, res) => {
     
     let topicId = ipTopics.get(ip);
     if (!topicId) {
-        console.log(`🆕 Создаём новый топик для IP: ${ip}`);
         topicId = await createTopicForIp(ip, site, userId, status.phone, status.region);
         if (!topicId) return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
     } else {
-        console.log(`📌 Используем существующий топик для IP: ${ip}`);
         await updatePinnedMessage(ip, topicId);
         await updateTopicInfo(ip, topicId, site);
     }
@@ -276,10 +263,7 @@ app.post('/send', async (req, res) => {
                     body: formData
                 });
                 const data = await response.json();
-                console.log('✅ Фото отправлено:', data.ok);
                 res.json(data);
-            } else {
-                throw new Error('Invalid image format');
             }
         } else if (text) {
             const data = await callTelegram('sendMessage', {
@@ -288,13 +272,11 @@ app.post('/send', async (req, res) => {
                 text: `💬 **${userId}:**\n\n${text}`,
                 parse_mode: 'Markdown'
             });
-            console.log('✅ Сообщение отправлено:', data.ok);
             res.json(data);
         } else {
             res.status(400).json({ ok: false, error: 'No text or image' });
         }
     } catch (error) {
-        console.error('Ошибка отправки:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
@@ -368,9 +350,7 @@ app.get('/getUpdates', async (req, res) => {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
                                 }
-                            } catch (err) {
-                                console.error('Ошибка фото:', err);
-                            }
+                            } catch (err) {}
                         }
                         
                         filtered.push(messageData);
@@ -381,7 +361,6 @@ app.get('/getUpdates', async (req, res) => {
         }
         res.json(data);
     } catch (error) {
-        console.error('Ошибка getUpdates:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
@@ -389,6 +368,5 @@ app.get('/getUpdates', async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}`);
-    console.log(`📂 Данные сохраняются в файл: ${DATA_FILE}\n`);
+    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}\n`);
 });
