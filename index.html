@@ -289,7 +289,6 @@
             border-radius: 12px;
             background: #f8f9fa;
             outline: none;
-            transition: all 0.2s;
         }
 
         .phone-input:focus {
@@ -337,9 +336,6 @@
             .message { max-width: 90%; font-size: 14px; }
             .phone-card { padding: 20px 16px; }
             .phone-card h4 { font-size: 22px; }
-            .country-select { font-size: 14px; padding: 10px 8px; }
-            .phone-input { font-size: 16px; letter-spacing: 1px; }
-            .phone-submit { padding: 12px 20px; font-size: 15px; }
         }
     </style>
 </head>
@@ -565,17 +561,17 @@
             countrySelect.addEventListener('change', updateMaxLength);
             updateMaxLength();
             
+            // Только цифры и ограничение длины
             phoneInput.addEventListener('input', function(e) {
-                this.value = this.value.replace(/\D/g, '');
-                if (this.value.length > currentMaxDigits) {
-                    this.value = this.value.slice(0, currentMaxDigits);
+                let val = this.value.replace(/\D/g, '');
+                if (val.length > currentMaxDigits) {
+                    val = val.slice(0, currentMaxDigits);
                 }
+                this.value = val;
             });
             
-            // Простой обработчик кнопки
-            phoneSubmit.onclick = function(e) {
-                e.preventDefault();
-                
+            // Кнопка "Начать чат"
+            phoneSubmit.onclick = function() {
                 const phoneDigits = phoneInput.value.trim();
                 const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
