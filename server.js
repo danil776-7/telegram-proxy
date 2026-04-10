@@ -4,8 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+// === НАСТРОЙКИ CORS (РАЗРЕШАЕМ ВСЁ) ===
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.options('*', cors());
+
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -61,6 +67,7 @@ function saveData() {
             ipStatus: Object.fromEntries(ipStatus)
         };
         fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+        console.log('💾 Данные сохранены');
     } catch (err) {}
 }
 
@@ -68,6 +75,8 @@ const savedData = loadData();
 for (const [ip, topicId] of Object.entries(savedData.ipTopics || {})) ipTopics.set(ip, topicId);
 for (const [topicId, ip] of Object.entries(savedData.topicToIp || {})) topicToIp.set(parseInt(topicId), ip);
 for (const [ip, status] of Object.entries(savedData.ipStatus || {})) ipStatus.set(ip, status);
+
+console.log(`📊 Загружено ${ipTopics.size} связей IP->топик`);
 
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
@@ -182,6 +191,7 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
     }
 }
 
+// === ВСЕ ЭНДПОИНТЫ С ЯВНЫМ УКАЗАНИЕМ CORS ===
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.json({ status: 'ok', message: 'Telegram Proxy работает!', topics: ipTopics.size });
