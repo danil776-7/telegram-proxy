@@ -7,60 +7,24 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
-        :root {
-            --bg-gradient-start: #667eea;
-            --bg-gradient-end: #764ba2;
-            --widget-bg: white;
-            --header-bg-start: #667eea;
-            --header-bg-end: #764ba2;
-            --messages-bg: #f5f7fb;
-            --user-message-bg-start: #667eea;
-            --user-message-bg-end: #764ba2;
-            --user-message-color: white;
-            --bot-message-bg: white;
-            --bot-message-color: #1a1a2e;
-            --input-bg: #f8f9fa;
-            --input-border: #e0e4e8;
-            --border-color: #e0e4e8;
-        }
-        
-        body.dark-theme {
-            --bg-gradient-start: #1a1a2e;
-            --bg-gradient-end: #16213e;
-            --widget-bg: #1e1e2e;
-            --header-bg-start: #0f3460;
-            --header-bg-end: #16213e;
-            --messages-bg: #2a2a3a;
-            --user-message-bg-start: #0f3460;
-            --user-message-bg-end: #16213e;
-            --user-message-color: #e0e0e0;
-            --bot-message-bg: #2d2d3d;
-            --bot-message-color: #e0e0e0;
-            --input-bg: #2a2a3a;
-            --input-border: #3a3a4a;
-            --border-color: #3a3a4a;
-        }
-        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 16px;
-            transition: background 0.3s ease;
         }
         
         .content {
             text-align: center;
             padding: 32px 20px;
-            background: var(--widget-bg);
+            background: white;
             border-radius: 28px;
             max-width: 500px;
             width: 100%;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
-            transition: background 0.3s ease;
         }
         
         h1 { 
@@ -74,21 +38,6 @@
         
         p { color: #666; line-height: 1.5; font-size: 16px; }
         
-        .theme-toggle {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            background: var(--widget-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 30px;
-            padding: 8px 16px;
-            cursor: pointer;
-            font-size: 14px;
-            z-index: 1001;
-            transition: all 0.3s ease;
-            color: var(--bot-message-color);
-        }
-        
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -97,7 +46,7 @@
             height: 650px;
             max-width: calc(100vw - 40px);
             max-height: calc(100vh - 40px);
-            background: var(--widget-bg);
+            background: white;
             border-radius: 28px;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
             display: flex;
@@ -134,7 +83,7 @@
         .chat-widget.closed .open-icon { display: flex; }
         
         .chat-header {
-            background: linear-gradient(135deg, var(--header-bg-start) 0%, var(--header-bg-end) 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 20px 20px 16px 20px;
             text-align: center;
@@ -182,12 +131,10 @@
             flex: 1;
             overflow-y: auto;
             padding: 16px;
-            background: var(--messages-bg);
+            background: #f5f7fb;
             display: flex;
             flex-direction: column;
             gap: 12px;
-            -webkit-overflow-scrolling: touch;
-            transition: background 0.3s ease;
         }
         
         .message {
@@ -195,29 +142,20 @@
             padding: 12px 16px;
             border-radius: 20px;
             word-wrap: break-word;
-            animation: fadeIn 0.2s ease;
             font-size: 15px;
             line-height: 1.4;
-            transition: all 0.3s ease;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         
         .user-message {
-            background: linear-gradient(135deg, var(--user-message-bg-start) 0%, var(--user-message-bg-end) 100%);
-            color: var(--user-message-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             align-self: flex-end;
-            border-bottom-right-radius: 4px;
         }
         
         .bot-message {
-            background: var(--bot-message-bg);
-            color: var(--bot-message-color);
+            background: white;
+            color: #1a1a2e;
             align-self: flex-start;
-            border-bottom-left-radius: 4px;
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
@@ -227,7 +165,6 @@
             border-radius: 12px;
             margin-top: 8px;
             cursor: pointer;
-            object-fit: contain;
         }
         
         .message-time {
@@ -240,30 +177,26 @@
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
-            border-top: 1px solid var(--border-color);
-            background: var(--widget-bg);
+            border-top: 1px solid #eef2f6;
+            background: white;
             gap: 10px;
             align-items: center;
-            flex-shrink: 0;
-            transition: background 0.3s ease, border-color 0.3s ease;
         }
         
         .chat-input {
             flex: 1;
             padding: 12px 16px;
-            border: 1px solid var(--input-border);
+            border: 1px solid #e0e4e8;
             border-radius: 30px;
             outline: none;
             font-size: 16px;
-            transition: all 0.2s;
-            background: var(--input-bg);
-            color: var(--bot-message-color);
+            background: #f8f9fa;
         }
         
         .chat-input:focus {
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-            background: var(--widget-bg);
+            background: white;
         }
         
         .send-btn, .file-btn {
@@ -274,7 +207,6 @@
             border-radius: 30px;
             cursor: pointer;
             font-size: 16px;
-            transition: transform 0.1s;
             min-width: 44px;
             min-height: 44px;
             display: flex;
@@ -283,7 +215,6 @@
         }
         
         .file-btn { background: #6c757d; }
-        .send-btn:active, .file-btn:active { transform: scale(0.96); }
         
         .status {
             font-size: 12px;
@@ -358,7 +289,6 @@
             border-radius: 12px;
             background: #f8f9fa;
             font-family: monospace;
-            letter-spacing: 1px;
         }
         
         .phone-input:focus {
@@ -405,13 +335,10 @@
             .message img { max-height: 150px; }
             .phone-card { padding: 20px 16px; }
             .phone-card h4 { font-size: 20px; }
-            .theme-toggle { top: 10px; left: 10px; padding: 6px 12px; font-size: 12px; }
         }
     </style>
 </head>
 <body>
-<button class="theme-toggle" id="themeToggle">🌙 Тёмная тема</button>
-
 <div class="content">
     <h1>💬 Чат с поддержкой</h1>
     <p>Напишите нам — мы ответим в Telegram</p>
@@ -428,10 +355,10 @@
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Определение страны...</div>
+        <div class="status online" id="status">🟢 Готов к работе</div>
     </div>
     <div class="chat-input-area">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
+        <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
         <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
@@ -440,21 +367,7 @@
 
 <script>
     (function() {
-        const themeToggle = document.getElementById('themeToggle');
-        const savedTheme = localStorage.getItem('chat_theme');
-        
-        if (savedTheme === 'dark') {
-            document.body.classList.add('dark-theme');
-            themeToggle.textContent = '☀️ Светлая тема';
-        }
-        
-        themeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('dark-theme');
-            const isDark = document.body.classList.contains('dark-theme');
-            localStorage.setItem('chat_theme', isDark ? 'dark' : 'light');
-            themeToggle.textContent = isDark ? '☀️ Светлая тема' : '🌙 Тёмная тема';
-        });
-        
+        // ВАЖНО: ЗАМЕНИ НА СВОЙ URL
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
@@ -479,28 +392,28 @@
         let userPhone = localStorage.getItem('user_phone');
         let isPhoneRequired = !userPhone;
         
-        let userGeo = { ip: '', countryCode: 'NL', countryName: 'Нидерланды', region: 'Noord-Holland', city: 'Amsterdam' };
-        let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
-        let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
+        let userIp = '';
+        let userCountry = 'NL';
+        let userCountryName = 'Нидерланды';
+        let userCity = 'Amsterdam';
+        let userRegion = 'Noord-Holland';
         
         async function detectGeo() {
             try {
                 const response = await fetch('https://ipapi.co/json/');
                 const data = await response.json();
                 if (data && data.country_code) {
-                    userGeo = {
-                        ip: data.ip,
-                        countryCode: data.country_code,
-                        countryName: data.country_name,
-                        region: data.region,
-                        city: data.city
-                    };
-                    console.log('📍 Геолокация:', userGeo.countryName, userGeo.city);
+                    userIp = data.ip;
+                    userCountry = data.country_code;
+                    userCountryName = data.country_name;
+                    userRegion = data.region;
+                    userCity = data.city;
+                    console.log('📍 Геолокация:', userCountryName, userCity);
                 }
             } catch (error) {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
-                userGeo.ip = ipData.ip;
+                userIp = ipData.ip;
             }
         }
         
@@ -515,8 +428,6 @@
         const statusDiv = document.getElementById('status');
         
         function addMessage(text, isUser, isImage = false, imageUrl = null, msgId = null, timestamp = null) {
-            if (msgId && processedIds.has(msgId)) return;
-            
             const div = document.createElement('div');
             div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
             
@@ -538,15 +449,6 @@
             
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            
-            if (msgId) {
-                processedIds.add(msgId);
-                localStorage.setItem('chat_processedIds', JSON.stringify([...processedIds]));
-            }
-            
-            const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, isImage, imageUrl, time: Date.now(), id: msgId });
-            localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
         }
         
         function setStatus(text) {
@@ -554,40 +456,41 @@
         }
         
         async function registerPhone(phone) {
-    console.log('📞 Регистрация телефона:', phone);
-    try {
-        const response = await fetch(`${PROXY_URL}/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                userId, 
-                site: window.location.hostname, 
-                ip: userGeo.ip, 
-                phone,
-                region: `${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}`
-            })
-        });
-        const data = await response.json();
-        console.log('📞 Ответ сервера:', data);
-        if (data.ok) {
-            userPhone = phone;
-            localStorage.setItem('user_phone', phone);
-            isPhoneRequired = false;
-            addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
-            return true;
+            console.log('📞 Отправка регистрации:', { userId, ip: userIp, phone, region: `${userCountryName}, ${userCity}` });
+            
+            try {
+                const response = await fetch(`${PROXY_URL}/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        userId, 
+                        site: window.location.hostname, 
+                        ip: userIp, 
+                        phone,
+                        region: `${userCountryName}${userCity ? ', ' + userCity : ''}`
+                    })
+                });
+                const data = await response.json();
+                console.log('📞 Ответ сервера:', data);
+                if (data.ok) {
+                    userPhone = phone;
+                    localStorage.setItem('user_phone', phone);
+                    isPhoneRequired = false;
+                    addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Ошибка:', error);
+                return false;
+            }
         }
-        return false;
-    } catch (error) {
-        console.error('Ошибка регистрации:', error);
-        return false;
-    }
-}
         
         function showPhoneForm() {
             const oldOverlay = document.querySelector('.phone-overlay');
             if (oldOverlay) oldOverlay.remove();
             
-            const detectedText = userGeo.countryName ? `📍 Определено: ${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}` : '';
+            const detectedText = userCountryName ? `📍 Определено: ${userCountryName}${userCity ? ', ' + userCity : ''}` : '';
             
             const overlay = document.createElement('div');
             overlay.className = 'phone-overlay';
@@ -598,9 +501,9 @@
                     <p style="font-size: 12px; color: #888; margin-bottom: 8px;">${detectedText}</p>
                     <div class="phone-input-wrapper">
                         <select class="country-select" id="countrySelect">
-                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" ${c.code === userGeo.countryCode ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
+                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                         </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric" maxlength="10">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -681,13 +584,14 @@
                     body: JSON.stringify({ 
                         userId, 
                         site: window.location.hostname, 
-                        ip: userGeo.ip, 
+                        ip: userIp, 
                         text,
                         imageBase64,
-                        region: `${userGeo.countryName}${userGeo.city ? ', ' + userGeo.city : ''}`
+                        region: `${userCountryName}${userCity ? ', ' + userCity : ''}`
                     })
                 });
                 const data = await response.json();
+                console.log('Ответ сервера:', data);
                 if (data.ok) setStatus('🟢 Онлайн');
                 else throw new Error();
             } catch (error) {
@@ -696,44 +600,19 @@
             }
         }
         
-        async function updateActivity(isOnline, isActive) {
-            try {
-                await fetch(`${PROXY_URL}/updateStatus`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, ip: userGeo.ip, isOnline, isActive })
-                });
-            } catch (e) {}
-        }
-        
         async function checkReplies() {
             try {
-                const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&ip=${userGeo.ip}`);
+                const response = await fetch(`${PROXY_URL}/getUpdates?offset=0`);
                 const data = await response.json();
                 if (data.ok && data.result) {
                     for (const update of data.result) {
-                        if (update.update_id > lastUpdateId) lastUpdateId = update.update_id;
-                        if (update.message && (update.message.text || update.message.hasImage)) {
-                            if (update.message.text && (
-                                update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') ||
-                                update.message.text.includes('указал номер телефона')
-                            )) {
-                                continue;
-                            }
-                            addMessage(
-                                update.message.text || '📷 Изображение', 
-                                false, 
-                                update.message.hasImage || false, 
-                                update.message.imageUrl || null, 
-                                update.update_id, 
-                                update.message.date
-                            );
+                        if (update.message && update.message.text && !update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
+                            addMessage(update.message.text, false, false, null, update.update_id, update.message.date);
                         }
                     }
-                    localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                 }
             } catch (error) {
-                console.error('Ошибка проверки:', error);
+                console.error('Ошибка:', error);
             }
         }
         
@@ -766,7 +645,6 @@
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
                 if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
-                updateActivity(true, true);
             }
         };
         
@@ -799,19 +677,11 @@
             }
         };
         
-        // Активность
-        setInterval(() => updateActivity(true, true), 30000);
-        window.addEventListener('blur', () => updateActivity(false, false));
-        window.addEventListener('focus', () => updateActivity(true, true));
-        document.addEventListener('click', () => updateActivity(true, true));
-        document.addEventListener('keypress', () => updateActivity(true, true));
-        
         loadHistory();
         setInterval(checkReplies, 5000);
         
         detectGeo().then(() => {
             if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
-            else updateActivity(true, true);
         });
     })();
 </script>
