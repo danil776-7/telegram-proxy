@@ -4,8 +4,16 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+// Настройки CORS - разрешаем всё
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Обрабатываем preflight запросы
 app.options('*', cors());
+
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -178,11 +186,15 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
     }
 }
 
+// ========== API ==========
+
 app.get('/', (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     res.json({ status: 'ok', message: 'Telegram Proxy работает!', topics: ipTopics.size });
 });
 
 app.post('/register', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     console.log('📞 Регистрация:', req.body);
     const { userId, site, ip, phone, region } = req.body;
     
@@ -217,6 +229,7 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/send', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, text, imageBase64, region } = req.body;
     console.log('📨 Отправка сообщения от:', userId, 'IP:', ip);
     
@@ -285,6 +298,7 @@ app.post('/send', async (req, res) => {
 });
 
 app.post('/updateStatus', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, isOnline, isActive } = req.body;
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
@@ -313,6 +327,7 @@ app.post('/updateStatus', async (req, res) => {
 });
 
 app.get('/getUpdates', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     const { offset, ip } = req.query;
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
