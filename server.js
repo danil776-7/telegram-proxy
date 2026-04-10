@@ -2,79 +2,48 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// Разрешаем все CORS запросы
+// --- НАСТРОЙКИ CORS (САМЫЕ ВАЖНЫЕ) ---
 app.use(cors({
-    origin: '*',
+    origin: '*', // Разрешаем запросы с любых доменов
     methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type']
 }));
-app.options('*', cors());
+app.options('*', cors()); // Обрабатываем preflight-запросы
+
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003765383331;
 
 console.log('🚀 Сервер запускается...');
-console.log('📡 BOT_TOKEN:', BOT_TOKEN.substring(0, 20) + '...');
-console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
-// Хранилище данных пользователей
+// Хранилище (простое, но для теста достаточно)
 const users = new Map();
 
-// Функция для форматирования времени в Московское время
-function getMoscowTime() {
-    const now = new Date();
-    return now.toLocaleString('ru-RU', {
-        timeZone: 'Europe/Moscow',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-    });
-}
-
-// === ЭНДПОИНТЫ ===
-
-// Проверка работоспособности сервера
+// Корневой маршрут для проверки
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Telegram Proxy работает! Версия 2.0' });
+    res.json({ status: 'ok', message: 'Proxy работает! CORS настроен' });
 });
 
 // Регистрация номера телефона
-app.post('/register', async (req, res) => {
+app.post('/register', (req, res) => {
     const { userId, site, ip, phone, region } = req.body;
-    console.log('📞 Регистрация:', { userId, site, ip, phone, region });
-    
-    if (!ip || !phone) {
-        return res.status(400).json({ ok: false, error: 'ip and phone required' });
-    }
-    
+    console.log(`📞 Регистрация: ${ip} -> ${phone}`);
     users.set(ip, { userId, phone, region, site, lastActive: Date.now() });
-    console.log(`✅ Зарегистрирован ${ip}: ${phone}`);
     res.json({ ok: true });
 });
 
 // Отправка сообщения в Telegram
 app.post('/send', async (req, res) => {
-    const { userId, site, ip, text, imageBase64, region } = req.body;
-    console.log('📨 Отправка сообщения от:', userId || ip);
+    const { userId, site, ip, text, imageBase64 } = req.body;
+    console.log(`📨 Сообщение от ${ip}: ${text?.substring(0, 50)}`);
     
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
-    // Обновляем активность пользователя
-    if (users.has(ip)) {
-        const user = users.get(ip);
-        user.lastActive = Date.now();
-        users.set(ip, user);
-    }
-    
     try {
-        const messageText = `💬 **${userId || ip}:**\n\n${text || '📷 Изображение'}`;
+        const messageText = `💬 **${userId || ip}:**\n\n${text || 'Изображение'}`;
         
         if (imageBase64) {
-            // Отправка фото
             const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
             if (matches) {
                 const buffer = Buffer.from(matches[2], 'base64');
@@ -88,12 +57,10 @@ app.post('/send', async (req, res) => {
                     body: formData
                 });
                 const data = await response.json();
-                console.log('✅ Фото отправлено, ok:', data.ok);
                 return res.json(data);
             }
         }
         
-        // Отправка текста
         const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -104,44 +71,37 @@ app.post('/send', async (req, res) => {
             })
         });
         const data = await response.json();
-        console.log('✅ Сообщение отправлено, ok:', data.ok);
         res.json(data);
         
     } catch (error) {
-        console.error('❌ Ошибка отправки:', error);
+        console.error('Ошибка отправки:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
 
-// Получение обновлений из Telegram (для виджета)
+// Получение обновлений
 app.get('/getUpdates', async (req, res) => {
-    const { offset, ip } = req.query;
-    console.log('📡 Запрос getUpdates, offset:', offset, 'ip:', ip);
-    
+    const { offset } = req.query;
+    console.log(`📡 Запрос getUpdates, offset: ${offset}`);
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
         const response = await fetch(url);
         const data = await response.json();
         
         if (data.ok && data.result) {
-            // Фильтруем сообщения от бота
             const filtered = data.result.filter(update => {
                 const msg = update.message;
                 return msg && !msg.from?.is_bot && msg.text && !msg.text.startsWith('💬');
             });
             data.result = filtered;
-            console.log(`📨 Найдено ${filtered.length} новых сообщений`);
         }
         res.json(data);
     } catch (error) {
-        console.error('❌ Ошибка getUpdates:', error);
         res.status(500).json({ ok: false, error: error.message });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}`);
-    console.log(`🕐 Время запуска: ${getMoscowTime()}\n`);
+    console.log(`✅ Сервер запущен на порту ${PORT}`);
 });
