@@ -374,21 +374,15 @@
 
 <script>
     (function() {
+        // ========== НАСТРОЙКИ ==========
         const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
         
+        // Список стран (только Россия для простоты)
         const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', pattern: /^31[1-9]\d{8}$/, maxDigits: 9, placeholder: '123456789' },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', pattern: /^380\d{9}$/, maxDigits: 9, placeholder: '123456789' },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', pattern: /^375\d{9}$/, maxDigits: 9, placeholder: '123456789' },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', pattern: /^1\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', pattern: /^44\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', pattern: /^49\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', pattern: /^33\d{9}$/, maxDigits: 9, placeholder: '123456789' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', pattern: /^39\d{10}$/, maxDigits: 10, placeholder: '1234567890' }
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, placeholder: '1234567890' }
         ];
         
+        // Данные пользователя
         let userGeo = {
             ip: 'не определён',
             countryCode: 'RU',
@@ -400,32 +394,17 @@
         let userCountry = localStorage.getItem('user_country') || 'RU';
         let isPhoneRequired = !userPhone;
         
+        // Определение IP
         async function detectGeo() {
             try {
-                const response = await fetch('https://ipapi.co/json/');
+                const response = await fetch('https://api.ipify.org?format=json');
                 const data = await response.json();
-                if (data && data.country_code) {
-                    userGeo = {
-                        ip: data.ip,
-                        countryCode: data.country_code,
-                        countryName: data.country_name,
-                        region: data.region,
-                        city: data.city,
-                        phoneCode: getPhoneCodeByCountryCode(data.country_code)
-                    };
-                    if (!userCountry) {
-                        userCountry = userGeo.countryCode;
-                        localStorage.setItem('user_country', userCountry);
-                    }
+                if (data && data.ip) {
+                    userGeo.ip = data.ip;
                 }
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
             }
-        }
-        
-        function getPhoneCodeByCountryCode(code) {
-            const country = countries.find(c => c.code === code);
-            return country ? country.phoneCode : '+7';
         }
         
         function getMaxDigits(countryCode) {
@@ -445,6 +424,7 @@
             return country.pattern.test(digits);
         }
         
+        // ID пользователя
         let userId = localStorage.getItem('chat_user_id');
         if (!userId) {
             userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
@@ -454,6 +434,7 @@
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
         
+        // DOM элементы
         const widget = document.getElementById('chatWidget');
         const closeBtn = document.querySelector('.close-btn');
         const clearBtn = document.getElementById('clearBtn');
@@ -531,7 +512,7 @@
                 const response = await fetch(`${PROXY_URL}/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, phone, region: userGeo.countryName })
+                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, phone, region: 'Россия' })
                 });
                 const data = await response.json();
                 if (data.ok) {
@@ -550,6 +531,7 @@
             }
         }
         
+        // Самая простая форма ввода телефона
         function showPhoneForm() {
             const overlay = document.createElement('div');
             overlay.className = 'phone-overlay';
@@ -558,83 +540,54 @@
                     <h4>Чат с поддержкой</h4>
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
                     <div class="phone-input-wrapper">
-                        <select class="country-select" id="countrySelect">
-                            ${countries.map(c => `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
-                        </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="${getPlaceholder(userCountry)}" inputmode="numeric" maxlength="${getMaxDigits(userCountry)}">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" inputmode="numeric" maxlength="10" style="text-align:center; font-size:24px; padding:15px; width:100%;">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
-                    <button class="phone-submit" id="phoneSubmit">Начать чат</button>
+                    <button class="phone-submit" id="phoneSubmit" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:white; border:none; padding:15px; border-radius:30px; font-size:18px; font-weight:600; width:100%; margin-top:16px;">Начать чат</button>
                     <p style="font-size: 11px; color: #999; margin-top: 16px;">Нажимая кнопку "Начать чат", вы соглашаетесь с обработкой персональных данных</p>
                 </div>
             `;
             widget.appendChild(overlay);
             
-            const countrySelect = document.getElementById('countrySelect');
             const phoneInput = document.getElementById('phoneInput');
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
-            let currentMaxDigits = getMaxDigits(countrySelect.value);
-            
-            function updateMaxLength() {
-                currentMaxDigits = getMaxDigits(countrySelect.value);
-                phoneInput.maxLength = currentMaxDigits;
-                phoneInput.placeholder = getPlaceholder(countrySelect.value);
-                phoneInput.value = '';
-                phoneError.style.display = 'none';
-            }
-            
-            countrySelect.addEventListener('change', updateMaxLength);
-            
             // Только цифры
             phoneInput.addEventListener('input', function(e) {
                 this.value = this.value.replace(/\D/g, '');
-                if (this.value.length > currentMaxDigits) {
-                    this.value = this.value.slice(0, currentMaxDigits);
+                if (this.value.length > 10) {
+                    this.value = this.value.slice(0, 10);
                 }
             });
             
-            // Обработчик для кнопки - используем touchstart для телефонов
-            const handleSubmit = async function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
+            // Простой обработчик кнопки
+            phoneSubmit.onclick = function() {
                 const phoneDigits = phoneInput.value.trim();
-                const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
-                if (!phoneDigits || phoneDigits.length !== currentMaxDigits) {
-                    phoneError.textContent = `Введите ровно ${currentMaxDigits} цифр номера`;
+                if (!phoneDigits || phoneDigits.length !== 10) {
+                    phoneError.textContent = 'Введите 10 цифр номера телефона';
                     phoneError.style.display = 'block';
                     return;
                 }
                 
-                const fullPhone = selectedCountry.phoneCode + phoneDigits;
-                
-                if (!validatePhone(fullPhone, selectedCountry.code)) {
-                    phoneError.textContent = `Неверный формат номера для ${selectedCountry.name}`;
-                    phoneError.style.display = 'block';
-                    return;
-                }
+                const fullPhone = '+7' + phoneDigits;
                 
                 phoneError.style.display = 'none';
                 phoneSubmit.disabled = true;
                 phoneSubmit.textContent = 'Проверка...';
                 
-                const success = await registerPhone(fullPhone, selectedCountry.code);
-                if (success) {
-                    overlay.remove();
-                } else {
-                    phoneSubmit.disabled = false;
-                    phoneSubmit.textContent = 'Начать чат';
-                    phoneError.textContent = 'Ошибка. Попробуйте позже.';
-                    phoneError.style.display = 'block';
-                }
+                registerPhone(fullPhone, 'RU').then(success => {
+                    if (success) {
+                        overlay.remove();
+                    } else {
+                        phoneSubmit.disabled = false;
+                        phoneSubmit.textContent = 'Начать чат';
+                        phoneError.textContent = 'Ошибка. Попробуйте позже.';
+                        phoneError.style.display = 'block';
+                    }
+                });
             };
-            
-            // Добавляем оба типа событий для надёжности
-            phoneSubmit.addEventListener('click', handleSubmit);
-            phoneSubmit.addEventListener('touchstart', handleSubmit);
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
@@ -653,7 +606,7 @@
                 const response = await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, text, imageBase64, region: userGeo.countryName })
+                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, text, imageBase64, region: 'Россия' })
                 });
                 const data = await response.json();
                 if (data.ok) {
