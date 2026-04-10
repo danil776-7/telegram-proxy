@@ -13,8 +13,8 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Функция для форматирования времени из timestamp Telegram в Московское время (UTC+3)
-function formatTelegramTime(timestamp) {
+// Функция для форматирования времени в Московское время
+function formatMoscowTime(timestamp) {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString('ru-RU', {
         timeZone: 'Europe/Moscow',
@@ -71,6 +71,8 @@ for (const [ip, topicId] of Object.entries(savedData.ipTopics || {})) ipTopics.s
 for (const [topicId, ip] of Object.entries(savedData.topicToIp || {})) topicToIp.set(parseInt(topicId), ip);
 for (const [ip, status] of Object.entries(savedData.ipStatus || {})) ipStatus.set(ip, status);
 
+console.log(`📊 Загружено ${ipTopics.size} связей IP->топик`);
+
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
     const response = await fetch(url, {
@@ -99,12 +101,11 @@ async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveStr = status.lastActive ? formatTelegramTime(Math.floor(status.lastActive / 1000)) : 'неизвестно';
+    const lastActiveStr = status.lastActive ? formatMoscowTime(Math.floor(status.lastActive / 1000)) : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
     
-    // ВСЯ ИНФОРМАЦИЯ В ОДНОМ СООБЩЕНИИ
     const text = `🧑‍💻 **Пользователь:** ${status.userId}\n${siteStr}📡 **IP:** ${ip}\n${regionStr}${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
     
     try {
@@ -139,7 +140,6 @@ async function updatePinnedMessage(ip, topicId) {
             status.pinnedMessageId = null;
             ipStatus.set(ip, status);
             saveData();
-            await updatePinnedMessage(ip, topicId);
         }
     }
 }
@@ -171,7 +171,6 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         const regionText = region ? `📍 **Регион:** ${region}\n` : '';
         const currentTime = getCurrentMoscowTime();
         
-        // Приветственное сообщение (только один раз)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -344,7 +343,6 @@ app.get('/getUpdates', async (req, res) => {
                         }
                     }
                     
-                    // Пропускаем сообщения от бота и системные сообщения о смене темы
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && (msg.text.includes('changed the topic name') || msg.text.includes('закрепил') || msg.text.includes('переименовал'))) continue;
                     
