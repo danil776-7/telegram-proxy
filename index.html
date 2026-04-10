@@ -285,10 +285,6 @@
             font-weight: 500;
             color: #333;
             padding: 12px 8px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
             background: transparent;
             border: none;
             white-space: nowrap;
@@ -301,6 +297,8 @@
             font-size: 18px;
             background: transparent;
             outline: none;
+            font-family: monospace;
+            letter-spacing: 1px;
         }
         
         .phone-submit {
@@ -407,16 +405,16 @@
         const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
         
         const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', example: '+7 123 456 78 90', pattern: /^7\d{10}$/, digits: 11 },
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', example: '+31 6 12345678', pattern: /^31[1-9]\d{8}$/, digits: 10 },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', example: '+380 12 345 67 89', pattern: /^380\d{9}$/, digits: 12 },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', example: '+7 123 456 78 90', pattern: /^7\d{10}$/, digits: 11 },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', example: '+375 12 345 67 89', pattern: /^375\d{9}$/, digits: 12 },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', example: '+1 234 567 8901', pattern: /^1\d{10}$/, digits: 11 },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', example: '+44 12 3456 7890', pattern: /^44\d{10}$/, digits: 12 },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', example: '+49 123 4567890', pattern: /^49\d{10}$/, digits: 12 },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', example: '+33 1 23 45 67 89', pattern: /^33\d{9}$/, digits: 11 },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', example: '+39 123 456 7890', pattern: /^39\d{10}$/, digits: 11 }
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', pattern: /^7\d{10}$/, maxLength: 11 },
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', pattern: /^31[1-9]\d{8}$/, maxLength: 10 },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', pattern: /^380\d{9}$/, maxLength: 12 },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', pattern: /^7\d{10}$/, maxLength: 11 },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', pattern: /^375\d{9}$/, maxLength: 12 },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', pattern: /^1\d{10}$/, maxLength: 11 },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', pattern: /^44\d{10}$/, maxLength: 12 },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', pattern: /^49\d{10}$/, maxLength: 12 },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', pattern: /^33\d{9}$/, maxLength: 11 },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', pattern: /^39\d{10}$/, maxLength: 11 }
         ];
         
         let userGeo = {
@@ -458,6 +456,11 @@
         function getPhoneCodeByCountryCode(code) {
             const country = countries.find(c => c.code === code);
             return country ? country.phoneCode : '+7';
+        }
+        
+        function getMaxPhoneLength(countryCode) {
+            const country = countries.find(c => c.code === countryCode);
+            return country ? country.maxLength : 11;
         }
         
         function validatePhone(phone, countryCode) {
@@ -582,7 +585,7 @@
                         <select class="country-select" id="countrySelect">
                             ${countries.map(c => `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                         </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="(00) 000 00 00" maxlength="15" inputmode="numeric">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" maxlength="15" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -596,19 +599,43 @@
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
+            // Обновляем максимальную длину при смене страны
+            function updateMaxLength() {
+                const country = countries.find(c => c.code === countrySelect.value);
+                if (country) {
+                    phoneInput.maxLength = country.maxLength + 2;
+                    phoneInput.placeholder = `${country.phoneCode} (${country.maxLength} цифр)`;
+                }
+            }
+            
+            countrySelect.addEventListener('change', updateMaxLength);
+            updateMaxLength();
+            
+            // Ограничение ввода только цифрами
+            phoneInput.addEventListener('input', function(e) {
+                let value = e.target.value;
+                let digits = value.replace(/\D/g, '');
+                const maxLen = phoneInput.maxLength;
+                if (digits.length > maxLen) {
+                    digits = digits.slice(0, maxLen);
+                }
+                e.target.value = digits;
+            });
+            
             phoneSubmit.onclick = async () => {
-                let phone = phoneInput.value.trim();
+                let phoneDigits = phoneInput.value.trim();
                 const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
-                if (!phone || phone.length < 5) {
-                    phoneError.textContent = 'Неверно указан номер телефона';
+                if (!phoneDigits || phoneDigits.length < 5) {
+                    phoneError.textContent = `Введите номер (${selectedCountry.maxLength} цифр)`;
                     phoneError.style.display = 'block';
                     return;
                 }
                 
-                const fullPhone = selectedCountry.phoneCode + phone.replace(/\D/g, '');
+                const fullPhone = selectedCountry.phoneCode + phoneDigits;
+                
                 if (!validatePhone(fullPhone, selectedCountry.code)) {
-                    phoneError.textContent = 'Неверно указан номер телефона';
+                    phoneError.textContent = `Неверный формат. Нужно ${selectedCountry.maxLength} цифр после ${selectedCountry.phoneCode}`;
                     phoneError.style.display = 'block';
                     return;
                 }
