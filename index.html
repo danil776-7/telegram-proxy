@@ -224,6 +224,7 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
 
+        /* ========== ФОРМА ВВОДА ТЕЛЕФОНА (АККУРАТНАЯ) ========== */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -262,42 +263,50 @@
         .phone-input-wrapper {
             display: flex;
             align-items: center;
-            gap: 8px;
+            justify-content: center;
             margin-bottom: 16px;
-            border: 1px solid #e0e4e8;
-            border-radius: 12px;
-            background: #f8f9fa;
-            padding: 4px 8px;
         }
 
         .country-select {
             font-size: 18px;
             font-weight: 500;
             color: #333;
-            padding: 12px 8px;
-            background: transparent;
-            border: none;
+            padding: 14px 12px;
+            background: #f8f9fa;
+            border: 1px solid #e0e4e8;
+            border-radius: 12px;
             cursor: pointer;
+            margin-right: 8px;
         }
 
         .phone-input {
             flex: 1;
-            padding: 12px 8px;
-            border: none;
+            padding: 14px 12px;
             font-size: 18px;
-            background: transparent;
-            outline: none;
             font-family: monospace;
             letter-spacing: 2px;
+            text-align: center;
+            border: 1px solid #e0e4e8;
+            border-radius: 12px;
+            background: #f8f9fa;
+            outline: none;
+            transition: all 0.2s;
+            max-width: 200px;
+        }
+
+        .phone-input:focus {
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 2px rgba(102,126,234,0.2);
         }
 
         .phone-submit {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 16px 24px;
+            padding: 14px 24px;
             border-radius: 30px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
             width: 100%;
@@ -330,8 +339,9 @@
             .message { max-width: 90%; font-size: 14px; }
             .phone-card { padding: 20px 16px; }
             .phone-card h4 { font-size: 22px; }
-            .country-select { font-size: 16px; }
-            .phone-input { font-size: 16px; letter-spacing: 1px; }
+            .country-select { font-size: 14px; padding: 10px 8px; }
+            .phone-input { font-size: 16px; letter-spacing: 1px; max-width: 160px; }
+            .phone-submit { padding: 12px 20px; font-size: 15px; }
         }
     </style>
 </head>
@@ -367,16 +377,16 @@
         const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
         
         const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, mask: '+7 (___) ___-__-__' },
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', pattern: /^31[1-9]\d{8}$/, maxDigits: 9, mask: '+31 __ _______' },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', pattern: /^380\d{9}$/, maxDigits: 9, mask: '+380 (__) ___-__-__' },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, mask: '+7 (___) ___-__-__' },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', pattern: /^375\d{9}$/, maxDigits: 9, mask: '+375 (__) ___-__-__' },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', pattern: /^1\d{10}$/, maxDigits: 10, mask: '+1 (___) ___-____' },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', pattern: /^44\d{10}$/, maxDigits: 10, mask: '+44 (__) ____-____' },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', pattern: /^49\d{10}$/, maxDigits: 10, mask: '+49 (___) _______' },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', pattern: /^33\d{9}$/, maxDigits: 9, mask: '+33 (__) __-__-__' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', pattern: /^39\d{10}$/, maxDigits: 10, mask: '+39 (__) ____-____' }
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', pattern: /^31[1-9]\d{8}$/, maxDigits: 9, placeholder: '123456789' },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', pattern: /^380\d{9}$/, maxDigits: 9, placeholder: '123456789' },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', pattern: /^375\d{9}$/, maxDigits: 9, placeholder: '123456789' },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', pattern: /^1\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', pattern: /^44\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', pattern: /^49\d{10}$/, maxDigits: 10, placeholder: '1234567890' },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', pattern: /^33\d{9}$/, maxDigits: 9, placeholder: '123456789' },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', pattern: /^39\d{10}$/, maxDigits: 10, placeholder: '1234567890' }
         ];
         
         let userGeo = {
@@ -423,22 +433,9 @@
             return country ? country.maxDigits : 10;
         }
         
-        function getMask(countryCode) {
+        function getPlaceholder(countryCode) {
             const country = countries.find(c => c.code === countryCode);
-            return country ? country.mask : '+7 (___) ___-__-__';
-        }
-        
-        function formatPhoneNumber(digits, mask) {
-            if (!digits) return '';
-            let result = mask;
-            let digitIndex = 0;
-            result = result.replace(/_/g, () => {
-                if (digitIndex < digits.length) {
-                    return digits[digitIndex++];
-                }
-                return '_';
-            });
-            return result;
+            return country ? country.placeholder : '1234567890';
         }
         
         function validatePhone(phone, countryCode) {
@@ -564,7 +561,7 @@
                         <select class="country-select" id="countrySelect">
                             ${countries.map(c => `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                         </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="+7 (___) ___-__-__" inputmode="numeric">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="${getPlaceholder(userCountry)}" inputmode="numeric" maxlength="${getMaxDigits(userCountry)}">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -579,73 +576,36 @@
             const phoneSubmit = document.getElementById('phoneSubmit');
             
             let currentMaxDigits = getMaxDigits(countrySelect.value);
-            let currentMask = getMask(countrySelect.value);
-            let rawDigits = '';
             
-            function updateMask() {
+            function updateMaxLength() {
                 currentMaxDigits = getMaxDigits(countrySelect.value);
-                currentMask = getMask(countrySelect.value);
-                phoneInput.placeholder = currentMask;
-                rawDigits = '';
+                phoneInput.maxLength = currentMaxDigits;
+                phoneInput.placeholder = getPlaceholder(countrySelect.value);
                 phoneInput.value = '';
                 phoneError.style.display = 'none';
             }
             
-            function updateInput() {
-                let formatted = formatPhoneNumber(rawDigits, currentMask);
-                phoneInput.value = formatted;
-            }
+            countrySelect.addEventListener('change', updateMaxLength);
             
-            countrySelect.addEventListener('change', () => {
-                updateMask();
-            });
-            
+            // Только цифры
             phoneInput.addEventListener('input', function(e) {
-                let cursorPos = e.target.selectionStart;
-                let oldLength = phoneInput.value.length;
-                
-                // Извлекаем только цифры из введённого значения
-                let newRaw = '';
-                for (let char of e.target.value) {
-                    if (/^\d$/.test(char)) {
-                        newRaw += char;
-                    }
-                }
-                
-                // Ограничиваем количество цифр
-                if (newRaw.length > currentMaxDigits) {
-                    newRaw = newRaw.slice(0, currentMaxDigits);
-                }
-                
-                rawDigits = newRaw;
-                updateInput();
-                
-                // Восстанавливаем позицию курсора
-                let newLength = phoneInput.value.length;
-                let newCursorPos = cursorPos + (newLength - oldLength);
-                if (newCursorPos < 0) newCursorPos = 0;
-                if (newCursorPos > newLength) newCursorPos = newLength;
-                phoneInput.setSelectionRange(newCursorPos, newCursorPos);
-            });
-            
-            // Запрещаем ввод не-цифр через keydown
-            phoneInput.addEventListener('keydown', function(e) {
-                const allowedKeys = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
-                if (allowedKeys.includes(e.key)) return;
-                if (!/^\d$/.test(e.key)) {
-                    e.preventDefault();
+                this.value = this.value.replace(/\D/g, '');
+                if (this.value.length > currentMaxDigits) {
+                    this.value = this.value.slice(0, currentMaxDigits);
                 }
             });
             
             phoneSubmit.onclick = async function() {
-                if (rawDigits.length !== currentMaxDigits) {
+                const phoneDigits = phoneInput.value.trim();
+                const selectedCountry = countries.find(c => c.code === countrySelect.value);
+                
+                if (!phoneDigits || phoneDigits.length !== currentMaxDigits) {
                     phoneError.textContent = `Введите ровно ${currentMaxDigits} цифр номера`;
                     phoneError.style.display = 'block';
                     return;
                 }
                 
-                const selectedCountry = countries.find(c => c.code === countrySelect.value);
-                const fullPhone = selectedCountry.phoneCode + rawDigits;
+                const fullPhone = selectedCountry.phoneCode + phoneDigits;
                 
                 if (!validatePhone(fullPhone, selectedCountry.code)) {
                     phoneError.textContent = `Неверный формат номера для ${selectedCountry.name}`;
