@@ -458,8 +458,8 @@
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10 },
             { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9 },
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10 },
             { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9 },
             { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10 },
             { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9 },
@@ -495,6 +495,7 @@
                         region: data.region,
                         city: data.city
                     };
+                    console.log('📍 Геолокация:', userGeo.countryName, userGeo.city);
                 }
             } catch (error) {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -692,6 +693,16 @@
             }
         }
         
+        async function updateActivity(isOnline, isActive) {
+            try {
+                await fetch(`${PROXY_URL}/updateStatus`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, ip: userGeo.ip, isOnline, isActive })
+                });
+            } catch (e) {}
+        }
+        
         async function checkReplies() {
             try {
                 const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&ip=${userGeo.ip}`);
@@ -701,7 +712,8 @@
                         if (update.update_id > lastUpdateId) lastUpdateId = update.update_id;
                         if (update.message && (update.message.text || update.message.hasImage)) {
                             if (update.message.text && (
-                                update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')
+                                update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') ||
+                                update.message.text.includes('указал номер телефона')
                             )) {
                                 continue;
                             }
@@ -751,6 +763,7 @@
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
                 if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
+                updateActivity(true, true);
             }
         };
         
@@ -783,11 +796,19 @@
             }
         };
         
+        // Активность
+        setInterval(() => updateActivity(true, true), 30000);
+        window.addEventListener('blur', () => updateActivity(false, false));
+        window.addEventListener('focus', () => updateActivity(true, true));
+        document.addEventListener('click', () => updateActivity(true, true));
+        document.addEventListener('keypress', () => updateActivity(true, true));
+        
         loadHistory();
         setInterval(checkReplies, 5000);
         
         detectGeo().then(() => {
             if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
+            else updateActivity(true, true);
         });
     })();
 </script>
