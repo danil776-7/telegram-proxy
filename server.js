@@ -13,15 +13,15 @@ const GROUP_CHAT_ID = -1003765383331;
 
 const DATA_FILE = path.join(__dirname, 'data.json');
 
-// Функция для получения времени в часовом поясе пользователя
-function getUserTimeZone() {
-    // По умолчанию Moscow, но можно определить по IP
-    return 'Europe/Moscow';
+function getMoscowTime() {
+    const now = new Date();
+    const moscowTime = new Date(now.toLocaleString('en-US', { timeZone: 'Europe/Moscow' }));
+    return moscowTime;
 }
 
-function formatLocalTime(date, timeZone = 'Europe/Moscow') {
+function formatMoscowTime(date) {
     return date.toLocaleString('ru-RU', {
-        timeZone: timeZone,
+        timeZone: 'Europe/Moscow',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -31,16 +31,10 @@ function formatLocalTime(date, timeZone = 'Europe/Moscow') {
     });
 }
 
-function getCurrentLocalTime() {
-    const now = new Date();
-    return formatLocalTime(now);
-}
-
 const ipTopics = new Map();
 const topicToIp = new Map();
 const ipStatus = new Map();
 
-// Загрузка данных из файла
 function loadData() {
     try {
         if (fs.existsSync(DATA_FILE)) {
@@ -54,7 +48,6 @@ function loadData() {
     return { ipTopics: {}, topicToIp: {}, ipStatus: {} };
 }
 
-// Сохранение данных в файл
 function saveData() {
     try {
         const data = {
@@ -69,7 +62,6 @@ function saveData() {
     }
 }
 
-// Загружаем сохранённые данные
 const savedData = loadData();
 for (const [ip, topicId] of Object.entries(savedData.ipTopics || {})) ipTopics.set(ip, topicId);
 for (const [topicId, ip] of Object.entries(savedData.topicToIp || {})) topicToIp.set(parseInt(topicId), ip);
@@ -85,17 +77,6 @@ async function callTelegram(method, params) {
         body: JSON.stringify(params)
     });
     return response.json();
-}
-
-// Удаление системных сообщений о смене темы
-async function deleteSystemMessages(topicId) {
-    try {
-        const updates = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=-1`);
-        // Эта функция будет вызываться после каждого изменения темы
-        // Чтобы удалить сообщения "changed the topic name"
-    } catch (err) {
-        console.error('Ошибка удаления системных сообщений:', err);
-    }
 }
 
 async function updateTopicInfo(ip, topicId, site) {
@@ -116,13 +97,12 @@ async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveDate = status.lastActive ? new Date(status.lastActive) : new Date();
-    const lastActiveStr = formatLocalTime(lastActiveDate);
+    const lastActiveDate = status.lastActive ? new Date(status.lastActive) : getMoscowTime();
+    const lastActiveStr = formatMoscowTime(lastActiveDate);
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
     
-    // Объединяем всю информацию в ОДНО сообщение
     const text = `🧑‍💻 **Пользователь:** ${status.userId}\n${siteStr}📡 **IP:** ${ip}\n${regionStr}${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
     
     try {
@@ -180,9 +160,8 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
         saveData();
         
         const regionText = region ? `📍 **Регион:** ${region}\n` : '';
-        const currentTime = getCurrentLocalTime();
+        const currentTime = formatMoscowTime(getMoscowTime());
         
-        // Отправляем ТОЛЬКО приветственное сообщение (не дублируем)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
@@ -354,7 +333,6 @@ app.get('/getUpdates', async (req, res) => {
                         }
                     }
                     
-                    // Пропускаем сообщения от бота и системные сообщения
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && msg.text.includes('changed the topic name')) continue;
                     
@@ -399,6 +377,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер запущен на порту ${PORT}`);
     console.log(`📡 GROUP_CHAT_ID: ${GROUP_CHAT_ID}`);
-    console.log(`📂 Данные сохраняются в файл: ${DATA_FILE}`);
-    console.log(`📊 Загружено ${ipTopics.size} сохранённых связей IP->топик\n`);
+    console.log(`📂 Данные сохраняются в файл: ${DATA_FILE}\n`);
 });
