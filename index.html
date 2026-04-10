@@ -260,22 +260,19 @@
         }
 
         .phone-input-wrapper {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
             margin-bottom: 16px;
         }
 
-        .country-select {
-            width: 100%;
-            font-size: 16px;
-            font-weight: 500;
+        .phone-code {
+            font-size: 18px;
+            font-weight: 600;
             color: #333;
             padding: 14px 12px;
             background: #f8f9fa;
             border: 1px solid #e0e4e8;
             border-radius: 12px;
-            cursor: pointer;
+            text-align: center;
+            margin-bottom: 12px;
         }
 
         .phone-input {
@@ -370,28 +367,8 @@
     (function() {
         const PROXY_URL = 'https://telegram-proxy-viyx.onrender.com';
         
-        const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10 },
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', pattern: /^31[1-9]\d{8}$/, maxDigits: 9 },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', pattern: /^380\d{9}$/, maxDigits: 9 },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', pattern: /^7\d{10}$/, maxDigits: 10 },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', pattern: /^375\d{9}$/, maxDigits: 9 },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', pattern: /^1\d{10}$/, maxDigits: 10 },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', pattern: /^44\d{10}$/, maxDigits: 10 },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', pattern: /^49\d{10}$/, maxDigits: 10 },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', pattern: /^33\d{9}$/, maxDigits: 9 },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', pattern: /^39\d{10}$/, maxDigits: 10 }
-        ];
-        
-        let userGeo = {
-            ip: 'не определён',
-            countryCode: 'RU',
-            countryName: 'Россия',
-            phoneCode: '+7'
-        };
-        
+        let userGeo = { ip: 'не определён' };
         let userPhone = localStorage.getItem('user_phone');
-        let userCountry = localStorage.getItem('user_country') || 'RU';
         let isPhoneRequired = !userPhone;
         
         async function detectGeo() {
@@ -402,20 +379,8 @@
                     userGeo.ip = data.ip;
                 }
             } catch (error) {
-                console.error('Ошибка геолокации:', error);
+                console.error('Ошибка:', error);
             }
-        }
-        
-        function getMaxDigits(countryCode) {
-            const country = countries.find(c => c.code === countryCode);
-            return country ? country.maxDigits : 10;
-        }
-        
-        function validatePhone(phone, countryCode) {
-            const country = countries.find(c => c.code === countryCode);
-            if (!country) return false;
-            const digits = phone.replace(/\D/g, '');
-            return country.pattern.test(digits);
         }
         
         let userId = localStorage.getItem('chat_user_id');
@@ -499,19 +464,17 @@
             }
         }
         
-        async function registerPhone(phone, countryCode) {
+        async function registerPhone(phone) {
             try {
                 const response = await fetch(`${PROXY_URL}/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, phone, region: userGeo.countryName })
+                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, phone, region: 'Россия' })
                 });
                 const data = await response.json();
                 if (data.ok) {
                     userPhone = phone;
-                    userCountry = countryCode;
                     localStorage.setItem('user_phone', phone);
-                    localStorage.setItem('user_country', countryCode);
                     isPhoneRequired = false;
                     addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
                     return true;
@@ -531,10 +494,8 @@
                     <h4>Чат с поддержкой</h4>
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
                     <div class="phone-input-wrapper">
-                        <select class="country-select" id="countrySelect">
-                            ${countries.map(c => `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
-                        </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="Введите номер" inputmode="numeric">
+                        <div class="phone-code">🇷🇺 Россия +7</div>
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" inputmode="numeric" maxlength="10">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -543,57 +504,34 @@
             `;
             widget.appendChild(overlay);
             
-            const countrySelect = document.getElementById('countrySelect');
             const phoneInput = document.getElementById('phoneInput');
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
-            let currentMaxDigits = getMaxDigits(countrySelect.value);
-            
-            function updateMaxLength() {
-                currentMaxDigits = getMaxDigits(countrySelect.value);
-                phoneInput.maxLength = currentMaxDigits;
-                phoneInput.placeholder = `${currentMaxDigits} цифр`;
-                phoneInput.value = '';
-                phoneError.style.display = 'none';
-            }
-            
-            countrySelect.addEventListener('change', updateMaxLength);
-            updateMaxLength();
-            
-            // Только цифры и ограничение длины
+            // Только цифры
             phoneInput.addEventListener('input', function(e) {
-                let val = this.value.replace(/\D/g, '');
-                if (val.length > currentMaxDigits) {
-                    val = val.slice(0, currentMaxDigits);
+                this.value = this.value.replace(/\D/g, '');
+                if (this.value.length > 10) {
+                    this.value = this.value.slice(0, 10);
                 }
-                this.value = val;
             });
             
-            // Кнопка "Начать чат"
             phoneSubmit.onclick = function() {
                 const phoneDigits = phoneInput.value.trim();
-                const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
-                if (!phoneDigits || phoneDigits.length !== currentMaxDigits) {
-                    phoneError.textContent = `Введите ровно ${currentMaxDigits} цифр`;
+                if (!phoneDigits || phoneDigits.length !== 10) {
+                    phoneError.textContent = 'Введите 10 цифр номера телефона';
                     phoneError.style.display = 'block';
                     return;
                 }
                 
-                const fullPhone = selectedCountry.phoneCode + phoneDigits;
-                
-                if (!validatePhone(fullPhone, selectedCountry.code)) {
-                    phoneError.textContent = `Неверный формат номера для ${selectedCountry.name}`;
-                    phoneError.style.display = 'block';
-                    return;
-                }
+                const fullPhone = '+7' + phoneDigits;
                 
                 phoneError.style.display = 'none';
                 phoneSubmit.disabled = true;
                 phoneSubmit.textContent = 'Проверка...';
                 
-                registerPhone(fullPhone, selectedCountry.code).then(success => {
+                registerPhone(fullPhone).then(success => {
                     if (success) {
                         overlay.remove();
                     } else {
@@ -622,7 +560,7 @@
                 const response = await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, text, imageBase64, region: userGeo.countryName })
+                    body: JSON.stringify({ userId, site: window.location.hostname, ip: userGeo.ip, text, imageBase64, region: 'Россия' })
                 });
                 const data = await response.json();
                 if (data.ok) {
