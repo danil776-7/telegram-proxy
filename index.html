@@ -451,13 +451,13 @@
         
         let userGeo = {
             ip: 'не определён',
-            countryCode: 'NL',
-            countryName: 'Нидерланды',
-            phoneCode: '+31'
+            countryCode: 'RU',
+            countryName: 'Россия',
+            phoneCode: '+7'
         };
         
         let userPhone = localStorage.getItem('user_phone');
-        let userCountry = localStorage.getItem('user_country') || 'NL';
+        let userCountry = localStorage.getItem('user_country') || 'RU';
         let isPhoneRequired = !userPhone;
         
         async function detectGeo() {
@@ -487,7 +487,7 @@
         
         function getPhoneCodeByCountryCode(code) {
             const country = countries.find(c => c.code === code);
-            return country ? country.phoneCode : '+31';
+            return country ? country.phoneCode : '+7';
         }
         
         function validatePhone(phone, countryCode) {
