@@ -278,10 +278,9 @@
             border-radius: 12px;
             background: #f8f9fa;
             padding: 4px 8px;
-            position: relative;
         }
         
-        .country-code {
+        .country-select {
             font-size: 18px;
             font-weight: 500;
             color: #333;
@@ -293,32 +292,6 @@
             background: transparent;
             border: none;
             white-space: nowrap;
-        }
-        
-        .country-select-dropdown {
-            position: absolute;
-            bottom: 100%;
-            left: 0;
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
-            max-height: 250px;
-            overflow-y: auto;
-            z-index: 30;
-            margin-bottom: 8px;
-            min-width: 200px;
-        }
-        
-        .country-option {
-            padding: 12px 16px;
-            cursor: pointer;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 14px;
-            transition: background 0.2s;
-        }
-        
-        .country-option:hover {
-            background: #f5f7fb;
         }
         
         .phone-input {
@@ -391,11 +364,8 @@
             .message img { max-height: 150px; }
             .phone-card { padding: 24px 16px; }
             .phone-card h4 { font-size: 20px; }
-            .phone-input-wrapper { padding: 2px 8px; }
-            .country-code { font-size: 16px; padding: 8px 4px; }
+            .country-select { font-size: 16px; padding: 8px 4px; }
             .phone-input { font-size: 16px; }
-            .country-select-dropdown { min-width: 160px; }
-            .country-option { padding: 10px 12px; font-size: 13px; }
         }
         
         /* Адаптация для компьютера */
@@ -609,7 +579,9 @@
                     <h4>Чат с поддержкой</h4>
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
                     <div class="phone-input-wrapper">
-                        <button class="country-code" id="countryCodeBtn">${getPhoneCodeByCountryCode(userCountry)} ▼</button>
+                        <select class="country-select" id="countrySelect">
+                            ${countries.map(c => `<option value="${c.code}" ${c.code === userCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
+                        </select>
                         <input type="tel" class="phone-input" id="phoneInput" placeholder="(00) 000 00 00" maxlength="15" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
@@ -619,53 +591,14 @@
             `;
             widget.appendChild(overlay);
             
-            const countryCodeBtn = document.getElementById('countryCodeBtn');
+            const countrySelect = document.getElementById('countrySelect');
             const phoneInput = document.getElementById('phoneInput');
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
-            // Создаём выпадающий список
-            const dropdown = document.createElement('div');
-            dropdown.className = 'country-select-dropdown';
-            dropdown.style.display = 'none';
-            
-            countries.forEach(country => {
-                const option = document.createElement('div');
-                option.className = 'country-option';
-                option.innerHTML = `${country.name} ${country.phoneCode}`;
-                option.onclick = (e) => {
-                    e.stopPropagation();
-                    countryCodeBtn.innerHTML = `${country.phoneCode} ▼`;
-                    dropdown.style.display = 'none';
-                    phoneInput.focus();
-                };
-                dropdown.appendChild(option);
-            });
-            
-            // Добавляем dropdown в DOM
-            const wrapper = countryCodeBtn.parentElement;
-            wrapper.style.position = 'relative';
-            wrapper.appendChild(dropdown);
-            
-            // Обработчик клика по кнопке выбора страны
-            countryCodeBtn.onclick = (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const isVisible = dropdown.style.display === 'block';
-                dropdown.style.display = isVisible ? 'none' : 'block';
-            };
-            
-            // Закрываем dropdown при клике вне
-            document.addEventListener('click', function closeDropdown(e) {
-                if (!wrapper.contains(e.target)) {
-                    dropdown.style.display = 'none';
-                }
-            });
-            
             phoneSubmit.onclick = async () => {
                 let phone = phoneInput.value.trim();
-                const selectedCode = countryCodeBtn.innerText.replace('▼', '').trim();
-                const country = countries.find(c => c.phoneCode === selectedCode);
+                const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
                 if (!phone || phone.length < 5) {
                     phoneError.textContent = 'Неверно указан номер телефона';
@@ -673,8 +606,8 @@
                     return;
                 }
                 
-                const fullPhone = selectedCode + phone.replace(/\D/g, '');
-                if (!validatePhone(fullPhone, country.code)) {
+                const fullPhone = selectedCountry.phoneCode + phone.replace(/\D/g, '');
+                if (!validatePhone(fullPhone, selectedCountry.code)) {
                     phoneError.textContent = 'Неверно указан номер телефона';
                     phoneError.style.display = 'block';
                     return;
@@ -684,7 +617,7 @@
                 phoneSubmit.disabled = true;
                 phoneSubmit.textContent = 'Проверка...';
                 
-                const success = await registerPhone(fullPhone, country.code);
+                const success = await registerPhone(fullPhone, selectedCountry.code);
                 if (success) {
                     overlay.remove();
                 } else {
