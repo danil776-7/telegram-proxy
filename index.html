@@ -304,16 +304,17 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 14px 24px;
+            padding: 16px 24px;
             border-radius: 30px;
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 600;
             cursor: pointer;
             width: 100%;
             margin-top: 16px;
+            transition: transform 0.1s;
         }
         
-        .phone-submit:active { transform: scale(0.98); }
+        .phone-submit:active { transform: scale(0.97); }
         .phone-submit:disabled { opacity: 0.6; }
         
         .error-text {
@@ -362,6 +363,7 @@
             .phone-card h4 { font-size: 20px; }
             .country-select { font-size: 16px; padding: 8px 4px; }
             .phone-input { font-size: 16px; }
+            .phone-submit { padding: 14px 20px; font-size: 16px; }
         }
         
         @media (min-width: 768px) {
@@ -611,16 +613,18 @@
             });
             updateMaxLength();
             
-            // Жёсткое ограничение - не даём ввести больше maxLength
             phoneInput.addEventListener('input', function(e) {
                 if (this.value.length > this.maxLength) {
                     this.value = this.value.slice(0, this.maxLength);
                 }
-                // Удаляем все не-цифры
                 this.value = this.value.replace(/\D/g, '');
             });
             
-            phoneSubmit.onclick = async () => {
+            // Обработчик для кнопки - используем touchstart для телефонов
+            const submitHandler = async function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
                 let phoneDigits = phoneInput.value.trim();
                 const selectedCountry = countries.find(c => c.code === countrySelect.value);
                 
@@ -652,6 +656,9 @@
                     phoneError.style.display = 'block';
                 }
             };
+            
+            phoneSubmit.addEventListener('click', submitHandler);
+            phoneSubmit.addEventListener('touchstart', submitHandler);
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
