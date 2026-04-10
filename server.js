@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
@@ -9,9 +11,65 @@ app.use(express.json({ limit: '50mb' }));
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003765383331;
 
+const DATA_FILE = path.join(__dirname, 'data.json');
+
+// Функция для форматирования времени из timestamp Telegram в Московское время (UTC+3)
+function formatTelegramTime(timestamp) {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function getCurrentMoscowTime() {
+    const now = new Date();
+    return now.toLocaleString('ru-RU', {
+        timeZone: 'Europe/Moscow',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
 const ipTopics = new Map();
 const topicToIp = new Map();
 const ipStatus = new Map();
+
+function loadData() {
+    try {
+        if (fs.existsSync(DATA_FILE)) {
+            const data = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+            console.log('📂 Данные загружены из файла');
+            return data;
+        }
+    } catch (err) {}
+    return { ipTopics: {}, topicToIp: {}, ipStatus: {} };
+}
+
+function saveData() {
+    try {
+        const data = {
+            ipTopics: Object.fromEntries(ipTopics),
+            topicToIp: Object.fromEntries(topicToIp),
+            ipStatus: Object.fromEntries(ipStatus)
+        };
+        fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
+        console.log('💾 Данные сохранены');
+    } catch (err) {}
+}
+
+const savedData = loadData();
+for (const [ip, topicId] of Object.entries(savedData.ipTopics || {})) ipTopics.set(ip, topicId);
+for (const [topicId, ip] of Object.entries(savedData.topicToIp || {})) topicToIp.set(parseInt(topicId), ip);
+for (const [ip, status] of Object.entries(savedData.ipStatus || {})) ipStatus.set(ip, status);
 
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
@@ -34,18 +92,19 @@ async function updateTopicInfo(ip, topicId, site) {
             message_thread_id: topicId,
             name: `${iconEmoji} ${shortSite}`
         });
-    } catch (e) { console.error('Ошибка иконки:', e.message); }
+    } catch (e) {}
 }
 
 async function updatePinnedMessage(ip, topicId) {
     const status = ipStatus.get(ip);
     if (!status) return;
     
-    const lastActiveStr = status.lastActive ? new Date(status.lastActive).toLocaleString('ru-RU') : 'неизвестно';
+    const lastActiveStr = status.lastActive ? formatTelegramTime(Math.floor(status.lastActive / 1000)) : 'неизвестно';
     const phoneStr = status.phone ? `📞 **Телефон:** ${status.phone}\n` : '';
     const siteStr = status.site ? `🌐 **Сайт:** ${status.site}\n` : '';
     const regionStr = status.region ? `📍 **Регион:** ${status.region}\n` : '';
     
+    // ВСЯ ИНФОРМАЦИЯ В ОДНОМ СООБЩЕНИИ
     const text = `🧑‍💻 **Пользователь:** ${status.userId}\n${siteStr}📡 **IP:** ${ip}\n${regionStr}${phoneStr}🟢 **Онлайн:** ${status.online ? '✅ Да' : '❌ Нет'}\n⏱ **Последняя активность:** ${lastActiveStr}`;
     
     try {
@@ -74,7 +133,15 @@ async function updatePinnedMessage(ip, topicId) {
             }
         }
         ipStatus.set(ip, status);
-    } catch (e) { console.error('Ошибка обновления:', e.message); }
+        saveData();
+    } catch (e) {
+        if (e.message?.includes('message to edit not found')) {
+            status.pinnedMessageId = null;
+            ipStatus.set(ip, status);
+            saveData();
+            await updatePinnedMessage(ip, topicId);
+        }
+    }
 }
 
 async function createTopicForIp(ip, site, userId, phone = null, region = null) {
@@ -99,12 +166,16 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
             pinnedMessageId: null
         });
         
-        const regionText = region ? `📍 **Регион:** ${region}\n` : '';
+        saveData();
         
+        const regionText = region ? `📍 **Регион:** ${region}\n` : '';
+        const currentTime = getCurrentMoscowTime();
+        
+        // Приветственное сообщение (только один раз)
         await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${regionText}${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${new Date().toLocaleString('ru-RU')}`,
+            text: `🔔 **Новый пользователь!**\n\n🆔 **ID:** ${userId}\n🌐 **Сайт:** ${site}\n📡 **IP:** ${ip}\n${regionText}${phone ? `📞 **Телефон:** ${phone}\n` : ''}⏰ **Время:** ${currentTime}`,
             parse_mode: 'Markdown'
         });
         
@@ -118,10 +189,12 @@ async function createTopicForIp(ip, site, userId, phone = null, region = null) {
 }
 
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Telegram Proxy работает!' });
+    res.header('Access-Control-Allow-Origin', '*');
+    res.json({ status: 'ok', message: 'Telegram Proxy работает!', topics: ipTopics.size });
 });
 
 app.post('/register', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     console.log('📞 Регистрация:', req.body);
     const { userId, site, ip, phone, region } = req.body;
     
@@ -139,17 +212,12 @@ app.post('/register', async (req, res) => {
         status.site = site;
         if (region) status.region = region;
         ipStatus.set(ip, status);
+        saveData();
         
         let topicId = ipTopics.get(ip);
         if (topicId) {
             await updatePinnedMessage(ip, topicId);
             await updateTopicInfo(ip, topicId, site);
-            await callTelegram('sendMessage', {
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: topicId,
-                text: `📞 **Пользователь указал номер телефона:** ${phone}`,
-                parse_mode: 'Markdown'
-            });
         }
         
         console.log('✅ Регистрация успешна');
@@ -161,8 +229,9 @@ app.post('/register', async (req, res) => {
 });
 
 app.post('/send', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, text, imageBase64, region } = req.body;
-    console.log('📨 Отправка сообщения от:', userId);
+    console.log('📨 Отправка сообщения от:', userId, 'IP:', ip);
     
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
@@ -176,12 +245,15 @@ app.post('/send', async (req, res) => {
     status.userId = userId || status.userId;
     if (region) status.region = region;
     ipStatus.set(ip, status);
+    saveData();
     
     let topicId = ipTopics.get(ip);
     if (!topicId) {
+        console.log(`🆕 Создаём новый топик для IP: ${ip}`);
         topicId = await createTopicForIp(ip, site, userId, status.phone, status.region);
         if (!topicId) return res.status(500).json({ ok: false, error: 'Не удалось создать топик' });
     } else {
+        console.log(`📌 Используем существующий топик для IP: ${ip}`);
         await updatePinnedMessage(ip, topicId);
         await updateTopicInfo(ip, topicId, site);
     }
@@ -226,6 +298,7 @@ app.post('/send', async (req, res) => {
 });
 
 app.post('/updateStatus', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     const { userId, site, ip, isOnline, isActive } = req.body;
     if (!ip) return res.status(400).json({ ok: false, error: 'ip required' });
     
@@ -239,27 +312,23 @@ app.post('/updateStatus', async (req, res) => {
     status.site = site || status.site;
     status.userId = userId || status.userId;
     ipStatus.set(ip, status);
+    saveData();
     
     const topicId = ipTopics.get(ip);
-    if (topicId) {
-        if (wasOnline !== status.online) {
-            await updatePinnedMessage(ip, topicId);
-            await updateTopicInfo(ip, topicId, site);
-        } else if (isActive) {
-            await updatePinnedMessage(ip, topicId);
-        }
+    if (topicId && wasOnline !== status.online) {
+        await updatePinnedMessage(ip, topicId);
+        await updateTopicInfo(ip, topicId, site);
     }
     res.json({ ok: true });
 });
 
 app.get('/getUpdates', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
     const { offset, ip } = req.query;
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        console.log('📨 getUpdates ответ:', data.ok ? 'OK' : 'ERROR', 'количество:', data.result?.length || 0);
         
         if (data.ok && data.result) {
             const filtered = [];
@@ -267,12 +336,17 @@ app.get('/getUpdates', async (req, res) => {
                 const msg = update.message;
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
                     const topicId = msg.message_thread_id;
-                    const userIp = topicToIp.get(topicId);
+                    let userIp = null;
+                    for (let [ip, tid] of ipTopics.entries()) {
+                        if (tid === topicId) {
+                            userIp = ip;
+                            break;
+                        }
+                    }
                     
-                    console.log(`📨 Сообщение в топике ${topicId}, IP: ${userIp}, от бота: ${msg.from?.is_bot}, есть фото: ${!!msg.photo}`);
-                    
-                    // Пропускаем сообщения от бота
+                    // Пропускаем сообщения от бота и системные сообщения о смене темы
                     if (msg.from && msg.from.is_bot) continue;
+                    if (msg.text && (msg.text.includes('changed the topic name') || msg.text.includes('закрепил') || msg.text.includes('переименовал'))) continue;
                     
                     if (userIp && (!ip || userIp === ip)) {
                         const messageData = {
@@ -284,27 +358,16 @@ app.get('/getUpdates', async (req, res) => {
                             }
                         };
                         
-                        // Обработка фото - получаем ссылку на файл
                         if (msg.photo && msg.photo.length > 0) {
                             try {
-                                // Берем самое большое фото (последнее в массиве)
                                 const photo = msg.photo[msg.photo.length - 1];
-                                console.log(`📸 Получено фото, file_id: ${photo.file_id}`);
-                                
                                 const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
                                 const fileData = await fileResponse.json();
-                                
                                 if (fileData.ok) {
-                                    const fileUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-                                    messageData.message.imageUrl = fileUrl;
+                                    messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
-                                    console.log(`📸 Ссылка на фото: ${fileUrl}`);
-                                } else {
-                                    console.error('Ошибка получения файла:', fileData);
                                 }
-                            } catch (err) {
-                                console.error('Ошибка обработки фото:', err);
-                            }
+                            } catch (err) {}
                         }
                         
                         filtered.push(messageData);
@@ -312,7 +375,6 @@ app.get('/getUpdates', async (req, res) => {
                 }
             }
             data.result = filtered;
-            console.log(`📨 Отправлено ${filtered.length} сообщений в виджет`);
         }
         res.json(data);
     } catch (error) {
