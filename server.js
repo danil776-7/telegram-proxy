@@ -2,8 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
+// Настройки CORS - РАЗРЕШАЕМ ВСЁ
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.options('*', cors());
+
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -16,7 +22,6 @@ const users = new Map();
 const topicToUser = new Map();
 let lastUpdateId = 0;
 
-// Функция для получения времени в Амстердаме (Нидерланды)
 function getAmsterdamTime(timestamp = null) {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
     return date.toLocaleString('ru-RU', {
@@ -29,7 +34,6 @@ function getAmsterdamTime(timestamp = null) {
     });
 }
 
-// Функция для определения страны по IP
 async function getCountryByIp(ip) {
     try {
         const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city`);
@@ -41,9 +45,7 @@ async function getCountryByIp(ip) {
                 city: data.city
             };
         }
-    } catch (error) {
-        console.error('Ошибка геолокации:', error);
-    }
+    } catch (error) {}
     return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам' };
 }
 
@@ -52,7 +54,6 @@ app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Proxy работает!' });
 });
 
-// РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     console.log('📞 РЕГИСТРАЦИЯ:', req.body);
@@ -63,16 +64,13 @@ app.post('/register', async (req, res) => {
     }
     
     try {
-        // Определяем страну по IP
         let geo = { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам' };
         if (ip && ip !== '127.0.0.1') {
             geo = await getCountryByIp(ip);
         }
         
         const finalRegion = `${geo.country}${geo.city ? ', ' + geo.city : ''}`;
-        console.log(`📍 IP: ${ip}, Определённый регион: ${finalRegion}`);
         
-        // Создаём топик
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -83,7 +81,6 @@ app.post('/register', async (req, res) => {
         }).then(r => r.json());
         
         if (!topic.ok) {
-            console.error('Ошибка создания топика:', topic);
             return res.status(500).json({ ok: false, error: topic.description });
         }
         
@@ -93,13 +90,7 @@ app.post('/register', async (req, res) => {
         
         const currentTime = getAmsterdamTime();
         
-        // ОДНО СООБЩЕНИЕ со всей информацией
-        const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n` +
-            `🆔 **ID:** ${userId}\n` +
-            `📡 **IP:** ${ip}\n` +
-            `📍 **Регион:** ${finalRegion}\n` +
-            `📞 **Телефон:** ${phone}\n` +
-            `⏰ **Время:** ${currentTime}`;
+        const infoMessage = `🔔 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\nID: ${userId}\nIP: ${ip}\nРегион: ${finalRegion}\nТелефон: ${phone}\nВремя: ${currentTime}`;
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -107,23 +98,10 @@ app.post('/register', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                text: infoMessage,
-                parse_mode: 'Markdown'
+                text: infoMessage
             })
         });
         
-        // Обновляем иконку топика
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: topicId,
-                name: `🟢 ${window.location?.hostname || 'website'}`
-            })
-        }).catch(() => {});
-        
-        console.log('✅ Регистрация успешна, userId:', userId);
         res.json({ ok: true, topicId });
         
     } catch (err) {
@@ -132,11 +110,10 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, text, imageBase64 } = req.body;
-    console.log('📨 Сообщение от:', userId, 'текст:', text?.substring(0, 50), 'фото:', !!imageBase64);
+    console.log('📨 Сообщение от:', userId);
     
     const user = users.get(userId);
     if (!user) {
@@ -172,12 +149,10 @@ app.post('/send', async (req, res) => {
         }
         res.json({ ok: true });
     } catch (err) {
-        console.error('Ошибка:', err);
         res.status(500).json({ ok: false });
     }
 });
 
-// ОБНОВЛЕНИЕ СТАТУСА
 app.post('/updateStatus', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, isOnline } = req.body;
@@ -191,14 +166,13 @@ app.post('/updateStatus', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: user.topicId,
-                name: `${icon} ${window.location?.hostname || 'website'}`
+                name: `${icon} website`
             })
         }).catch(() => {});
     }
     res.json({ ok: true });
 });
 
-// ПОЛУЧЕНИЕ ОТВЕТОВ
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { offset, userId } = req.query;
@@ -219,7 +193,7 @@ app.get('/getUpdates', async (req, res) => {
                     const topicUserId = topicToUser.get(topicId);
                     
                     if (msg.from && msg.from.is_bot) continue;
-                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил') || msg.text.includes('changed the topic name'))) continue;
+                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
                     
                     if (topicUserId && (!userId || topicUserId === userId)) {
                         const messageData = {
@@ -250,11 +224,9 @@ app.get('/getUpdates', async (req, res) => {
             }
             
             data.result = filtered;
-            console.log(`📨 Отправлено ${filtered.length} сообщений`);
         }
         res.json(data);
     } catch (err) {
-        console.error('Ошибка getUpdates:', err);
         res.status(500).json({ ok: false });
     }
 });
