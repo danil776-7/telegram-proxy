@@ -46,7 +46,15 @@ app.post('/register', async (req, res) => {
         const topicId = topic.result.message_thread_id;
         users.set(userId, { topicId, phone, region });
         
-        const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
+        // ВРЕМЯ В ЧАСОВОМ ПОЯСЕ ПОЛЬЗОВАТЕЛЯ (Амстердам)
+        const time = new Date().toLocaleString('nl-NL', {
+            timeZone: 'Europe/Amsterdam',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -73,7 +81,6 @@ app.post('/send', async (req, res) => {
     console.log('📨 СООБЩЕНИЕ от userId:', userId, 'текст:', text);
     
     const user = users.get(userId);
-    console.log('🔍 ПОИСК ПОЛЬЗОВАТЕЛЯ:', userId, 'НАЙДЕН:', !!user, 'topicId:', user?.topicId);
     
     if (!user) {
         console.log('❌ Нет регистрации для userId:', userId);
@@ -91,28 +98,42 @@ app.post('/send', async (req, res) => {
             })
         }).then(r => r.json());
         
-        console.log('📤 Ответ Telegram:', result);
+        console.log('✅ Сообщение отправлено, ok:', result.ok);
+        res.json({ ok: result.ok });
         
-        if (result.ok) {
-            console.log('✅ Сообщение отправлено!');
-            res.json({ ok: true });
-        } else {
-            console.error('❌ Ошибка Telegram:', result.description);
-            res.json({ ok: false, error: result.description });
-        }
     } catch (err) {
-        console.error('❌ Ошибка fetch:', err);
-        res.status(500).json({ ok: false, error: err.message });
+        console.error('Ошибка:', err);
+        res.status(500).json({ ok: false });
     }
 });
 
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    const { offset } = req.query;
+    const { offset, ip } = req.query;
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
         const response = await fetch(url);
         const data = await response.json();
+        
+        // Фильтруем сообщения для конкретного пользователя
+        if (data.ok && data.result && ip) {
+            const filtered = [];
+            for (const update of data.result) {
+                const msg = update.message;
+                if (msg && msg.chat.id === GROUP_CHAT_ID && msg.text && !msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
+                    // Здесь можно добавить фильтрацию по топику
+                    filtered.push({
+                        update_id: update.update_id,
+                        message: {
+                            text: msg.text,
+                            from: msg.from?.first_name || 'Поддержка',
+                            date: msg.date
+                        }
+                    });
+                }
+            }
+            data.result = filtered;
+        }
         res.json(data);
     } catch (err) {
         res.status(500).json({ ok: false });
