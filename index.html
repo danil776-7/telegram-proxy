@@ -38,6 +38,7 @@
         
         p { color: #666; line-height: 1.5; font-size: 16px; }
         
+        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -126,6 +127,8 @@
             justify-content: center;
             transition: background 0.2s;
         }
+        
+        .clear-btn:hover, .close-btn:hover { background: rgba(255,255,255,0.3); }
         
         .chat-messages {
             flex: 1;
@@ -390,10 +393,10 @@
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Готов к работе</div>
+        <div class="status online" id="status">🟢 Определение страны...</div>
     </div>
     <div class="chat-input-area">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
+        <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
         <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
@@ -424,7 +427,7 @@
         }
         
         let userPhone = localStorage.getItem('user_phone');
-        let isRegistered = !!userPhone;
+        let isPhoneRequired = !userPhone;
         
         let userGeo = { ip: '', countryCode: 'RU', countryName: 'Россия', region: '', city: '' };
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
@@ -445,6 +448,7 @@
                     console.log('📍 Геолокация:', userGeo.countryName, userGeo.city);
                 }
             } catch (error) {
+                console.error('Ошибка геолокации:', error);
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
                 userGeo.ip = ipData.ip;
@@ -516,7 +520,6 @@
         }
         
         async function registerPhone(phone) {
-            setStatus('⏳ Регистрация...', 'sending');
             try {
                 const response = await fetch(`${PROXY_URL}/register`, {
                     method: 'POST',
@@ -530,19 +533,16 @@
                     })
                 });
                 const data = await response.json();
-                console.log('📞 Регистрация ответ:', data);
                 if (data.ok) {
                     userPhone = phone;
                     localStorage.setItem('user_phone', phone);
-                    isRegistered = true;
-                    setStatus('🟢 Онлайн', 'online');
+                    isPhoneRequired = false;
                     addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
                     return true;
                 }
                 return false;
             } catch (error) {
                 console.error('Ошибка регистрации:', error);
-                setStatus('🔴 Ошибка', 'error');
                 return false;
             }
         }
@@ -630,7 +630,7 @@
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
-            if (!isRegistered) {
+            if (isPhoneRequired) {
                 showPhoneForm();
                 return;
             }
@@ -713,7 +713,7 @@
                 div.appendChild(timeSpan);
                 messagesDiv.appendChild(div);
             });
-            if (history.length === 0 && isRegistered) {
+            if (history.length === 0 && !isPhoneRequired) {
                 setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false), 500);
             }
         }
@@ -721,7 +721,7 @@
         widget.onclick = (e) => {
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
-                if (!isRegistered) setTimeout(() => showPhoneForm(), 100);
+                if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
             }
         };
         
@@ -758,7 +758,7 @@
         setInterval(checkReplies, 5000);
         
         detectGeo().then(() => {
-            if (!isRegistered) setTimeout(() => showPhoneForm(), 500);
+            if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
         });
     })();
 </script>
