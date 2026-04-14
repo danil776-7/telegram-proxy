@@ -444,7 +444,6 @@
         let detectedCountry = 'NL';
         let detectedCountryName = 'Нидерланды';
         
-        // Определение геолокации по IP
         async function detectGeo() {
             try {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -456,7 +455,7 @@
                 if (geoData && geoData.country_code) {
                     detectedCountry = geoData.country_code;
                     detectedCountryName = geoData.country_name;
-                    console.log(`📍 Ваш регион: ${detectedCountryName} (${detectedCountry})`);
+                    console.log(`📍 Ваш регион: ${detectedCountryName}`);
                 }
                 setStatus(`🟢 ${detectedCountryName}`);
             } catch (error) {
