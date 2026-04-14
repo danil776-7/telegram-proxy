@@ -175,7 +175,11 @@
 
 <script>
     const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
-    let userId = 'user_' + Date.now();
+    let userId = localStorage.getItem('chat_user_id');
+    if (!userId) {
+        userId = 'user_' + Date.now();
+        localStorage.setItem('chat_user_id', userId);
+    }
     let isRegistered = false;
     
     const widget = document.getElementById('chatWidget');
@@ -269,7 +273,6 @@
                 body: JSON.stringify({
                     userId: userId,
                     site: window.location.hostname,
-                    ip: '185.92.181.97',
                     text: text,
                     region: 'Россия'
                 })
