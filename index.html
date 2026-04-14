@@ -404,7 +404,7 @@
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Готов к работе</div>
+        <div class="status online" id="status">🟢 Определение страны...</div>
     </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
@@ -442,7 +442,9 @@
         let lastUpdateId = 0;
         let userIp = '';
         let detectedCountry = 'NL';
+        let detectedCountryName = 'Нидерланды';
         
+        // Определение геолокации по IP
         async function detectGeo() {
             try {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -453,10 +455,13 @@
                 const geoData = await geoRes.json();
                 if (geoData && geoData.country_code) {
                     detectedCountry = geoData.country_code;
-                    console.log(`📍 Страна: ${geoData.country_name}`);
+                    detectedCountryName = geoData.country_name;
+                    console.log(`📍 Ваш регион: ${detectedCountryName} (${detectedCountry})`);
                 }
+                setStatus(`🟢 ${detectedCountryName}`);
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
+                setStatus('🟢 Онлайн');
             }
         }
         
