@@ -21,7 +21,6 @@
             justify-content: center;
             align-items: center;
             padding: 16px;
-            -webkit-text-size-adjust: 100%;
         }
         
         .demo-content {
@@ -50,6 +49,7 @@
             font-size: 16px; 
         }
         
+        /* ========== ОСНОВНОЙ ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 24px;
@@ -99,6 +99,7 @@
             display: flex; 
         }
         
+        /* ========== ШАПКА ========== */
         .chat-header {
             background: white;
             border-bottom: 1px solid #eef2f6;
@@ -164,6 +165,7 @@
             background: #f2f2f6; 
         }
         
+        /* ========== СООБЩЕНИЯ ========== */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -273,6 +275,7 @@
             line-height: 1.5;
         }
         
+        /* ========== ПОЛЕ ВВОДА ========== */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -325,6 +328,7 @@
         .file-btn { background: #8e8e93; }
         .send-btn:active, .file-btn:active { transform: scale(0.96); }
         
+        /* ========== ФОРМА ТЕЛЕФОНА ========== */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -361,6 +365,7 @@
             line-height: 1.4;
         }
         
+        /* Кастомный выпадающий список */
         .custom-select {
             position: relative;
             width: 100%;
@@ -380,6 +385,15 @@
             font-weight: 500;
         }
         
+        .custom-select-trigger span:first-child {
+            color: #1a1a1a;
+        }
+        
+        .custom-select-trigger span:last-child {
+            color: #8e8e93;
+            font-size: 12px;
+        }
+        
         .custom-select-dropdown {
             position: absolute;
             top: 100%;
@@ -396,7 +410,9 @@
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
         }
         
-        .custom-select-dropdown.show { display: block; }
+        .custom-select-dropdown.show {
+            display: block;
+        }
         
         .custom-select-option {
             padding: 12px 16px;
@@ -405,7 +421,9 @@
             font-size: 14px;
         }
         
-        .custom-select-option:hover { background: #f2f2f6; }
+        .custom-select-option:hover {
+            background: #f2f2f6;
+        }
         
         .phone-input-wrapper {
             display: flex;
@@ -462,6 +480,7 @@
             margin-top: 20px;
         }
         
+        /* ========== МОДАЛЬНОЕ ОКНО ОЧИСТКИ ========== */
         .clear-confirm-overlay {
             position: absolute;
             top: 0;
@@ -523,6 +542,7 @@
             color: white;
         }
         
+        /* ========== АДАПТИВ ========== */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -594,19 +614,24 @@
         // ========== ВАШ СЕРВЕР НА RENDER ==========
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
+        // СТРАНЫ С РАЗНЫМ КОЛИЧЕСТВОМ ЦИФР
         const countries = [
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 34 56 789' },
-            { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '912 345 67 89' },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '712 345 67 89' },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '212 555 1234' },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '7911 123456' },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '151 12345678' },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '6 12 34 56 78' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '312 345 6789' },
-            { code: 'ES', name: '🇪🇸 Испания', phoneCode: '+34', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '612 34 56 78' }
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'ES', name: '🇪🇸 Испания', phoneCode: '+34', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'PL', name: '🇵🇱 Польша', phoneCode: '+48', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'TR', name: '🇹🇷 Турция', phoneCode: '+90', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'AE', name: '🇦🇪 ОАЭ', phoneCode: '+971', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'IN', name: '🇮🇳 Индия', phoneCode: '+91', maxDigits: 10, pattern: /^[0-9]{10}$/ }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -620,7 +645,19 @@
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let userIp = '';
         let detectedCountry = 'NL';
+        let detectedCountryName = 'Нидерланды';
         
+        // Функция для получения времени в Амстердаме
+        function formatMessageTime(timestamp) {
+            const date = timestamp ? new Date(timestamp * 1000) : new Date();
+            return date.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                timeZone: 'Europe/Amsterdam'
+            });
+        }
+        
+        // Определение геолокации по IP
         async function detectGeo() {
             try {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -631,18 +668,15 @@
                 const geoData = await response.json();
                 if (geoData && geoData.country_code) {
                     detectedCountry = geoData.country_code;
-                    console.log(`📍 Регион: ${geoData.country_name} (${detectedCountry})`);
+                    detectedCountryName = geoData.country_name;
+                    console.log(`📍 Регион: ${detectedCountryName} (${detectedCountry})`);
                 }
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
             }
         }
         
-        function formatMessageTime(timestamp) {
-            const date = timestamp ? new Date(timestamp * 1000) : new Date();
-            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' });
-        }
-        
+        // Добавление сообщения в чат
         function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
             const messagesDiv = document.getElementById('chatMessages');
             const div = document.createElement('div');
@@ -684,22 +718,25 @@
             addMessage(text, false, true);
         }
         
+        // Очистка чата
         function clearChat() {
-            if (confirm('Очистить чат? Номер телефона будет удалён.')) {
-                localStorage.removeItem('user_phone');
-                localStorage.removeItem('chat_history');
-                isRegistered = false;
-                userPhone = null;
-                document.getElementById('chatMessages').innerHTML = `
-                    <div class="welcome-message">
-                        <h4>💬 Чат с поддержкой</h4>
-                        <p>Мы на связи и готовы помочь.<br>Напишите ваш вопрос ниже,<br>Мы ответим в течение пары минут.</p>
-                    </div>
-                `;
-                setTimeout(() => showPhoneForm(), 100);
-            }
+            const messagesDiv = document.getElementById('chatMessages');
+            messagesDiv.innerHTML = `
+                <div class="welcome-message">
+                    <h4>💬 Чат с поддержкой</h4>
+                    <p>Мы на связи и готовы помочь.<br>Напишите ваш вопрос ниже,<br>Мы ответим в течение пары минут.</p>
+                </div>
+            `;
+            localStorage.removeItem('user_phone');
+            localStorage.removeItem('chat_history');
+            localStorage.setItem('chat_lastUpdateId', '0');
+            userPhone = null;
+            isRegistered = false;
+            lastUpdateId = 0;
+            setTimeout(() => showPhoneForm(), 100);
         }
         
+        // Показать форму ввода телефона
         function showPhoneForm() {
             const widget = document.getElementById('chatWidget');
             const oldOverlay = document.querySelector('.phone-overlay');
@@ -724,7 +761,7 @@
                     </div>
                     <div class="phone-input-wrapper">
                         <span class="phone-code" id="phoneCodeDisplay">${currentCountry.phoneCode}</span>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="${currentCountry.mask}" inputmode="numeric">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="_".repeat(currentCountry.maxDigits).split('').join(' ') inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -740,22 +777,31 @@
             
             const selectTrigger = document.getElementById('selectTrigger');
             const selectDropdown = document.getElementById('selectDropdown');
+            const selectedCountryName = document.getElementById('selectedCountryName');
+            const selectedCountryCode = document.getElementById('selectedCountryCode');
+            const phoneCodeDisplay = document.getElementById('phoneCodeDisplay');
             const phoneInput = document.getElementById('phoneInput');
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
-            const phoneCodeDisplay = document.getElementById('phoneCodeDisplay');
             
-            selectTrigger.onclick = () => selectDropdown.classList.toggle('show');
+            // Открыть/закрыть выпадающий список
+            selectTrigger.onclick = (e) => {
+                e.stopPropagation();
+                selectDropdown.classList.toggle('show');
+            };
             
+            // Выбор страны из списка
             document.querySelectorAll('.custom-select-option').forEach(opt => {
                 opt.onclick = () => {
-                    currentMaxDigits = parseInt(opt.dataset.maxdigits);
-                    currentPhoneCode = opt.dataset.phonecode;
-                    currentCountryName = opt.dataset.name;
-                    currentPattern = new RegExp(`^[0-9]{${currentMaxDigits}}$`);
+                    const code = opt.dataset.code;
+                    const newCountry = countries.find(c => c.code === code);
+                    currentMaxDigits = newCountry.maxDigits;
+                    currentPhoneCode = newCountry.phoneCode;
+                    currentCountryName = newCountry.name;
+                    currentPattern = newCountry.pattern;
                     
-                    document.getElementById('selectedCountryName').innerText = currentCountryName;
-                    document.getElementById('selectedCountryCode').innerText = currentPhoneCode;
+                    selectedCountryName.innerText = currentCountryName;
+                    selectedCountryCode.innerText = currentPhoneCode;
                     phoneCodeDisplay.innerText = currentPhoneCode;
                     phoneInput.maxLength = currentMaxDigits;
                     phoneInput.placeholder = '_'.repeat(currentMaxDigits).split('').join(' ');
@@ -765,11 +811,17 @@
                 };
             });
             
-            document.addEventListener('click', () => selectDropdown.classList.remove('show'));
+            // Закрыть дропдаун при клике вне
+            document.addEventListener('click', () => {
+                selectDropdown.classList.remove('show');
+            });
             
+            // Валидация ввода
             phoneInput.oninput = function() {
                 let value = this.value.replace(/\D/g, '');
-                if (value.length > currentMaxDigits) value = value.slice(0, currentMaxDigits);
+                if (value.length > currentMaxDigits) {
+                    value = value.slice(0, currentMaxDigits);
+                }
                 this.value = value;
                 if (value.length > 0 && value.length < currentMaxDigits) {
                     phoneError.innerText = `Осталось ${currentMaxDigits - value.length} цифр из ${currentMaxDigits}`;
@@ -779,6 +831,7 @@
                 }
             };
             
+            // Отправка формы
             phoneSubmit.onclick = async () => {
                 const digits = phoneInput.value.replace(/\D/g, '');
                 
@@ -806,20 +859,27 @@
                 phoneSubmit.textContent = 'Регистрация...';
                 
                 try {
-                    // ========== ИСПРАВЛЕНО: используем PROXY_URL ==========
                     const response = await fetch(`${PROXY_URL}/register`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId, ip: userIp, phone: fullPhone, region: currentCountryName })
+                        body: JSON.stringify({ 
+                            userId, 
+                            ip: userIp, 
+                            phone: fullPhone, 
+                            region: currentCountryName 
+                        })
                     });
                     const data = await response.json();
+                    console.log('Ответ сервера:', data);
                     
                     if (data.ok) {
+                        userPhone = fullPhone;
                         localStorage.setItem('user_phone', fullPhone);
                         isRegistered = true;
                         overlay.remove();
                         addSystemMessage('✅ Вы успешно подключены к поддержке');
                         addMessage('Здравствуйте! Подскажите, о чем вы хотели бы спросить?', false, false, false, null, null, 'Оператор Анна');
+                        updateActivity(true, true);
                     } else {
                         phoneSubmit.disabled = false;
                         phoneSubmit.textContent = 'Начать чат';
@@ -836,10 +896,17 @@
             };
         }
         
+        // Отправка сообщения в Telegram
         async function sendToTelegram(text, imageBase64 = null) {
-            if (!isRegistered) { showPhoneForm(); return; }
+            if (!isRegistered) {
+                showPhoneForm();
+                return;
+            }
             if (!text && !imageBase64) return;
-            addMessage(text || '📷 Изображение', true);
+            if (text) addMessage(text, true);
+            else addMessage('📷 Изображение', true);
+            updateActivity(true, true);
+            
             try {
                 await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
@@ -849,6 +916,7 @@
             } catch (err) {}
         }
         
+        // Проверка новых сообщений от оператора
         async function checkReplies() {
             if (!isRegistered) return;
             try {
@@ -868,8 +936,15 @@
             } catch (err) {}
         }
         
+        // Обновление статуса активности
+        let lastStatusUpdate = 0;
+        let currentStatus = false;
         async function updateActivity(isOnline, isActive) {
             if (!isRegistered) return;
+            const now = Date.now();
+            if (now - lastStatusUpdate < 30000 && currentStatus === isOnline) return;
+            lastStatusUpdate = now;
+            currentStatus = isOnline;
             try {
                 await fetch(`${PROXY_URL}/updateStatus`, {
                     method: 'POST',
@@ -879,27 +954,16 @@
             } catch (err) {}
         }
         
+        // Инициализация виджета
         const widget = document.getElementById('chatWidget');
-        document.querySelector('.close-btn').onclick = () => widget.classList.add('closed');
-        document.getElementById('clearBtn').onclick = () => clearChat();
-        document.getElementById('sendBtn').onclick = () => {
-            const input = document.getElementById('messageInput');
-            if (input.value.trim()) sendToTelegram(input.value.trim());
-            input.value = '';
-        };
-        document.getElementById('messageInput').onkeypress = (e) => {
-            if (e.key === 'Enter') document.getElementById('sendBtn').click();
-        };
-        document.getElementById('fileBtn').onclick = () => document.getElementById('fileInput').click();
-        document.getElementById('fileInput').onchange = (e) => {
-            const file = e.target.files[0];
-            if (file && file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = (event) => sendToTelegram('', event.target.result);
-                reader.readAsDataURL(file);
-            }
-        };
+        const clearBtn = document.getElementById('clearBtn');
+        const closeBtn = document.querySelector('.close-btn');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const fileBtn = document.getElementById('fileBtn');
+        const fileInput = document.getElementById('fileInput');
         
+        // Открытие/закрытие виджета
         widget.onclick = (e) => {
             if (widget.classList.contains('closed')) {
                 widget.classList.remove('closed');
@@ -907,11 +971,44 @@
             }
         };
         
+        if (closeBtn) closeBtn.onclick = (e) => { widget.classList.add('closed'); e.stopPropagation(); };
+        if (clearBtn) clearBtn.onclick = (e) => { if (confirm('Очистить чат? Номер телефона будет удалён.')) clearChat(); e.stopPropagation(); };
+        
+        // Отправка сообщения
+        if (sendBtn) sendBtn.onclick = () => { const text = messageInput.value.trim(); if (text) { sendToTelegram(text); messageInput.value = ''; } };
+        if (messageInput) messageInput.onkeypress = (e) => { if (e.key === 'Enter') sendBtn.click(); };
+        
+        // Отправка фото
+        if (fileBtn && fileInput) {
+            fileBtn.onclick = () => fileInput.click();
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => sendToTelegram('', event.target.result);
+                    reader.readAsDataURL(file);
+                }
+                fileInput.value = '';
+            };
+        }
+        
+        // Отслеживание активности
+        let activeTimeout;
+        function onUserActivity() {
+            if (isRegistered) {
+                updateActivity(true, true);
+                clearTimeout(activeTimeout);
+                activeTimeout = setTimeout(() => updateActivity(true, false), 5000);
+            }
+        }
+        document.addEventListener('click', onUserActivity);
+        if (messageInput) messageInput.addEventListener('focus', onUserActivity);
+        
+        // Запуск
         detectGeo().then(() => {
-            if (!localStorage.getItem('user_phone')) {
-                setTimeout(() => showPhoneForm(), 500);
-            } else {
+            if (userPhone) {
                 isRegistered = true;
+                updateActivity(true, true);
                 const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
                 if (savedHistory.length > 0) {
                     savedHistory.forEach(msg => {
@@ -921,6 +1018,8 @@
                 } else {
                     addMessage('Здравствуйте! Подскажите, о чем вы хотели бы спросить?', false, false, false, null, null, 'Оператор Анна');
                 }
+            } else {
+                setTimeout(() => showPhoneForm(), 500);
             }
         });
         
