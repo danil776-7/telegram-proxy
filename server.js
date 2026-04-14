@@ -8,6 +8,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003911846697;
+const SITE_URL = 'https://ваш-сайт.ru'; // Замените на ваш URL
 
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
@@ -16,31 +17,46 @@ const users = new Map();
 const topicToUser = new Map();
 let lastUpdateId = 0;
 
-function getAmsterdamTime(timestamp = null) {
+// Функция для получения времени в часовом поясе пользователя (используем UTC+3 для Москвы, но лучше по IP)
+function getLocalTime(timestamp = null, timezone = 'Europe/Moscow') {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
     return date.toLocaleString('ru-RU', {
-        timeZone: 'Europe/Amsterdam',
+        timeZone: timezone,
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
+        second: '2-digit'
     });
+}
+
+// Определение часового пояса по IP
+async function getTimezoneByIp(ip) {
+    try {
+        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,timezone`);
+        const data = await response.json();
+        if (data.status === 'success' && data.timezone) {
+            return data.timezone;
+        }
+    } catch (error) {}
+    return 'Europe/Amsterdam'; // По умолчанию Амстердам
 }
 
 async function getCountryByIp(ip) {
     try {
-        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city`);
+        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,timezone`);
         const data = await response.json();
         if (data.status === 'success') {
             return {
                 country: data.country,
                 countryCode: data.countryCode,
-                city: data.city
+                city: data.city,
+                timezone: data.timezone || 'Europe/Amsterdam'
             };
         }
     } catch (error) {}
-    return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам' };
+    return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
 }
 
 app.get('/', (req, res) => {
@@ -58,19 +74,22 @@ app.post('/register', async (req, res) => {
     }
     
     try {
-        let geo = { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам' };
+        let geo = { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
         if (ip && ip !== '127.0.0.1') {
             geo = await getCountryByIp(ip);
         }
         
         const finalRegion = `${geo.country}${geo.city ? ', ' + geo.city : ''}`;
+        const currentTime = getLocalTime(null, geo.timezone);
         
+        // Создаём топик с иконкой статуса (🟢 для онлайн)
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
-                name: `👤 ${userId.substring(0, 20)}`
+                name: `🟢 ${SITE_URL.replace('https://', '')}`,
+                icon_color: 0x6FCF97
             })
         }).then(r => r.json());
         
@@ -79,12 +98,17 @@ app.post('/register', async (req, res) => {
         }
         
         const topicId = topic.result.message_thread_id;
-        users.set(userId, { topicId, phone, region: finalRegion, ip });
+        users.set(userId, { topicId, phone, region: finalRegion, ip, timezone: geo.timezone });
         topicToUser.set(topicId, userId);
         
-        const currentTime = getAmsterdamTime();
-        
-        const infoMessage = `🔔 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\nID: ${userId}\nIP: ${ip}\nРегион: ${finalRegion}\nТелефон: ${phone}\nВремя: ${currentTime}`;
+        // ОДНО системное сообщение со всей информацией
+        const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ**\n\n` +
+            `🆔 **ID:** ${userId}\n` +
+            `🌍 **IP:** ${ip}\n` +
+            `📍 **Регион:** ${finalRegion}\n` +
+            `📞 **Телефон:** ${phone}\n` +
+            `🕐 **Время:** ${currentTime}\n` +
+            `🌐 **Сайт:** ${SITE_URL}`;
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -92,7 +116,8 @@ app.post('/register', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                text: infoMessage
+                text: infoMessage,
+                parse_mode: 'Markdown'
             })
         });
         
@@ -147,7 +172,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Обновление статуса - ТОЛЬКО при реальном изменении
+// Обновление статуса - меняем название топика (иконка и ссылка сайта)
 let lastStatus = new Map();
 app.post('/updateStatus', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -159,14 +184,16 @@ app.post('/updateStatus', async (req, res) => {
         // Отправляем обновление ТОЛЬКО если статус изменился
         if (prevStatus !== isOnline) {
             lastStatus.set(userId, isOnline);
-            const icon = isOnline !== false ? '🟢' : '⚫️';
+            const icon = isOnline ? '🟢' : '⚫️';
+            const newName = `${icon} ${SITE_URL.replace('https://', '').replace('http://', '')}`;
+            
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: GROUP_CHAT_ID,
                     message_thread_id: user.topicId,
-                    name: `${icon} website`
+                    name: newName
                 })
             }).catch(() => {});
             console.log(`🔄 Статус пользователя ${userId}: ${isOnline ? 'онлайн' : 'офлайн'}`);
@@ -194,6 +221,7 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const topicUserId = topicToUser.get(topicId);
                     
+                    // Пропускаем сообщения от ботов и системные
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
                     
@@ -203,10 +231,11 @@ app.get('/getUpdates', async (req, res) => {
                             message: {
                                 text: msg.caption || msg.text || '',
                                 from: msg.from?.first_name || 'Поддержка',
-                                date: msg.date
+                                date: msg.date // Сохраняем оригинальный timestamp из Telegram
                             }
                         };
                         
+                        // Обработка фото из Telegram
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -216,11 +245,15 @@ app.get('/getUpdates', async (req, res) => {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
                                 }
-                            } catch (err) {}
+                            } catch (err) {
+                                console.error('Ошибка получения фото:', err);
+                            }
                         }
                         
                         filtered.push(messageData);
-                        lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
+                        if (update.update_id + 1 > lastUpdateId) {
+                            lastUpdateId = update.update_id + 1;
+                        }
                     }
                 }
             }
@@ -229,11 +262,14 @@ app.get('/getUpdates', async (req, res) => {
         }
         res.json(data);
     } catch (err) {
-        res.status(500).json({ ok: false });
+        console.error('Ошибка getUpdates:', err);
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 Сервер на порту ${PORT}\n`);
+    console.log(`📡 Группа: ${GROUP_CHAT_ID}`);
+    console.log(`🤖 Бот: ${BOT_TOKEN.substring(0, 10)}...`);
 });
