@@ -2,12 +2,12 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Чат с поддержкой</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест чата</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            font-family: Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -17,42 +17,37 @@
         }
         .content {
             text-align: center;
-            padding: 40px 20px;
+            padding: 40px;
             background: white;
-            border-radius: 28px;
+            border-radius: 20px;
             max-width: 500px;
-            width: 100%;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
         }
-        h1 { font-size: 28px; margin-bottom: 16px; }
-        p { color: #666; font-size: 16px; }
+        h1 { margin-bottom: 20px; }
         
         .chat-widget {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 380px;
-            height: 600px;
+            width: 350px;
+            height: 500px;
             background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: all 0.3s;
             z-index: 1000;
         }
         .chat-widget.closed {
             width: 60px;
             height: 60px;
             border-radius: 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #25a3e2;
             cursor: pointer;
         }
         .chat-widget.closed .chat-header,
         .chat-widget.closed .chat-messages,
-        .chat-widget.closed .chat-input-area,
-        .chat-widget.closed .phone-overlay { display: none; }
+        .chat-widget.closed .chat-input-area { display: none; }
         .open-icon {
             display: none;
             width: 100%;
@@ -65,104 +60,65 @@
         .chat-widget.closed .open-icon { display: flex; }
         
         .chat-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #25a3e2;
             color: white;
-            padding: 20px;
+            padding: 15px;
             text-align: center;
             position: relative;
         }
-        .chat-header h3 { font-size: 20px; margin-bottom: 4px; }
-        .chat-header p { font-size: 13px; opacity: 0.8; }
-        .header-buttons {
+        .close-btn {
             position: absolute;
-            top: 16px;
-            right: 16px;
-            display: flex;
-            gap: 8px;
-        }
-        .clear-btn, .close-btn {
-            background: rgba(255,255,255,0.2);
+            top: 10px;
+            right: 15px;
+            background: none;
             border: none;
             color: white;
+            font-size: 20px;
             cursor: pointer;
-            width: 32px;
-            height: 32px;
-            border-radius: 16px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
-        
         .chat-messages {
             flex: 1;
             overflow-y: auto;
-            padding: 16px;
-            background: #f5f7fb;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            padding: 10px;
+            background: #f5f5f5;
         }
         .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 15px;
             max-width: 80%;
-            padding: 10px 14px;
-            border-radius: 18px;
-            font-size: 14px;
-            line-height: 1.4;
         }
         .user-message {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #25a3e2;
             color: white;
-            align-self: flex-end;
+            margin-left: auto;
         }
         .bot-message {
-            background: white;
-            color: #1a1a2e;
-            align-self: flex-start;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            background: #e0e0e0;
+            color: black;
         }
-        .message-time {
-            font-size: 10px;
-            opacity: 0.6;
-            margin-top: 4px;
-            text-align: right;
-        }
-        
         .chat-input-area {
             display: flex;
-            padding: 12px;
-            border-top: 1px solid #eef2f6;
+            padding: 10px;
             background: white;
-            gap: 8px;
+            border-top: 1px solid #ddd;
         }
         .chat-input {
             flex: 1;
-            padding: 12px;
+            padding: 8px;
             border: 1px solid #ddd;
-            border-radius: 25px;
+            border-radius: 20px;
             outline: none;
-            font-size: 15px;
         }
         .send-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #25a3e2;
             border: none;
             color: white;
-            padding: 12px 20px;
-            border-radius: 25px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            margin-left: 8px;
             cursor: pointer;
         }
-        
-        .status {
-            font-size: 12px;
-            padding: 8px;
-            text-align: center;
-            background: #d4edda;
-            color: #155724;
-            border-radius: 20px;
-            width: fit-content;
-            align-self: center;
-        }
-        
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -174,44 +130,28 @@
             align-items: center;
             justify-content: center;
             z-index: 20;
-            border-radius: 24px;
-            padding: 20px;
         }
         .phone-card {
             text-align: center;
-            width: 100%;
-            max-width: 320px;
+            padding: 20px;
         }
-        .phone-card h4 { font-size: 24px; margin-bottom: 12px; color: #333; }
-        .phone-card p { font-size: 14px; color: #666; margin-bottom: 24px; }
         .phone-input {
             width: 100%;
-            padding: 16px;
+            padding: 10px;
+            margin: 10px 0;
             font-size: 18px;
             text-align: center;
-            border: 1px solid #ddd;
-            border-radius: 12px;
-            font-family: monospace;
         }
         .phone-submit {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #25a3e2;
             color: white;
             border: none;
-            padding: 14px;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 25px;
             cursor: pointer;
             width: 100%;
-            margin-top: 16px;
         }
-        .error-text { color: #dc3545; font-size: 12px; margin-top: 8px; }
-        
-        @media (max-width: 480px) {
-            .chat-widget { width: 100%; height: 100%; bottom: 0; right: 0; border-radius: 0; }
-            .chat-widget.closed { width: 56px; height: 56px; bottom: 20px; right: 20px; border-radius: 28px; }
-            .message { max-width: 90%; }
-        }
+        .error-text { color: red; font-size: 12px; }
     </style>
 </head>
 <body>
@@ -224,235 +164,144 @@
     <div class="open-icon">💬</div>
     <div class="chat-header">
         <h3>Чат с поддержкой</h3>
-        <p>Мы на связи и готовы помочь</p>
-        <div class="header-buttons">
-            <button class="clear-btn" id="clearBtn">🗑️</button>
-            <button class="close-btn">×</button>
-        </div>
+        <button class="close-btn">×</button>
     </div>
-    <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Готов к работе</div>
-    </div>
+    <div class="chat-messages" id="chatMessages"></div>
     <div class="chat-input-area">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
+        <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
         <button class="send-btn" id="sendBtn">➤</button>
     </div>
 </div>
 
 <script>
-    (function() {
-        const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
-        
-        let userId = localStorage.getItem('chat_user_id');
-        if (!userId) {
-            userId = 'user_' + Date.now();
-            localStorage.setItem('chat_user_id', userId);
-        }
-        
-        let userPhone = localStorage.getItem('user_phone');
-        let isRegistered = !!userPhone;
-        let userIp = '';
-        let lastUpdateId = 0;
-        
-        fetch('https://api.ipify.org?format=json')
-            .then(r => r.json())
-            .then(data => userIp = data.ip)
-            .catch(() => userIp = '127.0.0.1');
-        
-        const widget = document.getElementById('chatWidget');
-        const clearBtn = document.getElementById('clearBtn');
-        const closeBtn = document.querySelector('.close-btn');
-        const messagesDiv = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const statusDiv = document.getElementById('status');
-        
-        function addMessage(text, isUser) {
-            const div = document.createElement('div');
-            div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            div.innerText = text;
-            messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            
-            const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, time: Date.now() });
-            localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
-        }
-        
-        function setStatus(text) {
-            if (statusDiv) statusDiv.innerHTML = text;
-        }
-        
-        async function registerPhone(phone) {
-            setStatus('⏳ Регистрация...');
-            try {
-                const response = await fetch(`${PROXY_URL}/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId, 
-                        site: window.location.hostname, 
-                        ip: userIp, 
-                        phone, 
-                        region: 'Россия' 
-                    })
-                });
-                const data = await response.json();
-                console.log('Регистрация ответ:', data);
-                if (data.ok) {
-                    userPhone = phone;
-                    localStorage.setItem('user_phone', phone);
-                    isRegistered = true;
-                    setStatus('🟢 Онлайн');
-                    addMessage('Здравствуйте! Напишите ваш вопрос.', false);
-                    return true;
-                }
-                return false;
-            } catch (err) {
-                console.error('Ошибка регистрации:', err);
-                setStatus('❌ Ошибка');
-                return false;
+    // ПРОСТЕЙШАЯ ВЕРСИЯ - ВСЁ РАБОТАЕТ
+    const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
+    let userId = 'user_' + Date.now();
+    let userIp = '';
+    let isRegistered = false;
+    
+    fetch('https://api.ipify.org?format=json')
+        .then(r => r.json())
+        .then(data => userIp = data.ip)
+        .catch(() => userIp = '127.0.0.1');
+    
+    const widget = document.getElementById('chatWidget');
+    const closeBtn = document.querySelector('.close-btn');
+    const messagesDiv = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    function addMessage(text, isUser) {
+        const div = document.createElement('div');
+        div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+        div.innerText = text;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    async function registerPhone(phone) {
+        try {
+            const response = await fetch(`${PROXY_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId, site: window.location.hostname, ip: userIp, phone, region: 'Россия'
+                })
+            });
+            const data = await response.json();
+            console.log('Регистрация:', data);
+            if (data.ok) {
+                isRegistered = true;
+                addMessage('Здравствуйте! Напишите ваш вопрос.', false);
+                return true;
             }
+            return false;
+        } catch (err) {
+            console.error('Ошибка:', err);
+            return false;
         }
+    }
+    
+    function showPhoneForm() {
+        const overlay = document.createElement('div');
+        overlay.className = 'phone-overlay';
+        overlay.innerHTML = `
+            <div class="phone-card">
+                <h4>Укажите номер телефона</h4>
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10">
+                <div id="phoneError" class="error-text"></div>
+                <button class="phone-submit" id="phoneSubmit">Начать чат</button>
+            </div>
+        `;
+        widget.appendChild(overlay);
         
-        function showPhoneForm() {
-            const overlay = document.createElement('div');
-            overlay.className = 'phone-overlay';
-            overlay.innerHTML = `
-                <div class="phone-card">
-                    <h4>Чат с поддержкой</h4>
-                    <p>Оставьте свой номер, чтобы мы могли ответить вам</p>
-                    <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10" inputmode="numeric">
-                    <div id="phoneError" class="error-text" style="display: none;"></div>
-                    <button class="phone-submit" id="phoneSubmit">Начать чат</button>
-                </div>
-            `;
-            widget.appendChild(overlay);
-            
-            const phoneInput = document.getElementById('phoneInput');
-            const phoneError = document.getElementById('phoneError');
-            const phoneSubmit = document.getElementById('phoneSubmit');
-            
-            phoneInput.oninput = function() {
-                this.value = this.value.replace(/\D/g, '').slice(0, 10);
-            };
-            
-            phoneSubmit.onclick = async function() {
-                const digits = phoneInput.value.trim();
-                if (!digits || digits.length !== 10) {
-                    phoneError.textContent = 'Введите 10 цифр';
-                    phoneError.style.display = 'block';
-                    return;
-                }
-                const fullPhone = '+7' + digits;
-                phoneError.style.display = 'none';
-                phoneSubmit.disabled = true;
-                phoneSubmit.textContent = 'Проверка...';
-                const success = await registerPhone(fullPhone);
-                if (success) {
-                    overlay.remove();
-                } else {
-                    phoneSubmit.disabled = false;
-                    phoneSubmit.textContent = 'Начать чат';
-                    phoneError.textContent = 'Ошибка. Попробуйте позже.';
-                    phoneError.style.display = 'block';
-                }
-            };
-        }
+        const phoneInput = document.getElementById('phoneInput');
+        const phoneError = document.getElementById('phoneError');
+        const phoneSubmit = document.getElementById('phoneSubmit');
         
-        async function sendToTelegram(text) {
-            if (!isRegistered) {
-                showPhoneForm();
+        phoneSubmit.onclick = async function() {
+            const digits = phoneInput.value.trim();
+            if (!digits || digits.length !== 10) {
+                phoneError.textContent = 'Введите 10 цифр';
                 return;
             }
-            addMessage(text, true);
-            setStatus('⏳ Отправка...');
-            try {
-                const response = await fetch(`${PROXY_URL}/send`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId, 
-                        site: window.location.hostname, 
-                        ip: userIp, 
-                        text, 
-                        region: 'Россия' 
-                    })
-                });
-                const data = await response.json();
-                console.log('Отправка ответ:', data);
-                if (data.ok) setStatus('🟢 Онлайн');
-                else throw new Error();
-            } catch (err) {
-                console.error('Ошибка отправки:', err);
-                setStatus('🔴 Ошибка');
-                setTimeout(() => setStatus('🟢 Онлайн'), 3000);
+            const fullPhone = '+7' + digits;
+            phoneSubmit.disabled = true;
+            phoneSubmit.textContent = 'Проверка...';
+            const success = await registerPhone(fullPhone);
+            if (success) {
+                overlay.remove();
+            } else {
+                phoneSubmit.disabled = false;
+                phoneSubmit.textContent = 'Начать чат';
+                phoneError.textContent = 'Ошибка. Попробуйте позже.';
             }
+        };
+    }
+    
+    async function sendToTelegram(text) {
+        if (!isRegistered) {
+            showPhoneForm();
+            return;
         }
-        
-        async function checkReplies() {
-            try {
-                const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}`);
-                const data = await response.json();
-                if (data.ok && data.result) {
-                    for (const update of data.result) {
-                        lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                        if (update.message && update.message.text && 
-                            !update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
-                            addMessage(update.message.text, false);
-                        }
-                    }
-                }
-            } catch (err) {}
-        }
-        
-        function loadHistory() {
-            const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-                div.innerText = msg.text;
-                messagesDiv.appendChild(div);
+        addMessage(text, true);
+        try {
+            const response = await fetch(`${PROXY_URL}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId, site: window.location.hostname, ip: userIp, text, region: 'Россия'
+                })
             });
-            if (history.length === 0 && isRegistered) {
-                setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос.', false), 500);
-            }
+            const data = await response.json();
+            console.log('Отправка:', data);
+        } catch (err) {
+            console.error('Ошибка:', err);
         }
-        
-        widget.onclick = (e) => {
-            if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
-                widget.classList.remove('closed');
-                if (!isRegistered) setTimeout(() => showPhoneForm(), 100);
-            }
-        };
-        
-        if (closeBtn) closeBtn.onclick = () => widget.classList.add('closed');
-        if (clearBtn) clearBtn.onclick = () => {
-            if (confirm('Очистить историю чата?')) {
-                localStorage.clear();
-                location.reload();
-            }
-        };
-        
-        sendBtn.onclick = () => {
+    }
+    
+    widget.onclick = (e) => {
+        if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
+            widget.classList.remove('closed');
+            if (!isRegistered) showPhoneForm();
+        }
+    };
+    
+    closeBtn.onclick = () => widget.classList.add('closed');
+    sendBtn.onclick = () => {
+        const text = messageInput.value.trim();
+        if (text) sendToTelegram(text);
+        messageInput.value = '';
+    };
+    messageInput.onkeypress = (e) => {
+        if (e.key === 'Enter') {
             const text = messageInput.value.trim();
             if (text) sendToTelegram(text);
             messageInput.value = '';
-        };
-        
-        messageInput.onkeypress = (e) => {
-            if (e.key === 'Enter') {
-                const text = messageInput.value.trim();
-                if (text) sendToTelegram(text);
-                messageInput.value = '';
-            }
-        };
-        
-        loadHistory();
-        setInterval(checkReplies, 5000);
-        
-        if (!isRegistered) setTimeout(() => showPhoneForm(), 500);
-    })();
+        }
+    };
+    
+    addMessage('Здравствуйте! Напишите ваш вопрос.', false);
 </script>
 </body>
 </html>
