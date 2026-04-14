@@ -8,7 +8,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003911846697;
-const SITE_URL = 'https://ваш-сайт.ru'; // Замените на ваш URL
+const SITE_URL = 'https://danil776-7.github.io/telegram-proxy/'; 
 
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
