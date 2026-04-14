@@ -273,14 +273,17 @@
                 body: JSON.stringify({
                     userId: userId,
                     site: window.location.hostname,
-                    text: text,
-                    region: 'Россия'
+                    text: text
                 })
             });
             const data = await response.json();
-            console.log('Отправка:', data);
+            console.log('Отправка ответ:', data);
+            if (!data.ok) {
+                addMessage('Ошибка: ' + (data.error || 'Неизвестная ошибка'), false);
+            }
         } catch (err) {
             console.error('Ошибка:', err);
+            addMessage('Ошибка соединения', false);
         }
     }
     
