@@ -274,7 +274,7 @@
             line-height: 1.5;
         }
         
-        /* ========== ПОЛЕ ВВОДА ========== */
+        /* ========== ПОЛЕ ВВОДА (фикс сжатия экрана) ========== */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -291,7 +291,7 @@
             border: 1px solid #e2e8f0;
             border-radius: 28px;
             outline: none;
-            font-size: 15px;
+            font-size: 16px;
             transition: all 0.2s;
             background: #f8f9fc;
             font-family: inherit;
@@ -301,6 +301,13 @@
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
             background: white;
+        }
+        
+        /* Запрещаем масштабирование на телефонах при фокусе */
+        @media (max-width: 768px) {
+            .chat-input, .phone-input, .country-select {
+                font-size: 16px;
+            }
         }
         
         .send-btn, .file-btn {
@@ -328,7 +335,7 @@
             transform: scale(0.96); 
         }
         
-        /* ========== ФОРМА ТЕЛЕФОНА (ПО ДИЗАЙНУ ИЗ СКРИНШОТА) ========== */
+        /* ========== ФОРМА ТЕЛЕФОНА (исправленная верстка) ========== */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -342,6 +349,7 @@
             border-radius: 28px;
             padding: 32px 24px;
             overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
         .phone-card {
@@ -369,34 +377,88 @@
             margin-bottom: 24px;
         }
         
+        /* Кастомный выпадающий список (фикс дроплиста) */
+        .custom-select {
+            position: relative;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+        
+        .custom-select-trigger {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: #f8f9fc;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 500;
+        }
+        
+        .custom-select-trigger span:first-child {
+            color: #1a1a1a;
+        }
+        
+        .custom-select-trigger span:last-child {
+            color: #8e8e93;
+            font-size: 12px;
+        }
+        
+        .custom-select-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 16px;
+            margin-top: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 40;
+            display: none;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+        }
+        
+        .custom-select-dropdown.show {
+            display: block;
+        }
+        
+        .custom-select-option {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-size: 14px;
+        }
+        
+        .custom-select-option:hover {
+            background: #f2f2f6;
+        }
+        
         .phone-input-wrapper {
             display: flex;
-            gap: 12px;
-            margin-bottom: 16px;
             align-items: center;
             background: #f8f9fc;
             border: 1px solid #e2e8f0;
             border-radius: 16px;
-            padding: 4px 12px;
+            padding: 4px 16px;
+            margin-bottom: 16px;
         }
         
-        .country-select {
-            flex: 1;
-            padding: 14px 0;
+        .phone-code {
             font-size: 16px;
             font-weight: 500;
-            border: none;
-            background: transparent;
-            cursor: pointer;
-            font-family: inherit;
-            outline: none;
+            color: #1a1a1a;
+            padding-right: 12px;
+            border-right: 1px solid #e2e8f0;
         }
         
         .phone-input {
-            flex: 2;
-            padding: 14px 0;
+            flex: 1;
+            padding: 14px 0 14px 12px;
             font-size: 16px;
-            text-align: left;
             border: none;
             background: transparent;
             font-family: monospace;
@@ -514,7 +576,7 @@
             color: white;
         }
         
-        /* ========== АДАПТИВ ========== */
+        /* ========== АДАПТИВ (фикс сжатия) ========== */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -546,6 +608,10 @@
             
             .phone-card h4 {
                 font-size: 22px;
+            }
+            
+            .chat-input, .phone-input, .custom-select-trigger {
+                font-size: 16px;
             }
         }
         
@@ -611,16 +677,16 @@
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/ }
+            { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'BY', name: 'Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'GB', name: 'Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'DE', name: 'Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'FR', name: 'Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/ }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -636,7 +702,6 @@
         let detectedCountry = null;
         let detectedCountryName = '';
         
-        // Форматирование времени Amsterdam
         function formatMessageTime(timestamp) {
             const date = timestamp ? new Date(timestamp * 1000) : new Date();
             return date.toLocaleTimeString('ru-RU', { 
@@ -646,7 +711,6 @@
             });
         }
         
-        // Геолокация
         async function detectGeo() {
             try {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -680,7 +744,6 @@
             return { country: detectedCountry, name: detectedCountryName };
         }
         
-        // Добавление сообщения
         function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
             const messagesDiv = document.getElementById('chatMessages');
             if (!messagesDiv) return;
@@ -728,7 +791,6 @@
             addMessage(text, false, true);
         }
         
-        // Модальное окно очистки
         function showClearConfirm() {
             const widget = document.getElementById('chatWidget');
             const existingOverlay = document.querySelector('.clear-confirm-overlay');
@@ -778,11 +840,13 @@
             }, 100);
         }
         
-        // Форма телефона (по дизайну из скриншота)
+        // Исправленная форма телефона с кастомным дропдауном
         function showPhoneForm() {
             const widget = document.getElementById('chatWidget');
             const oldOverlay = document.querySelector('.phone-overlay');
             if (oldOverlay) oldOverlay.remove();
+            
+            const currentCountryObj = countries.find(c => c.code === detectedCountry) || countries[0];
             
             const overlay = document.createElement('div');
             overlay.className = 'phone-overlay';
@@ -791,9 +855,22 @@
                     <h4>Чат с поддержкой</h4>
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
                     <div class="phone-input-group">
+                        <div class="custom-select" id="customSelect">
+                            <div class="custom-select-trigger" id="selectTrigger">
+                                <span id="selectedCountryName">${currentCountryObj.name}</span>
+                                <span id="selectedCountryCode">${currentCountryObj.phoneCode}</span>
+                            </div>
+                            <div class="custom-select-dropdown" id="selectDropdown">
+                                ${countries.map(c => `
+                                    <div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}">
+                                        ${c.name} ${c.phoneCode}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
                         <div class="phone-input-wrapper">
-                            <select class="country-select" id="countrySelect"></select>
-                            <input type="tel" class="phone-input" id="phoneInput" placeholder="__ __ __ __" inputmode="numeric">
+                            <span class="phone-code" id="phoneCodeDisplay">${currentCountryObj.phoneCode}</span>
+                            <input type="tel" class="phone-input" id="phoneInput" placeholder="12 34 56 78" inputmode="numeric">
                         </div>
                         <div id="phoneError" class="error-text" style="display: none;"></div>
                     </div>
@@ -803,48 +880,56 @@
             `;
             widget.appendChild(overlay);
             
-            const countrySelect = document.getElementById('countrySelect');
+            // Кастомный дропдаун
+            const selectTrigger = document.getElementById('selectTrigger');
+            const selectDropdown = document.getElementById('selectDropdown');
+            const selectedCountryName = document.getElementById('selectedCountryName');
+            const selectedCountryCode = document.getElementById('selectedCountryCode');
+            const phoneCodeDisplay = document.getElementById('phoneCodeDisplay');
             const phoneInput = document.getElementById('phoneInput');
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
-            // Заполнение стран
-            countries.forEach(c => {
-                const option = document.createElement('option');
-                option.value = c.code;
-                option.textContent = `${c.name} ${c.phoneCode}`;
-                if (c.code === detectedCountry) option.selected = true;
-                countrySelect.appendChild(option);
-            });
-            
-            let currentCountry = countries.find(c => c.code === detectedCountry) || countries[0];
+            let currentCountry = currentCountryObj;
             let currentMaxDigits = currentCountry.maxDigits;
             let currentPhoneCode = currentCountry.phoneCode;
             let currentCountryName = currentCountry.name;
             let currentPattern = currentCountry.pattern;
             
-            function updateCountry() {
-                const selectedCode = countrySelect.value;
-                currentCountry = countries.find(c => c.code === selectedCode);
-                currentMaxDigits = currentCountry.maxDigits;
-                currentPhoneCode = currentCountry.phoneCode;
-                currentCountryName = currentCountry.name;
-                currentPattern = currentCountry.pattern;
-                phoneInput.maxLength = currentMaxDigits;
-                phoneInput.placeholder = '_'.repeat(currentMaxDigits).split('').join(' ');
-                phoneInput.value = '';
-                phoneError.style.display = 'none';
-            }
+            selectTrigger.onclick = (e) => {
+                e.stopPropagation();
+                selectDropdown.classList.toggle('show');
+            };
             
-            countrySelect.onchange = updateCountry;
-            updateCountry();
+            document.querySelectorAll('.custom-select-option').forEach(option => {
+                option.onclick = (e) => {
+                    const code = option.dataset.code;
+                    currentCountry = countries.find(c => c.code === code);
+                    currentMaxDigits = currentCountry.maxDigits;
+                    currentPhoneCode = currentCountry.phoneCode;
+                    currentCountryName = currentCountry.name;
+                    currentPattern = currentCountry.pattern;
+                    
+                    selectedCountryName.innerText = currentCountryName;
+                    selectedCountryCode.innerText = currentPhoneCode;
+                    phoneCodeDisplay.innerText = currentPhoneCode;
+                    phoneInput.maxLength = currentMaxDigits;
+                    phoneInput.placeholder = ' '.repeat(currentMaxDigits).split('').join(' ');
+                    phoneInput.value = '';
+                    phoneError.style.display = 'none';
+                    selectDropdown.classList.remove('show');
+                };
+            });
+            
+            document.addEventListener('click', () => {
+                selectDropdown.classList.remove('show');
+            });
             
             phoneInput.oninput = function() {
                 let value = this.value.replace(/\D/g, '');
                 if (value.length > currentMaxDigits) {
                     value = value.slice(0, currentMaxDigits);
                 }
-                // Форматирование с пробелами
                 let formatted = '';
                 for (let i = 0; i < value.length; i++) {
                     if (i > 0 && i % 2 === 0) formatted += ' ';
@@ -888,6 +973,8 @@
         
         async function registerPhone(phone, countryCode, countryName) {
             try {
+                console.log('📞 Регистрация:', { userId, phone, countryName, ip: userIp });
+                
                 const response = await fetch(`${PROXY_URL}/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -900,6 +987,8 @@
                     })
                 });
                 const data = await response.json();
+                console.log('Ответ сервера:', data);
+                
                 if (data.ok) {
                     userPhone = phone;
                     localStorage.setItem('user_phone', phone);
@@ -908,10 +997,12 @@
                     addMessage('Здравствуйте! Подскажите, о чем вы хотели бы спросить?', false, false, false, null, null, 'Оператор Анна');
                     updateActivity(true, true);
                     return true;
+                } else {
+                    console.error('Ошибка регистрации:', data.error);
+                    return false;
                 }
-                return false;
             } catch (err) {
-                console.error('Ошибка:', err);
+                console.error('Ошибка при регистрации:', err);
                 return false;
             }
         }
