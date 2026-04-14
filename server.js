@@ -13,27 +13,6 @@ console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
 const users = new Map();
-const topicToUser = new Map();
-let lastProcessedUpdateId = 0;
-
-// Функция для определения страны по IP
-async function getCountryByIp(ip) {
-    try {
-        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,region`);
-        const data = await response.json();
-        if (data.status === 'success') {
-            return {
-                country: data.country,
-                countryCode: data.countryCode,
-                city: data.city,
-                region: data.region
-            };
-        }
-    } catch (error) {
-        console.error('Ошибка определения геолокации:', error);
-    }
-    return { country: 'Неизвестно', countryCode: 'UN', city: '', region: '' };
-}
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -43,7 +22,7 @@ app.get('/', (req, res) => {
 // РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    console.log('📞 РЕГИСТРАЦИЯ:', req.body);
+    console.log('📞 РЕГИСТРАЦИЯ ПОЛУЧЕНА:', req.body);
     const { userId, ip, phone, region } = req.body;
     
     if (!userId || !phone) {
@@ -51,18 +30,6 @@ app.post('/register', async (req, res) => {
     }
     
     try {
-        // Определяем регион по IP
-        let geoData = { country: region || 'Неизвестно', countryCode: '', city: '', region: '' };
-        if (ip && ip !== '127.0.0.1') {
-            geoData = await getCountryByIp(ip);
-        }
-        
-        const finalRegion = geoData.country !== 'Неизвестно' 
-            ? `${geoData.country}${geoData.city ? ', ' + geoData.city : ''}${geoData.region ? ' (' + geoData.region + ')' : ''}`
-            : (region || 'Не определён');
-        
-        console.log(`📍 Регион для IP ${ip}: ${finalRegion}`);
-        
         // Создаём топик
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
@@ -79,47 +46,41 @@ app.post('/register', async (req, res) => {
         }
         
         const topicId = topic.result.message_thread_id;
-        users.set(userId, { topicId, phone, region: finalRegion, ip });
-        topicToUser.set(topicId, userId);
+        users.set(userId, { topicId, phone, region, ip });
         
         const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Amsterdam' });
         
-        // ОТПРАВЛЯЕМ ВСЮ ИНФОРМАЦИЮ В 1 СООБЩЕНИИ
-        const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n` +
-            `🆔 **ID:** ${userId}\n` +
-            `📡 **IP:** ${ip}\n` +
-            `📍 **Регион:** ${finalRegion}\n` +
-            `📞 **Телефон:** ${phone}\n` +
-            `⏰ **Время:** ${time}`;
+        // Отправляем сообщение
+        const messageText = `🔔 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\nID: ${userId}\nIP: ${ip}\nРегион: ${region || 'Нидерланды'}\nТелефон: ${phone}\nВремя: ${time}`;
         
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                text: infoMessage,
-                parse_mode: 'Markdown'
+                text: messageText
             })
-        });
+        }).then(r => r.json());
         
-        console.log('✅ Регистрация успешна, userId:', userId);
-        res.json({ ok: true, topicId, region: finalRegion });
+        console.log('✅ Сообщение отправлено, ok:', sent.ok);
+        res.json({ ok: true, topicId });
         
     } catch (err) {
-        console.error('Ошибка:', err);
+        console.error('❌ Ошибка:', err);
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
-// ОТПРАВКА СООБЩЕНИЯ (текст + фото)
+// ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, text, imageBase64 } = req.body;
-    console.log('📨 Сообщение от:', userId, 'текст:', text?.substring(0, 50), 'фото:', !!imageBase64);
+    console.log('📨 СООБЩЕНИЕ от userId:', userId, 'текст:', text);
     
     const user = users.get(userId);
     if (!user) {
+        console.log('❌ Нет регистрации для userId:', userId);
         return res.status(400).json({ ok: false, error: 'Please register first' });
     }
     
@@ -132,7 +93,7 @@ app.post('/send', async (req, res) => {
                 formData.append('chat_id', GROUP_CHAT_ID);
                 formData.append('message_thread_id', user.topicId);
                 formData.append('photo', new Blob([buffer]), 'image.jpg');
-                if (text) formData.append('caption', `💬 **${userId}:**\n\n${text}`);
+                if (text) formData.append('caption', `💬 ${userId}:\n\n${text}`);
                 
                 await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
                     method: 'POST',
@@ -146,8 +107,7 @@ app.post('/send', async (req, res) => {
                 body: JSON.stringify({
                     chat_id: GROUP_CHAT_ID,
                     message_thread_id: user.topicId,
-                    text: `💬 **${userId}:**\n\n${text}`,
-                    parse_mode: 'Markdown'
+                    text: `💬 ${userId}:\n\n${text}`
                 })
             });
         }
@@ -161,64 +121,22 @@ app.post('/send', async (req, res) => {
 // ПОЛУЧЕНИЕ ОТВЕТОВ
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    const { offset, userId } = req.query;
-    const currentOffset = parseInt(offset) || lastProcessedUpdateId;
-    
+    const { offset } = req.query;
     try {
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=30`;
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
         const response = await fetch(url);
         const data = await response.json();
         
-        if (data.ok && data.result && data.result.length > 0) {
-            const filtered = [];
-            const processedIds = [];
-            
-            for (const update of data.result) {
+        // Фильтруем сообщения от бота
+        if (data.ok && data.result) {
+            const filtered = data.result.filter(update => {
                 const msg = update.message;
-                if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
-                    const topicId = msg.message_thread_id;
-                    const topicUserId = topicToUser.get(topicId);
-                    
-                    if (msg.from && msg.from.is_bot) continue;
-                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
-                    
-                    if (topicUserId && (!userId || topicUserId === userId)) {
-                        const messageData = {
-                            update_id: update.update_id,
-                            message: {
-                                text: msg.caption || msg.text || '',
-                                from: msg.from?.first_name || 'Поддержка',
-                                date: msg.date
-                            }
-                        };
-                        
-                        if (msg.photo && msg.photo.length > 0) {
-                            try {
-                                const photo = msg.photo[msg.photo.length - 1];
-                                const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
-                                const fileData = await fileResponse.json();
-                                if (fileData.ok) {
-                                    messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-                                    messageData.message.hasImage = true;
-                                }
-                            } catch (err) {}
-                        }
-                        
-                        filtered.push(messageData);
-                        processedIds.push(update.update_id);
-                    }
-                }
-            }
-            
-            if (processedIds.length > 0) {
-                lastProcessedUpdateId = Math.max(...processedIds) + 1;
-            }
-            
+                return msg && !msg.from?.is_bot && msg.text && !msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ');
+            });
             data.result = filtered;
         }
         res.json(data);
     } catch (err) {
-        console.error('Ошибка getUpdates:', err);
         res.status(500).json({ ok: false });
     }
 });
