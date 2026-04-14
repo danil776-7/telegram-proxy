@@ -1,120 +1,146 @@
 const express = require('express');
-const cors = require('cors');
+const http = require('http');
+const path = require('path');
+const { Server } = require('socket.io');
+const TelegramBot = require('node-telegram-bot-api');
+
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const GROUP_CHAT_ID = parseInt(process.env.GROUP_CHAT_ID);
+
+const bot = new TelegramBot(BOT_TOKEN, { polling: true });
+
+const userTopics = new Map();
+const userStatus = new Map();
+
 const app = express();
-
-app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
-app.options('*', cors());
-app.use(express.json({ limit: '50mb' }));
-
-const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
-const GROUP_CHAT_ID = -1003765383331;
-
-console.log('🚀 СЕРВЕР ЗАПУЩЕН');
-console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
-
-// Простое хранилище
-const users = new Map();
-
-app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Proxy работает!' });
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: { origin: "*" }
 });
 
-// РЕГИСТРАЦИЯ
-app.post('/register', async (req, res) => {
-    console.log('📞 РЕГИСТРАЦИЯ:', req.body);
-    const { userId, ip, phone, region } = req.body;
-    
-    if (!phone) {
-        return res.status(400).json({ ok: false, error: 'phone required' });
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json({ limit: '10mb' }));
+
+// ===== helpers =====
+
+function isValidPhone(phone) {
+    return /^\+?[1-9]\d{7,14}$/.test(phone);
+}
+
+function updateStatus(userId, isOnline, isTabOpen = false) {
+    const now = Date.now();
+    userStatus.set(userId, {
+        online: isOnline,
+        tabOpen: isTabOpen,
+        lastActive: now
+    });
+}
+
+async function sendSystemInfo(userId, site, geo, phone, timezone) {
+    const topicId = userTopics.get(userId);
+
+    const time = new Date().toLocaleString('ru-RU', { timeZone: timezone });
+
+    const text = `
+🧑‍💻 ID: ${userId}
+📞 Телефон: ${phone || 'не указан'}
+
+🌍 ${geo?.country_name || ''}
+🏙 ${geo?.city || ''}
+🌐 ${site}
+
+🕒 ${time}
+    `.trim();
+
+    const msg = await bot.sendMessage(GROUP_CHAT_ID, text, {
+        message_thread_id: topicId
+    });
+
+    await bot.pinChatMessage(GROUP_CHAT_ID, msg.message_id, {
+        message_thread_id: topicId
+    });
+}
+
+async function createUserTopic(userId, site, geo, phone, timezone) {
+    const topic = await bot.createForumTopic(GROUP_CHAT_ID, `🆕 ${userId}`);
+    const topicId = topic.message_thread_id;
+
+    userTopics.set(userId, topicId);
+
+    await sendSystemInfo(userId, site, geo, phone, timezone);
+
+    return topicId;
+}
+
+// ===== TG → сайт =====
+bot.on('message', async (msg) => {
+    if (msg.chat.id !== GROUP_CHAT_ID || !msg.is_topic_message) return;
+
+    const topicId = msg.message_thread_id;
+
+    let userId = null;
+    for (let [uid, tid] of userTopics.entries()) {
+        if (tid === topicId) userId = uid;
     }
-    
-    try {
-        // Создаём топик
-        const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                name: `👤 ${userId.substring(0, 20)}`
-            })
-        }).then(r => r.json());
-        
-        if (!topic.ok) {
-            console.error('Ошибка создания топика:', topic);
-            return res.status(500).json({ ok: false, error: topic.description });
+    if (!userId) return;
+
+    if (msg.photo) {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        const file = await bot.getFile(fileId);
+        const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+
+        io.to(userId).emit('tg_message', {
+            isImage: true,
+            imageUrl: url
+        });
+    } else {
+        io.to(userId).emit('tg_message', {
+            text: msg.text
+        });
+    }
+});
+
+// ===== SOCKET =====
+io.on('connection', (socket) => {
+    const { userId, site, timezone } = socket.handshake.query;
+
+    socket.join(userId);
+
+    socket.on('user_message', async (data) => {
+        const { text, imageBase64, geo, phone } = data;
+
+        if (!isValidPhone(phone)) {
+            socket.emit('error', 'Неверный номер телефона');
+            return;
         }
-        
-        const topicId = topic.result.message_thread_id;
-        users.set(ip, { topicId, phone, region, userId });
-        
-        const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
-        
-        // Отправляем информацию
-        const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: topicId,
-                text: `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 ID: ${userId}\n📡 IP: ${ip}\n📍 Регион: ${region || 'не определён'}\n📞 Телефон: ${phone}\n⏰ Время: ${time}`,
-                parse_mode: 'Markdown'
-            })
-        }).then(r => r.json());
-        
-        console.log('✅ Информация отправлена, ok:', sent.ok);
-        res.json({ ok: true, topicId });
-        
-    } catch (err) {
-        console.error('Ошибка:', err);
-        res.status(500).json({ ok: false, error: err.message });
-    }
+
+        let topicId = userTopics.get(userId);
+
+        if (!topicId) {
+            topicId = await createUserTopic(userId, site, geo, phone, timezone);
+        }
+
+        try {
+            if (imageBase64) {
+                const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+                const buffer = Buffer.from(matches[2], 'base64');
+
+                await bot.sendPhoto(GROUP_CHAT_ID, buffer, {
+                    caption: text || '📷 Фото',
+                    message_thread_id: topicId
+                });
+            } else {
+                await bot.sendMessage(GROUP_CHAT_ID, text, {
+                    message_thread_id: topicId
+                });
+            }
+
+        } catch (e) {
+            socket.emit('error', 'Ошибка отправки');
+        }
+    });
 });
 
-// ОТПРАВКА СООБЩЕНИЯ
-app.post('/send', async (req, res) => {
-    console.log('📨 СООБЩЕНИЕ:', { ip: req.body.ip, text: req.body.text?.substring(0, 50) });
-    const { userId, ip, text, imageBase64 } = req.body;
-    
-    const user = users.get(ip);
-    if (!user) {
-        console.log('❌ Нет регистрации для IP:', ip);
-        return res.status(400).json({ ok: false, error: 'Please register first' });
-    }
-    
-    try {
-        const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: user.topicId,
-                text: `💬 **${userId}:**\n\n${text}`,
-                parse_mode: 'Markdown'
-            })
-        }).then(r => r.json());
-        
-        console.log('✅ Сообщение отправлено, ok:', sent.ok);
-        res.json({ ok: true });
-    } catch (err) {
-        console.error('Ошибка:', err);
-        res.status(500).json({ ok: false });
-    }
-});
-
-// ПОЛУЧЕНИЕ ОТВЕТОВ
-app.get('/getUpdates', async (req, res) => {
-    const { offset } = req.query;
-    try {
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
-        const response = await fetch(url);
-        const data = await response.json();
-        res.json(data);
-    } catch (err) {
-        res.status(500).json({ ok: false });
-    }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`\n🚀 Сервер на порту ${PORT}\n`);
+server.listen(3000, () => {
+    console.log('🚀 Server started');
 });
