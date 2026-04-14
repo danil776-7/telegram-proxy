@@ -2,16 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// Настройки CORS - РАЗРЕШАЕМ ВСЁ
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Обрабатываем preflight запросы
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.options('*', cors());
-
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -20,7 +12,7 @@ const GROUP_CHAT_ID = -1003765383331;
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
-// Хранилище
+// Хранилище - ключ = userId, а не ip!
 const users = new Map();
 
 app.get('/', (req, res) => {
@@ -34,8 +26,8 @@ app.post('/register', async (req, res) => {
     console.log('📞 РЕГИСТРАЦИЯ:', req.body);
     const { userId, ip, phone, region } = req.body;
     
-    if (!phone) {
-        return res.status(400).json({ ok: false, error: 'phone required' });
+    if (!userId || !phone) {
+        return res.status(400).json({ ok: false, error: 'userId and phone required' });
     }
     
     try {
@@ -55,7 +47,11 @@ app.post('/register', async (req, res) => {
         }
         
         const topicId = topic.result.message_thread_id;
-        users.set(ip, { topicId, phone, region, userId });
+        // КЛЮЧ = userId, а не ip!
+        users.set(userId, { topicId, phone, region });
+        
+        console.log('📦 Текущие пользователи:', Array.from(users.keys()));
+        console.log('✅ Регистрация успешна, userId:', userId, 'topicId:', topicId);
         
         const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
         
@@ -66,12 +62,11 @@ app.post('/register', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                text: `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 ID: ${userId}\n📡 IP: ${ip}\n📍 Регион: ${region || 'не определён'}\n📞 Телефон: ${phone}\n⏰ Время: ${time}`,
+                text: `🔔 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\n🆔 ID: ${userId}\n📡 IP: ${ip}\n📍 Регион: ${region || 'не определён'}\n📞 Телефон: ${phone}\n⏰ Время: ${time}`,
                 parse_mode: 'Markdown'
             })
         });
         
-        console.log('✅ Регистрация успешна, topicId:', topicId);
         res.json({ ok: true, topicId });
         
     } catch (err) {
@@ -83,12 +78,15 @@ app.post('/register', async (req, res) => {
 // ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    console.log('📨 СООБЩЕНИЕ:', { ip: req.body.ip, text: req.body.text?.substring(0, 50) });
-    const { userId, ip, text } = req.body;
+    const { userId, text } = req.body;
+    console.log('📨 СООБЩЕНИЕ от userId:', userId, 'текст:', text?.substring(0, 50));
     
-    const user = users.get(ip);
+    // Ищем по userId
+    const user = users.get(userId);
+    console.log('🔍 ПОИСК ПОЛЬЗОВАТЕЛЯ:', userId, 'НАЙДЕН:', !!user);
+    
     if (!user) {
-        console.log('❌ Нет регистрации для IP:', ip);
+        console.log('❌ Нет регистрации для userId:', userId);
         return res.status(400).json({ ok: false, error: 'Please register first' });
     }
     
@@ -99,13 +97,16 @@ app.post('/send', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: user.topicId,
-                text: `💬 **${userId}:**\n\n${text}`,
+                text: `💬 ${userId}:\n\n${text}`,
                 parse_mode: 'Markdown'
             })
         }).then(r => r.json());
         
         console.log('✅ Сообщение отправлено, ok:', result.ok);
-        res.json({ ok: true });
+        if (!result.ok) {
+            console.error('❌ Ошибка Telegram:', result);
+        }
+        res.json({ ok: result.ok });
     } catch (err) {
         console.error('Ошибка:', err);
         res.status(500).json({ ok: false });
