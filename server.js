@@ -17,30 +17,33 @@ const userData = new Map();
 
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
-    });
-    return response.json();
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+        });
+        const data = await response.json();
+        console.log(`📡 ${method}:`, data.ok ? 'OK' : 'ERROR', data.description || '');
+        return data;
+    } catch (err) {
+        console.error(`❌ Ошибка ${method}:`, err);
+        return { ok: false, error: err.message };
+    }
 }
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Proxy работает!' });
 });
 
-// РЕГИСТРАЦИЯ С НОМЕРОМ ТЕЛЕФОНА
+// РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
-    console.log('📞 ПОЛУЧЕНА РЕГИСТРАЦИЯ:', JSON.stringify(req.body, null, 2));
-    
+    console.log('📞 РЕГИСТРАЦИЯ:', req.body);
     const { userId, ip, phone, region } = req.body;
     
     if (!phone) {
-        console.log('❌ Нет телефона!');
         return res.status(400).json({ ok: false, error: 'phone required' });
     }
-    
-    const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
     
     try {
         // Создаём топик
@@ -50,49 +53,40 @@ app.post('/register', async (req, res) => {
         });
         
         if (!topic.ok) {
-            console.error('❌ Ошибка создания топика:', topic);
-            return res.status(500).json({ ok: false });
+            return res.status(500).json({ ok: false, error: topic.description });
         }
         
         const topicId = topic.result.message_thread_id;
-        console.log('✅ Топик создан:', topicId);
-        
-        // Сохраняем данные
         userData.set(ip, { topicId, phone, region, userId });
         
-        // Отправляем сообщение с информацией
-        const messageText = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 **ID:** ${userId}\n📡 **IP:** ${ip}\n📍 **Регион:** ${region || 'не определён'}\n📞 **Телефон:** ${phone}\n⏰ **Время:** ${time}`;
+        const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
         
-        console.log('📤 Отправка сообщения:', messageText);
-        
-        const sent = await callTelegram('sendMessage', {
+        // Отправляем информацию о пользователе
+        await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            text: messageText,
+            text: `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 **ID:** ${userId}\n📡 **IP:** ${ip}\n📍 **Регион:** ${region || 'не определён'}\n📞 **Телефон:** ${phone}\n⏰ **Время:** ${time}`,
             parse_mode: 'Markdown'
         });
         
-        console.log('✅ Сообщение отправлено, ok:', sent.ok);
-        
+        console.log('✅ Регистрация успешна, топик:', topicId);
         res.json({ ok: true, topicId });
         
     } catch (err) {
         console.error('❌ Ошибка:', err);
-        res.status(500).json({ ok: false });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
 // ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
-    console.log('📨 ПОЛУЧЕНО СООБЩЕНИЕ:', JSON.stringify(req.body, null, 2));
+    console.log('📨 СООБЩЕНИЕ:', { userId: req.body.userId, ip: req.body.ip, text: req.body.text?.substring(0, 50) });
+    const { userId, ip, text, imageBase64 } = req.body;
     
-    const { userId, ip, text, imageBase64, region } = req.body;
-    
-    let data = userData.get(ip);
-    
+    const data = userData.get(ip);
     if (!data) {
-        console.log('❌ Нет данных для IP:', ip);
-        return res.status(400).json({ ok: false, error: 'No topic found' });
+        console.log('❌ Нет регистрации для IP:', ip);
+        return res.status(400).json({ ok: false, error: 'Please register first' });
     }
     
     try {
@@ -121,8 +115,8 @@ app.post('/send', async (req, res) => {
         }
         console.log('✅ Сообщение отправлено');
         res.json({ ok: true });
-    } catch (error) {
-        console.error('❌ Ошибка:', error);
+    } catch (err) {
+        console.error('❌ Ошибка:', err);
         res.status(500).json({ ok: false });
     }
 });
@@ -155,12 +149,12 @@ app.get('/getUpdates', async (req, res) => {
             data.result = filtered;
         }
         res.json(data);
-    } catch (error) {
+    } catch (err) {
         res.status(500).json({ ok: false });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`\n🚀 Сервер запущен на порту ${PORT}\n`);
+    console.log(`\n🚀 Сервер на порту ${PORT}\n`);
 });
