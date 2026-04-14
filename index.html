@@ -307,7 +307,6 @@
             background: white;
         }
         
-        /* Запрещаем масштабирование на телефонах */
         @media (max-width: 768px) {
             .chat-input, .phone-input, .custom-select-trigger {
                 font-size: 16px !important;
@@ -639,7 +638,6 @@
             }
         }
         
-        /* Запрет на выделение элементов на телефонах */
         button, input, textarea, select {
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
@@ -686,9 +684,10 @@
 
 <script>
     (function() {
-        const PROXY_URL = 'http://localhost:3000';
+        // Убираем localhost - используем относительный путь
+        // Сервер должен быть на том же домене, что и виджет
+        const PROXY_URL = '';  // Пустая строка = текущий домен
         
-        // РАЗНАЯ ДЛИНА НОМЕРА ДЛЯ КАЖДОЙ СТРАНЫ
         const countries = [
             { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 34 56 789' },
             { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
@@ -721,7 +720,6 @@
         let detectedCountry = null;
         let detectedCountryName = '';
         
-        // Форматирование времени Amsterdam
         function formatMessageTime(timestamp) {
             const date = timestamp ? new Date(timestamp * 1000) : new Date();
             return date.toLocaleTimeString('ru-RU', { 
@@ -731,7 +729,6 @@
             });
         }
         
-        // Геолокация
         async function detectGeo() {
             try {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -765,7 +762,6 @@
             return { country: detectedCountry, name: detectedCountryName };
         }
         
-        // Добавление сообщения
         function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
             const messagesDiv = document.getElementById('chatMessages');
             if (!messagesDiv) return;
@@ -813,7 +809,6 @@
             addMessage(text, false, true);
         }
         
-        // Модальное окно очистки
         function showClearConfirm() {
             const widget = document.getElementById('chatWidget');
             const existingOverlay = document.querySelector('.clear-confirm-overlay');
@@ -863,7 +858,6 @@
             }, 100);
         }
         
-        // Форма телефона
         function showPhoneForm() {
             const widget = document.getElementById('chatWidget');
             const oldOverlay = document.querySelector('.phone-overlay');
@@ -1009,7 +1003,7 @@
             try {
                 console.log('📞 Регистрация:', { userId, phone, countryName, ip: userIp });
                 
-                const response = await fetch(`${PROXY_URL}/register`, {
+                const response = await fetch(`/register`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -1052,7 +1046,7 @@
             updateActivity(true, true);
             
             try {
-                await fetch(`${PROXY_URL}/send`, {
+                await fetch(`/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, text, imageBase64 })
@@ -1063,7 +1057,7 @@
         async function checkReplies() {
             if (!isRegistered) return;
             try {
-                const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
+                const response = await fetch(`/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
                 const data = await response.json();
                 if (data.ok && data.result) {
                     for (const update of data.result) {
@@ -1088,7 +1082,7 @@
             lastStatusUpdate = now;
             currentStatus = isOnline;
             try {
-                await fetch(`${PROXY_URL}/updateStatus`, {
+                await fetch(`/updateStatus`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, isOnline, isActive })
