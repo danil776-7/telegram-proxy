@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
 app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
@@ -10,14 +12,38 @@ const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003911846697;
 const SITE_URL = 'https://ваш-сайт.ru'; // Замените на ваш URL
 
-console.log('🚀 СЕРВЕР ЗАПУЩЕН');
-console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
-
+// Хранилище логов и пользователей
 const users = new Map();
 const topicToUser = new Map();
+let allMessages = []; // Храним все сообщения для админ-панели
 let lastUpdateId = 0;
 
-// Функция для получения точного времени в Амстердаме (Нидерланды)
+// Функция для записи логов в файл
+function logToFile(type, data) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+        timestamp,
+        type,
+        data
+    };
+    
+    // Читаем существующие логи
+    let logs = [];
+    if (fs.existsSync('logs.json')) {
+        try {
+            logs = JSON.parse(fs.readFileSync('logs.json', 'utf8'));
+        } catch(e) {}
+    }
+    
+    logs.push(logEntry);
+    
+    // Сохраняем только последние 10000 логов
+    if (logs.length > 10000) logs = logs.slice(-10000);
+    
+    fs.writeFileSync('logs.json', JSON.stringify(logs, null, 2));
+}
+
+// Функция для получения времени в Амстердаме
 function getAmsterdamTime(timestamp = null) {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
     return date.toLocaleString('ru-RU', {
@@ -31,10 +57,9 @@ function getAmsterdamTime(timestamp = null) {
     });
 }
 
-// Улучшенное определение страны по IP (точное)
+// Улучшенное определение страны по IP
 async function getCountryByIp(ip) {
     try {
-        // Используем несколько сервисов для точности
         const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,timezone`);
         const data = await response.json();
         
@@ -47,18 +72,6 @@ async function getCountryByIp(ip) {
                 timezone: data.timezone || 'Europe/Amsterdam'
             };
         }
-        
-        // Fallback на другой сервис
-        const response2 = await fetch(`https://ipapi.co/${ip}/json/`);
-        const data2 = await response2.json();
-        if (data2 && data2.country_name) {
-            return {
-                country: data2.country_name,
-                countryCode: data2.country_code,
-                city: data2.city,
-                timezone: data2.timezone || 'Europe/Amsterdam'
-            };
-        }
     } catch (error) {
         console.error('Ошибка геолокации:', error);
     }
@@ -66,9 +79,468 @@ async function getCountryByIp(ip) {
     return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
 }
 
+// ========== АДМИН-ПАНЕЛЬ (HTML) ==========
+app.get('/admin', (req, res) => {
+    res.send(`
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админ-панель чата</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f5f5f7;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        /* Шапка */
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 24px 32px;
+            border-radius: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 20px;
+            border-radius: 40px;
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        /* Табы */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            background: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+            color: #666;
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .tab:hover:not(.active) {
+            background: #e0e0e0;
+        }
+        
+        /* Панели */
+        .panel {
+            display: none;
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .panel.active {
+            display: block;
+        }
+        
+        /* Таблицы */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        th {
+            background: #f8f9fc;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        tr:hover {
+            background: #f8f9fc;
+        }
+        
+        .user-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-online { background: #34c759; }
+        .status-offline { background: #8e8e93; }
+        
+        .message-bubble {
+            max-width: 300px;
+            padding: 8px 12px;
+            border-radius: 16px;
+            background: #f2f2f6;
+            font-size: 13px;
+        }
+        
+        .message-user {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        .badge-online { background: #34c75920; color: #34c759; }
+        .badge-offline { background: #8e8e9320; color: #8e8e93; }
+        
+        /* Обновление в реальном времени */
+        .refresh-info {
+            text-align: right;
+            font-size: 12px;
+            color: #8e8e93;
+            margin-bottom: 16px;
+        }
+        
+        /* Модальное окно */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-content h3 {
+            margin-bottom: 16px;
+        }
+        
+        .close-modal {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                text-align: center;
+            }
+            .stats {
+                justify-content: center;
+            }
+            th, td {
+                font-size: 12px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>📊 Админ-панель чата поддержки</h1>
+        <div class="stats" id="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="statUsers">0</div>
+                <div class="stat-label">Пользователей</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="statMessages">0</div>
+                <div class="stat-label">Сообщений</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="statOnline">0</div>
+                <div class="stat-label">Онлайн</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tabs">
+        <button class="tab active" data-tab="users">👥 Пользователи</button>
+        <button class="tab" data-tab="messages">💬 Сообщения</button>
+        <button class="tab" data-tab="logs">📋 Системные логи</button>
+    </div>
+    
+    <div class="panel active" id="panel-users">
+        <div class="refresh-info">🔄 Обновляется автоматически каждые 5 секунд</div>
+        <div class="table-wrapper">
+            <table id="usersTable">
+                <thead>
+                    <tr><th>ID</th><th>Телефон</th><th>Регион</th><th>IP</th><th>Статус</th><th>Время регистрации</th><th>Действия</th></tr>
+                </thead>
+                <tbody id="usersList"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="panel" id="panel-messages">
+        <div class="refresh-info">🔄 Обновляется автоматически каждые 3 секунды</div>
+        <div class="table-wrapper">
+            <table id="messagesTable">
+                <thead>
+                    <tr><th>Время</th><th>Пользователь</th><th>Сообщение</th><th>Тип</th></tr>
+                </thead>
+                <tbody id="messagesList"></tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="panel" id="panel-logs">
+        <div class="refresh-info">🔄 Обновляется автоматически каждые 10 секунд</div>
+        <div class="table-wrapper">
+            <table id="logsTable">
+                <thead>
+                    <tr><th>Время</th><th>Тип</th><th>Данные</th></tr>
+                </thead>
+                <tbody id="logsList"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="modal">
+    <div class="modal-content">
+        <h3 id="modalTitle">Детали пользователя</h3>
+        <div id="modalBody"></div>
+        <button class="close-modal" onclick="closeModal()">Закрыть</button>
+    </div>
+</div>
+
+<script>
+    let currentTab = 'users';
+    
+    // Переключение табов
+    document.querySelectorAll('.tab').forEach(tab => {
+        tab.onclick = () => {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            const panelId = 'panel-' + tab.dataset.tab;
+            document.getElementById(panelId).classList.add('active');
+            currentTab = tab.dataset.tab;
+        };
+    });
+    
+    // Загрузка данных
+    async function loadData() {
+        try {
+            const response = await fetch('/api/data');
+            const data = await response.json();
+            
+            // Обновляем статистику
+            document.getElementById('statUsers').innerText = data.stats.users;
+            document.getElementById('statMessages').innerText = data.stats.messages;
+            document.getElementById('statOnline').innerText = data.stats.online;
+            
+            // Обновляем список пользователей
+            const usersList = document.getElementById('usersList');
+            usersList.innerHTML = data.users.map(user => \`
+                <tr>
+                    <td><code>\${user.id.substring(0, 16)}...</code></td>
+                    <td>\${user.phone || '—'}</td>
+                    <td>\${user.region || '—'}</td>
+                    <td><code>\${user.ip || '—'}</code></td>
+                    <td>
+                        <span class="user-status \${user.isOnline ? 'status-online' : 'status-offline'}"></span>
+                        <span class="badge \${user.isOnline ? 'badge-online' : 'badge-offline'}">
+                            \${user.isOnline ? 'онлайн' : 'офлайн'}
+                        </span>
+                    </td>
+                    <td>\${user.registeredAt || '—'}</td>
+                    <td><button onclick="showUserDetails('\${user.id}')">📋</button></td>
+                </tr>
+            \`).join('');
+            
+            // Обновляем список сообщений
+            const messagesList = document.getElementById('messagesList');
+            messagesList.innerHTML = data.messages.slice().reverse().map(msg => \`
+                <tr>
+                    <td style="white-space: nowrap">\${msg.time}</td>
+                    <td><code>\${msg.userId?.substring(0, 12)}...</code></td>
+                    <td>
+                        <div class="message-bubble \${msg.isUser ? 'message-user' : ''}">
+                            \${msg.text || (msg.hasImage ? '📷 Изображение' : '—')}
+                        </div>
+                    </td>
+                    <td><span class="badge">\${msg.isUser ? '👤 Пользователь' : '🤖 Оператор'}</span></td>
+                </tr>
+            \`).join('');
+            
+            // Обновляем список логов
+            const logsList = document.getElementById('logsList');
+            logsList.innerHTML = data.logs.slice().reverse().map(log => \`
+                <tr>
+                    <td style="white-space: nowrap">\${log.timestamp}</td>
+                    <td><span class="badge">\${log.type}</span></td>
+                    <td style="word-break: break-word"><code>\${JSON.stringify(log.data, null, 2)}</code></td>
+                </tr>
+            \`).join('');
+            
+        } catch (err) {
+            console.error('Ошибка загрузки:', err);
+        }
+    }
+    
+    function showUserDetails(userId) {
+        fetch('/api/user/' + userId)
+            .then(r => r.json())
+            .then(user => {
+                document.getElementById('modalTitle').innerText = '👤 Пользователь';
+                document.getElementById('modalBody').innerHTML = \`
+                    <p><strong>ID:</strong> <code>\${user.id}</code></p>
+                    <p><strong>Телефон:</strong> \${user.phone || '—'}</p>
+                    <p><strong>IP:</strong> \${user.ip || '—'}</p>
+                    <p><strong>Регион:</strong> \${user.region || '—'}</p>
+                    <p><strong>Статус:</strong> \${user.isOnline ? '🟢 Онлайн' : '⚫️ Офлайн'}</p>
+                    <p><strong>Время регистрации:</strong> \${user.registeredAt || '—'}</p>
+                    <p><strong>Топик ID:</strong> \${user.topicId || '—'}</p>
+                \`;
+                document.getElementById('modal').classList.add('active');
+            });
+    }
+    
+    function closeModal() {
+        document.getElementById('modal').classList.remove('active');
+    }
+    
+    // Автообновление
+    loadData();
+    setInterval(loadData, 5000);
+</script>
+</body>
+</html>
+    `);
+});
+
+// ========== API для админ-панели ==========
+app.get('/api/data', (req, res) => {
+    const usersList = Array.from(users.entries()).map(([id, data]) => ({
+        id,
+        phone: data.phone,
+        region: data.region,
+        ip: data.ip,
+        isOnline: data.isOnline || false,
+        registeredAt: data.registeredAt,
+        topicId: data.topicId
+    }));
+    
+    // Читаем логи из файла
+    let logs = [];
+    if (fs.existsSync('logs.json')) {
+        try {
+            logs = JSON.parse(fs.readFileSync('logs.json', 'utf8'));
+        } catch(e) {}
+    }
+    
+    res.json({
+        stats: {
+            users: users.size,
+            messages: allMessages.length,
+            online: Array.from(users.values()).filter(u => u.isOnline).length
+        },
+        users: usersList,
+        messages: allMessages.slice(-200),
+        logs: logs.slice(-100)
+    });
+});
+
+app.get('/api/user/:userId', (req, res) => {
+    const user = users.get(req.params.userId);
+    if (user) {
+        res.json({
+            id: req.params.userId,
+            phone: user.phone,
+            region: user.region,
+            ip: user.ip,
+            isOnline: user.isOnline || false,
+            registeredAt: user.registeredAt,
+            topicId: user.topicId
+        });
+    } else {
+        res.status(404).json({ error: 'User not found' });
+    }
+});
+
+// ========== ОСНОВНЫЕ ЭНДПОИНТЫ ==========
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.json({ status: 'ok', message: 'Proxy работает!' });
+    res.json({ status: 'ok', message: 'Proxy работает!', adminPanel: '/admin' });
 });
 
 app.post('/register', async (req, res) => {
@@ -81,7 +553,6 @@ app.post('/register', async (req, res) => {
     }
     
     try {
-        // Определяем точную геолокацию по IP
         let geo = { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
         if (ip && ip !== '127.0.0.1' && ip !== '::1') {
             geo = await getCountryByIp(ip);
@@ -90,7 +561,6 @@ app.post('/register', async (req, res) => {
         const finalRegion = `${geo.country}${geo.city ? ', ' + geo.city : ''}`;
         const currentTime = getAmsterdamTime();
         
-        // Создаём топик с иконкой статуса и названием сайта
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -106,10 +576,19 @@ app.post('/register', async (req, res) => {
         }
         
         const topicId = topic.result.message_thread_id;
-        users.set(userId, { topicId, phone, region: finalRegion, ip, timezone: geo.timezone });
+        
+        // Сохраняем пользователя с данными
+        users.set(userId, { 
+            topicId, 
+            phone, 
+            region: finalRegion, 
+            ip, 
+            timezone: geo.timezone,
+            registeredAt: currentTime,
+            isOnline: true
+        });
         topicToUser.set(topicId, userId);
         
-        // ОДНО системное сообщение со всей информацией
         const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ**\n\n` +
             `🆔 **ID:** ${userId}\n` +
             `🌍 **IP:** ${ip}\n` +
@@ -129,7 +608,10 @@ app.post('/register', async (req, res) => {
             })
         });
         
-        console.log(`✅ Пользователь ${userId} зарегистрирован, страна: ${geo.country}`);
+        // Логируем в файл
+        logToFile('REGISTER', { userId, ip, phone, region: finalRegion });
+        
+        console.log(`✅ Пользователь ${userId} зарегистрирован`);
         res.json({ ok: true, topicId });
         
     } catch (err) {
@@ -147,6 +629,18 @@ app.post('/send', async (req, res) => {
     if (!user) {
         return res.status(400).json({ ok: false, error: 'Please register first' });
     }
+    
+    // Сохраняем сообщение для админ-панели
+    allMessages.push({
+        userId,
+        text: text || (imageBase64 ? '📷 Изображение' : ''),
+        isUser: true,
+        hasImage: !!imageBase64,
+        time: getAmsterdamTime()
+    });
+    
+    // Ограничиваем количество сообщений
+    if (allMessages.length > 1000) allMessages = allMessages.slice(-1000);
     
     try {
         if (imageBase64) {
@@ -175,6 +669,8 @@ app.post('/send', async (req, res) => {
                 })
             });
         }
+        
+        logToFile('MESSAGE', { userId, text: text || 'image', direction: 'out' });
         res.json({ ok: true });
     } catch (err) {
         console.error('Ошибка отправки:', err);
@@ -182,7 +678,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// Обновление статуса - меняем иконку и название топика
+// Обновление статуса
 let lastStatus = new Map();
 app.post('/updateStatus', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -191,9 +687,10 @@ app.post('/updateStatus', async (req, res) => {
     const user = users.get(userId);
     if (user) {
         const prevStatus = lastStatus.get(userId) || false;
-        // Отправляем обновление ТОЛЬКО если статус изменился
         if (prevStatus !== isOnline) {
             lastStatus.set(userId, isOnline);
+            user.isOnline = isOnline;
+            
             const icon = isOnline ? '🟢' : '⚫️';
             const newName = `${icon} ${SITE_URL.replace('https://', '').replace('http://', '')}`;
             
@@ -206,7 +703,9 @@ app.post('/updateStatus', async (req, res) => {
                     name: newName
                 })
             }).catch(() => {});
-            console.log(`🔄 Статус пользователя ${userId}: ${isOnline ? 'онлайн' : 'офлайн'}`);
+            
+            console.log(`🔄 Статус ${userId}: ${isOnline ? 'онлайн' : 'офлайн'}`);
+            logToFile('STATUS', { userId, isOnline });
         }
     }
     res.json({ ok: true });
@@ -231,7 +730,6 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const topicUserId = topicToUser.get(topicId);
                     
-                    // Пропускаем сообщения от ботов и системные
                     if (msg.from && msg.from.is_bot) continue;
                     if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || 
                                      msg.text.includes('закрепил') ||
@@ -243,11 +741,19 @@ app.get('/getUpdates', async (req, res) => {
                             message: {
                                 text: msg.caption || msg.text || '',
                                 from: msg.from?.first_name || 'Поддержка',
-                                date: msg.date // Оригинальный timestamp из Telegram
+                                date: msg.date
                             }
                         };
                         
-                        // Обработка фото из Telegram в виджет
+                        // Сохраняем входящее сообщение для админ-панели
+                        allMessages.push({
+                            userId: topicUserId,
+                            text: msg.caption || msg.text || '',
+                            isUser: false,
+                            hasImage: false,
+                            time: getAmsterdamTime(msg.date)
+                        });
+                        
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -256,10 +762,17 @@ app.get('/getUpdates', async (req, res) => {
                                 if (fileData.ok) {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
+                                    
+                                    allMessages.push({
+                                        userId: topicUserId,
+                                        text: '📷 Изображение от оператора',
+                                        isUser: false,
+                                        hasImage: true,
+                                        imageUrl: messageData.message.imageUrl,
+                                        time: getAmsterdamTime(msg.date)
+                                    });
                                 }
-                            } catch (err) {
-                                console.error('Ошибка получения фото:', err);
-                            }
+                            } catch (err) {}
                         }
                         
                         filtered.push(messageData);
@@ -281,7 +794,9 @@ app.get('/getUpdates', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`\n🚀 Сервер на порту ${PORT}\n`);
+    console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН`);
+    console.log(`📡 Порт: ${PORT}`);
+    console.log(`🌐 Админ-панель: http://localhost:${PORT}/admin`);
     console.log(`📡 Группа: ${GROUP_CHAT_ID}`);
     console.log(`🤖 Бот: ${BOT_TOKEN.substring(0, 10)}...`);
     console.log(`🌍 Временная зона: Europe/Amsterdam\n`);
