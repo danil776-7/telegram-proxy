@@ -17,7 +17,6 @@
             padding: 16px;
         }
         
-        /* Демо-контент на странице */
         .content {
             text-align: center;
             padding: 32px 20px;
@@ -39,7 +38,6 @@
         
         p { color: #666; line-height: 1.5; font-size: 16px; }
         
-        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -84,7 +82,6 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
-        /* Шапка виджета */
         .chat-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -130,9 +127,6 @@
             transition: background 0.2s;
         }
         
-        .clear-btn:hover, .close-btn:hover { background: rgba(255,255,255,0.3); }
-        
-        /* Область сообщений */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -174,7 +168,6 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         
-        /* Сообщение оператора */
         .operator-message {
             background: #e8f4fd;
             color: #1a1a2e;
@@ -205,7 +198,6 @@
             text-align: right;
         }
         
-        /* Поле ввода */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -265,7 +257,6 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         
-        /* Форма ввода телефона */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -399,10 +390,10 @@
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Определение страны...</div>
+        <div class="status online" id="status">🟢 Готов к работе</div>
     </div>
     <div class="chat-input-area">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
+        <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
         <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
@@ -433,9 +424,9 @@
         }
         
         let userPhone = localStorage.getItem('user_phone');
-        let isPhoneRequired = !userPhone;
+        let isRegistered = !!userPhone;
         
-        let userGeo = { ip: '', countryCode: 'NL', countryName: 'Нидерланды', region: 'Noord-Holland', city: 'Amsterdam' };
+        let userGeo = { ip: '', countryCode: 'RU', countryName: 'Россия', region: '', city: '' };
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let processedIds = new Set(JSON.parse(localStorage.getItem('chat_processedIds') || '[]'));
         
@@ -454,7 +445,6 @@
                     console.log('📍 Геолокация:', userGeo.countryName, userGeo.city);
                 }
             } catch (error) {
-                console.error('Ошибка геолокации:', error);
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
                 userGeo.ip = ipData.ip;
@@ -526,6 +516,7 @@
         }
         
         async function registerPhone(phone) {
+            setStatus('⏳ Регистрация...', 'sending');
             try {
                 const response = await fetch(`${PROXY_URL}/register`, {
                     method: 'POST',
@@ -539,16 +530,19 @@
                     })
                 });
                 const data = await response.json();
+                console.log('📞 Регистрация ответ:', data);
                 if (data.ok) {
                     userPhone = phone;
                     localStorage.setItem('user_phone', phone);
-                    isPhoneRequired = false;
+                    isRegistered = true;
+                    setStatus('🟢 Онлайн', 'online');
                     addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
                     return true;
                 }
                 return false;
             } catch (error) {
                 console.error('Ошибка регистрации:', error);
+                setStatus('🔴 Ошибка', 'error');
                 return false;
             }
         }
@@ -636,7 +630,7 @@
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
-            if (isPhoneRequired) {
+            if (!isRegistered) {
                 showPhoneForm();
                 return;
             }
@@ -719,7 +713,7 @@
                 div.appendChild(timeSpan);
                 messagesDiv.appendChild(div);
             });
-            if (history.length === 0 && !isPhoneRequired) {
+            if (history.length === 0 && isRegistered) {
                 setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false), 500);
             }
         }
@@ -727,7 +721,7 @@
         widget.onclick = (e) => {
             if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
                 widget.classList.remove('closed');
-                if (isPhoneRequired) setTimeout(() => showPhoneForm(), 100);
+                if (!isRegistered) setTimeout(() => showPhoneForm(), 100);
             }
         };
         
@@ -764,7 +758,7 @@
         setInterval(checkReplies, 5000);
         
         detectGeo().then(() => {
-            if (isPhoneRequired) setTimeout(() => showPhoneForm(), 500);
+            if (!isRegistered) setTimeout(() => showPhoneForm(), 500);
         });
     })();
 </script>
