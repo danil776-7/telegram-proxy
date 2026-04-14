@@ -14,6 +14,38 @@ console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
 const users = new Map();
 const topicToUser = new Map();
+let lastUpdateId = 0;
+
+// Функция для получения времени в Амстердаме (Нидерланды)
+function getAmsterdamTime(timestamp = null) {
+    const date = timestamp ? new Date(timestamp * 1000) : new Date();
+    return date.toLocaleString('ru-RU', {
+        timeZone: 'Europe/Amsterdam',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Функция для определения страны по IP
+async function getCountryByIp(ip) {
+    try {
+        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            return {
+                country: data.country,
+                countryCode: data.countryCode,
+                city: data.city
+            };
+        }
+    } catch (error) {
+        console.error('Ошибка геолокации:', error);
+    }
+    return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам' };
+}
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -31,6 +63,16 @@ app.post('/register', async (req, res) => {
     }
     
     try {
+        // Определяем страну по IP
+        let geo = { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам' };
+        if (ip && ip !== '127.0.0.1') {
+            geo = await getCountryByIp(ip);
+        }
+        
+        const finalRegion = `${geo.country}${geo.city ? ', ' + geo.city : ''}`;
+        console.log(`📍 IP: ${ip}, Определённый регион: ${finalRegion}`);
+        
+        // Создаём топик
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -46,12 +88,18 @@ app.post('/register', async (req, res) => {
         }
         
         const topicId = topic.result.message_thread_id;
-        users.set(userId, { topicId, phone, region, ip });
+        users.set(userId, { topicId, phone, region: finalRegion, ip });
         topicToUser.set(topicId, userId);
         
-        const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Amsterdam' });
+        const currentTime = getAmsterdamTime();
         
-        const messageText = `🔔 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\nID: ${userId}\nIP: ${ip}\nРегион: ${region || 'Нидерланды'}\nТелефон: ${phone}\nВремя: ${time}`;
+        // ОДНО СООБЩЕНИЕ со всей информацией
+        const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n` +
+            `🆔 **ID:** ${userId}\n` +
+            `📡 **IP:** ${ip}\n` +
+            `📍 **Регион:** ${finalRegion}\n` +
+            `📞 **Телефон:** ${phone}\n` +
+            `⏰ **Время:** ${currentTime}`;
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -59,9 +107,21 @@ app.post('/register', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                text: messageText
+                text: infoMessage,
+                parse_mode: 'Markdown'
             })
         });
+        
+        // Обновляем иконку топика
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: GROUP_CHAT_ID,
+                message_thread_id: topicId,
+                name: `🟢 ${window.location?.hostname || 'website'}`
+            })
+        }).catch(() => {});
         
         console.log('✅ Регистрация успешна, userId:', userId);
         res.json({ ok: true, topicId });
@@ -76,7 +136,7 @@ app.post('/register', async (req, res) => {
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, text, imageBase64 } = req.body;
-    console.log('📨 Сообщение от userId:', userId, 'текст:', text);
+    console.log('📨 Сообщение от:', userId, 'текст:', text?.substring(0, 50), 'фото:', !!imageBase64);
     
     const user = users.get(userId);
     if (!user) {
@@ -117,11 +177,32 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// ПОЛУЧЕНИЕ ОТВЕТОВ (ключевая функция)
+// ОБНОВЛЕНИЕ СТАТУСА
+app.post('/updateStatus', async (req, res) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    const { userId, isOnline } = req.body;
+    
+    const user = users.get(userId);
+    if (user) {
+        const icon = isOnline !== false ? '🟢' : '⚫️';
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: GROUP_CHAT_ID,
+                message_thread_id: user.topicId,
+                name: `${icon} ${window.location?.hostname || 'website'}`
+            })
+        }).catch(() => {});
+    }
+    res.json({ ok: true });
+});
+
+// ПОЛУЧЕНИЕ ОТВЕТОВ
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { offset, userId } = req.query;
-    const currentOffset = parseInt(offset) || 0;
+    const currentOffset = parseInt(offset) || lastUpdateId;
     
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=30`;
@@ -130,7 +211,6 @@ app.get('/getUpdates', async (req, res) => {
         
         if (data.ok && data.result) {
             const filtered = [];
-            let maxUpdateId = currentOffset;
             
             for (const update of data.result) {
                 const msg = update.message;
@@ -138,10 +218,8 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const topicUserId = topicToUser.get(topicId);
                     
-                    // Пропускаем сообщения от бота
                     if (msg.from && msg.from.is_bot) continue;
-                    // Пропускаем системные сообщения
-                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
+                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил') || msg.text.includes('changed the topic name'))) continue;
                     
                     if (topicUserId && (!userId || topicUserId === userId)) {
                         const messageData = {
@@ -153,7 +231,6 @@ app.get('/getUpdates', async (req, res) => {
                             }
                         };
                         
-                        // Обработка фото
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -167,13 +244,13 @@ app.get('/getUpdates', async (req, res) => {
                         }
                         
                         filtered.push(messageData);
+                        lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
                     }
                 }
-                maxUpdateId = Math.max(maxUpdateId, update.update_id + 1);
             }
             
             data.result = filtered;
-            console.log(`📨 Отправлено ${filtered.length} сообщений для userId: ${userId}`);
+            console.log(`📨 Отправлено ${filtered.length} сообщений`);
         }
         res.json(data);
     } catch (err) {
