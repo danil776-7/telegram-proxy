@@ -49,8 +49,8 @@
             max-width: calc(100vw - 48px);
             max-height: calc(100vh - 48px);
             background: white;
-            border-radius: 32px;
-            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3), 0 0 0 1px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
             overflow: hidden;
@@ -96,6 +96,10 @@
             flex-shrink: 0;
         }
         
+        .chat-header-info {
+            flex: 1;
+        }
+        
         .chat-header-info h3 {
             font-size: 18px;
             font-weight: 600;
@@ -111,7 +115,7 @@
         
         .header-buttons {
             display: flex;
-            gap: 12px;
+            gap: 8px;
         }
         
         .clear-btn, .close-btn {
@@ -143,7 +147,6 @@
             -webkit-overflow-scrolling: touch;
         }
         
-        /* Стилизация скролла */
         .chat-messages::-webkit-scrollbar {
             width: 5px;
         }
@@ -186,6 +189,17 @@
             align-self: flex-start;
             border-bottom-left-radius: 4px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        .system-message {
+            background: #e9eef3;
+            color: #4a5b6e;
+            align-self: center;
+            max-width: 90%;
+            font-size: 12px;
+            padding: 8px 14px;
+            border-radius: 60px;
+            text-align: center;
         }
         
         .message img {
@@ -277,7 +291,7 @@
             align-items: center;
             justify-content: center;
             z-index: 20;
-            border-radius: 32px;
+            border-radius: 28px;
             padding: 24px;
         }
         
@@ -415,7 +429,7 @@
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Готов к работе</div>
+        <div class="status online" id="status">🟢 Загрузка...</div>
     </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
@@ -430,21 +444,22 @@
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9 },
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10 },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9 },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10 },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9 },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10 },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10 },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10 },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9 },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10 }
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/ },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, pattern: /^[0-9]{10}$/ },
+            { code: 'ES', name: '🇪🇸 Испания', phoneCode: '+34', maxDigits: 9, pattern: /^[0-9]{9}$/ }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
         if (!userId) {
-            userId = 'user_' + Date.now();
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
             localStorage.setItem('chat_user_id', userId);
         }
         
@@ -452,78 +467,99 @@
         let isRegistered = !!userPhone;
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let userIp = '';
-        let detectedCountry = 'NL';
-        let detectedCountryName = 'Нидерланды';
+        let detectedCountry = null;
+        let detectedCountryName = '';
         
+        // Функция для определения ГЕО (улучшенная)
         async function detectGeo() {
             try {
+                // Получаем IP
                 const ipRes = await fetch('https://api.ipify.org?format=json');
                 const ipData = await ipRes.json();
                 userIp = ipData.ip;
                 
+                // Получаем точную геолокацию
                 const geoRes = await fetch(`https://ipapi.co/${userIp}/json/`);
                 const geoData = await geoRes.json();
+                
                 if (geoData && geoData.country_code) {
                     detectedCountry = geoData.country_code;
                     detectedCountryName = geoData.country_name;
-                    console.log(`📍 Ваш регион: ${detectedCountryName}`);
+                    console.log(`📍 Ваш регион: ${detectedCountryName} (${detectedCountry})`);
+                } else {
+                    // Fallback
+                    detectedCountry = 'NL';
+                    detectedCountryName = 'Нидерланды';
                 }
-                document.getElementById('status').innerHTML = `🟢 ${detectedCountryName}`;
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
+                detectedCountry = 'NL';
+                detectedCountryName = 'Нидерланды';
             }
+            
+            document.getElementById('status').innerHTML = `🟢 ${detectedCountryName}`;
+            return { country: detectedCountry, name: detectedCountryName };
         }
         
-        detectGeo();
-        
-        const widget = document.getElementById('chatWidget');
-        const clearBtn = document.getElementById('clearBtn');
-        const closeBtn = document.querySelector('.close-btn');
-        const messagesDiv = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const fileBtn = document.getElementById('fileBtn');
-        const fileInput = document.getElementById('fileInput');
-        const statusDiv = document.getElementById('status');
-        
-        function addMessage(text, isUser, isImage = false, imageUrl = null, timestamp = null) {
+        // Функция добавления сообщения
+        function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null) {
             const div = document.createElement('div');
-            div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
             
-            if (isImage && imageUrl) {
-                const img = document.createElement('img');
-                img.src = imageUrl;
-                img.onclick = () => window.open(imageUrl, '_blank');
-                div.appendChild(img);
-                if (text) div.appendChild(document.createTextNode(' ' + text));
-            } else {
+            if (isSystem) {
+                div.className = 'message system-message';
                 div.innerText = text;
+            } else {
+                div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+                
+                if (isImage && imageUrl) {
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.onclick = () => window.open(imageUrl, '_blank');
+                    div.appendChild(img);
+                    if (text) div.appendChild(document.createTextNode(' ' + text));
+                } else {
+                    div.innerText = text;
+                }
+                
+                const timeSpan = document.createElement('div');
+                timeSpan.className = 'message-time';
+                // Используем правильное время (из Telegram или текущее локальное)
+                let displayDate;
+                if (timestamp) {
+                    displayDate = new Date(timestamp * 1000);
+                } else {
+                    displayDate = new Date();
+                }
+                timeSpan.innerText = displayDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+                div.appendChild(timeSpan);
             }
-            
-            const timeSpan = document.createElement('div');
-            timeSpan.className = 'message-time';
-            const date = timestamp ? new Date(timestamp * 1000) : new Date();
-            timeSpan.innerText = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-            div.appendChild(timeSpan);
             
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             
+            // Сохраняем в историю
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, isImage, imageUrl, time: Date.now() });
+            history.push({ text, isUser, isSystem, isImage, imageUrl, time: Date.now() });
             localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
         }
         
+        function addSystemMessage(text) {
+            addMessage(text, false, true);
+        }
+        
         function setStatus(text) {
+            const statusDiv = document.getElementById('status');
             if (statusDiv) statusDiv.innerHTML = text;
         }
         
+        // Обновление статуса (с защитой от спама)
         let lastStatusUpdate = 0;
+        let currentStatus = false;
         async function updateActivity(isOnline, isActive) {
             const now = Date.now();
-            // Отправляем статус не чаще чем раз в 30 секунд (чтобы не спамить)
-            if (now - lastStatusUpdate < 30000 && !isActive) return;
+            if (now - lastStatusUpdate < 30000 && currentStatus === isOnline) return;
             lastStatusUpdate = now;
+            currentStatus = isOnline;
             
             try {
                 await fetch(`${PROXY_URL}/updateStatus`, {
@@ -534,6 +570,7 @@
             } catch (err) {}
         }
         
+        // Регистрация с телефоном
         async function registerPhone(phone, countryCode, countryName) {
             setStatus('⏳ Регистрация...');
             try {
@@ -555,6 +592,7 @@
                     localStorage.setItem('user_phone', phone);
                     isRegistered = true;
                     setStatus('🟢 Онлайн');
+                    addSystemMessage('✅ Вы успешно подключены к поддержке');
                     addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
                     updateActivity(true, true);
                     return true;
@@ -567,6 +605,7 @@
             }
         }
         
+        // Форма ввода телефона
         function showPhoneForm() {
             const oldOverlay = document.querySelector('.phone-overlay');
             if (oldOverlay) oldOverlay.remove();
@@ -575,8 +614,8 @@
             overlay.className = 'phone-overlay';
             overlay.innerHTML = `
                 <div class="phone-card">
-                    <h4>Чат с поддержкой</h4>
-                    <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам</p>
+                    <h4>📱 Чат с поддержкой</h4>
+                    <p>Оставьте номер телефона, чтобы мы могли ответить вам</p>
                     <div class="phone-input-wrapper">
                         <select class="country-select" id="countrySelect">
                             ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" ${c.code === detectedCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
@@ -594,15 +633,19 @@
             const phoneError = document.getElementById('phoneError');
             const phoneSubmit = document.getElementById('phoneSubmit');
             
-            let currentMaxDigits = 9;
-            let currentPhoneCode = '+31';
-            let currentCountryName = 'Нидерланды';
+            let currentCountry = countries.find(c => c.code === detectedCountry) || countries[0];
+            let currentMaxDigits = currentCountry.maxDigits;
+            let currentPhoneCode = currentCountry.phoneCode;
+            let currentCountryName = currentCountry.name;
+            let currentPattern = currentCountry.pattern;
             
             function updateCountry() {
-                const selected = countrySelect.options[countrySelect.selectedIndex];
-                currentMaxDigits = parseInt(selected.getAttribute('data-maxdigits'));
-                currentPhoneCode = selected.getAttribute('data-phonecode');
-                currentCountryName = selected.getAttribute('data-name');
+                const selectedCode = countrySelect.options[countrySelect.selectedIndex].value;
+                currentCountry = countries.find(c => c.code === selectedCode);
+                currentMaxDigits = currentCountry.maxDigits;
+                currentPhoneCode = currentCountry.phoneCode;
+                currentCountryName = currentCountry.name;
+                currentPattern = currentCountry.pattern;
                 phoneInput.maxLength = currentMaxDigits;
                 phoneInput.placeholder = `${currentMaxDigits} цифр`;
                 phoneInput.value = '';
@@ -618,15 +661,24 @@
                     value = value.slice(0, currentMaxDigits);
                 }
                 this.value = value;
+                phoneError.style.display = 'none';
             };
             
             phoneSubmit.onclick = async function() {
                 const digits = phoneInput.value.replace(/\D/g, '');
                 if (!digits || digits.length !== currentMaxDigits) {
-                    phoneError.textContent = `Введите ровно ${currentMaxDigits} цифр`;
+                    phoneError.textContent = `❌ Введите ровно ${currentMaxDigits} цифр`;
                     phoneError.style.display = 'block';
                     return;
                 }
+                
+                // Проверка по паттерну страны
+                if (!currentPattern.test(digits)) {
+                    phoneError.textContent = `❌ Неверный формат номера для ${currentCountryName}`;
+                    phoneError.style.display = 'block';
+                    return;
+                }
+                
                 const fullPhone = currentPhoneCode + digits;
                 
                 phoneError.style.display = 'none';
@@ -639,12 +691,13 @@
                 } else {
                     phoneSubmit.disabled = false;
                     phoneSubmit.textContent = 'Начать чат';
-                    phoneError.textContent = 'Ошибка. Попробуйте позже.';
+                    phoneError.textContent = '❌ Ошибка сервера. Попробуйте позже.';
                     phoneError.style.display = 'block';
                 }
             };
         }
         
+        // Отправка в Telegram
         async function sendToTelegram(text, imageBase64 = null) {
             if (!isRegistered) {
                 showPhoneForm();
@@ -673,22 +726,31 @@
             }
         }
         
+        // Получение ответов (включая фото)
+        let lastFetchTime = 0;
         async function checkReplies() {
             try {
                 const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
                 const data = await response.json();
                 if (data.ok && data.result) {
                     for (const update of data.result) {
-                        lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                        if (update.message && (update.message.text || update.message.hasImage)) {
-                            if (update.message.text && (update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || update.message.text.includes('закрепил'))) continue;
-                            addMessage(
-                                update.message.text || '📷 Изображение', 
-                                false, 
-                                update.message.hasImage || false, 
-                                update.message.imageUrl || null,
-                                update.message.date
-                            );
+                        if (update.update_id > lastUpdateId) {
+                            lastUpdateId = update.update_id;
+                            if (update.message) {
+                                // Пропускаем системные сообщения о регистрации
+                                if (update.message.text && update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
+                                if (update.message.text && update.message.text.includes('закрепил')) continue;
+                                
+                                // Добавляем сообщение с правильным временем из Telegram
+                                addMessage(
+                                    update.message.text || '📷 Изображение', 
+                                    false, 
+                                    false,
+                                    update.message.hasImage || false, 
+                                    update.message.imageUrl || null,
+                                    update.message.date  // Передаём timestamp из Telegram
+                                );
+                            }
                         }
                     }
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
@@ -698,5 +760,99 @@
             }
         }
         
+        // Инициализация
+        const widget = document.getElementById('chatWidget');
+        const clearBtn = document.getElementById('clearBtn');
+        const closeBtn = document.querySelector('.close-btn');
+        const messagesDiv = document.getElementById('chatMessages');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const fileBtn = document.getElementById('fileBtn');
+        const fileInput = document.getElementById('fileInput');
+        
+        // Открытие/закрытие виджета
         widget.onclick = (e) => {
-           
+            if (widget.classList.contains('closed')) {
+                widget.classList.remove('closed');
+                e.stopPropagation();
+            }
+        };
+        
+        closeBtn.onclick = (e) => {
+            widget.classList.add('closed');
+            e.stopPropagation();
+        };
+        
+        clearBtn.onclick = (e) => {
+            messagesDiv.innerHTML = '<div class="status online" id="status">🟢 Онлайн</div>';
+            localStorage.removeItem('chat_history');
+            e.stopPropagation();
+        };
+        
+        // Отправка сообщения
+        sendBtn.onclick = () => {
+            const text = messageInput.value.trim();
+            if (text) {
+                sendToTelegram(text);
+                messageInput.value = '';
+            }
+        };
+        
+        messageInput.onkeypress = (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        };
+        
+        // Отправка фото
+        fileBtn.onclick = () => fileInput.click();
+        fileInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    sendToTelegram('', event.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+            fileInput.value = '';
+        };
+        
+        // Отслеживание активности
+        let activeTimeout;
+        function onUserActivity() {
+            updateActivity(true, true);
+            clearTimeout(activeTimeout);
+            activeTimeout = setTimeout(() => updateActivity(true, false), 5000);
+        }
+        
+        document.addEventListener('click', onUserActivity);
+        document.addEventListener('scroll', onUserActivity);
+        messageInput.addEventListener('focus', onUserActivity);
+        
+        // Запуск
+        detectGeo().then(() => {
+            if (userPhone) {
+                isRegistered = true;
+                setStatus('🟢 Онлайн');
+                updateActivity(true, true);
+            } else {
+                setTimeout(() => {
+                    if (!isRegistered) showPhoneForm();
+                }, 500);
+            }
+        });
+        
+        // Проверка новых сообщений каждые 2 секунды
+        setInterval(checkReplies, 2000);
+        
+        // Загрузка истории
+        const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        savedHistory.forEach(msg => {
+            if (msg.isSystem) addSystemMessage(msg.text);
+            else addMessage(msg.text, msg.isUser, false, msg.isImage, msg.imageUrl);
+        });
+    })();
+</script>
+</body>
+</html>
