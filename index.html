@@ -404,7 +404,7 @@
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
-        <div class="status online" id="status">🟢 Готов к работе</div>
+        <div class="status online" id="status">🟢 Определение страны...</div>
     </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
@@ -419,21 +419,17 @@
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, placeholder: '612 345 678' },
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, placeholder: '912 345 67 89' },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, placeholder: '50 123 45 67' },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, placeholder: '701 234 56 78' },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, placeholder: '29 123 45 67' },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, placeholder: '212 555 12 34' },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, placeholder: '77 1234 5678' },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, placeholder: '151 234 567 89' },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, placeholder: '6 12 34 56 78' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, placeholder: '312 345 67 89' }
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9 },
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10 },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9 },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10 },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9 },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10 },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10 },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10 },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9 },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10 }
         ];
-        
-        // Очищаем историю при загрузке
-        localStorage.removeItem('chat_history');
-        localStorage.removeItem('chat_lastUpdateId');
         
         let userId = localStorage.getItem('chat_user_id');
         if (!userId) {
@@ -445,35 +441,41 @@
         let isRegistered = !!userPhone;
         let lastUpdateId = 0;
         let userIp = '';
-        let userCountryCode = 'NL';
-        let userCountryName = 'Нидерланды';
+        let detectedCountry = 'NL';
+        let detectedCountryName = 'Нидерланды';
         
-        // Определение геолокации
+        // Определение геолокации по IP
         async function detectGeo() {
             try {
-                const response = await fetch('https://ipapi.co/json/');
-                const data = await response.json();
-                if (data && data.country_code) {
-                    userIp = data.ip;
-                    userCountryCode = data.country_code;
-                    userCountryName = data.country_name;
-                    console.log('📍 Геолокация:', userCountryName);
+                // Получаем IP
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                userIp = ipData.ip;
+                
+                // Определяем страну по IP
+                const geoRes = await fetch(`https://ipapi.co/${userIp}/json/`);
+                const geoData = await geoRes.json();
+                
+                if (geoData && geoData.country_code) {
+                    detectedCountry = geoData.country_code;
+                    detectedCountryName = geoData.country_name;
+                    console.log(`📍 Определена страна: ${detectedCountryName} (${detectedCountry})`);
                     
+                    // Обновляем выбранную страну в списке
                     const countrySelect = document.getElementById('countrySelect');
                     if (countrySelect) {
                         for (let i = 0; i < countrySelect.options.length; i++) {
-                            if (countrySelect.options[i].value === userCountryCode) {
+                            if (countrySelect.options[i].value === detectedCountry) {
                                 countrySelect.selectedIndex = i;
                                 break;
                             }
                         }
                     }
                 }
+                setStatus(`🟢 ${detectedCountryName}`);
             } catch (error) {
                 console.error('Ошибка геолокации:', error);
-                const ipRes = await fetch('https://api.ipify.org?format=json');
-                const ipData = await ipRes.json();
-                userIp = ipData.ip;
+                setStatus('🟢 Онлайн');
             }
         }
         
@@ -517,7 +519,7 @@
             if (statusDiv) statusDiv.innerHTML = text;
         }
         
-        async function registerPhone(phone, countryName) {
+        async function registerPhone(phone, countryCode, countryName) {
             setStatus('⏳ Регистрация...');
             try {
                 const response = await fetch(`${PROXY_URL}/register`, {
@@ -561,7 +563,7 @@
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам</p>
                     <div class="phone-input-wrapper">
                         <select class="country-select" id="countrySelect">
-                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" ${c.code === userCountryCode ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
+                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" ${c.code === detectedCountry ? 'selected' : ''}>${c.name} ${c.phoneCode}</option>`).join('')}
                         </select>
                         <input type="tel" class="phone-input" id="phoneInput" placeholder="" maxlength="10" inputmode="numeric">
                     </div>
@@ -615,7 +617,7 @@
                 phoneSubmit.disabled = true;
                 phoneSubmit.textContent = 'Проверка...';
                 
-                const success = await registerPhone(fullPhone, currentCountryName);
+                const success = await registerPhone(fullPhone, currentPhoneCode, currentCountryName);
                 if (success) {
                     overlay.remove();
                 } else {
