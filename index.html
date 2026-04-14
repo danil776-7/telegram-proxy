@@ -38,7 +38,6 @@
         
         p { color: #666; line-height: 1.5; font-size: 16px; }
         
-        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
@@ -83,7 +82,6 @@
         
         .chat-widget.closed .open-icon { display: flex; }
         
-        /* Шапка виджета */
         .chat-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -131,7 +129,6 @@
         
         .clear-btn:hover, .close-btn:hover { background: rgba(255,255,255,0.3); }
         
-        /* Область сообщений */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -189,7 +186,6 @@
             text-align: right;
         }
         
-        /* Поле ввода */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -249,7 +245,6 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         
-        /* Форма ввода телефона */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -281,7 +276,7 @@
         .phone-card p {
             font-size: 14px;
             color: #666;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             line-height: 1.5;
         }
         
@@ -289,16 +284,18 @@
             display: flex;
             gap: 12px;
             margin-bottom: 16px;
+            align-items: center;
         }
         
         .country-select {
             flex: 1;
             padding: 14px 12px;
-            font-size: 16px;
+            font-size: 15px;
             border: 1px solid #ddd;
             border-radius: 12px;
             background: #f8f9fa;
             cursor: pointer;
+            min-width: 110px;
         }
         
         .phone-input {
@@ -310,7 +307,9 @@
             border-radius: 12px;
             background: #f8f9fa;
             font-family: monospace;
-            letter-spacing: 1px;
+            letter-spacing: 2px;
+            min-width: 0;
+            width: 100%;
         }
         
         .phone-input:focus {
@@ -332,13 +331,15 @@
             margin-top: 16px;
         }
         
+        .phone-submit:active { transform: scale(0.98); }
+        .phone-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        
         .error-text {
             color: #dc3545;
             font-size: 12px;
             margin-top: 8px;
         }
         
-        /* ========== АДАПТАЦИЯ ДЛЯ ТЕЛЕФОНОВ ========== */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -364,111 +365,32 @@
                 padding: 10px 14px;
             }
             
-            .message img {
-                max-height: 150px;
-            }
-            
-            .chat-header h3 {
-                font-size: 18px;
-            }
-            
-            .chat-header p {
-                font-size: 11px;
-            }
-            
-            .chat-input {
-                font-size: 14px;
-                padding: 10px 14px;
-            }
-            
-            .send-btn, .file-btn {
-                padding: 10px 14px;
-                min-width: 40px;
-                min-height: 40px;
-            }
-            
-            .phone-card {
-                padding: 16px;
-            }
-            
-            .phone-card h4 {
-                font-size: 20px;
-            }
-            
-            .phone-card p {
-                font-size: 13px;
-                margin-bottom: 20px;
-            }
-            
-            .phone-input-wrapper {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .country-select {
-                width: 100%;
-                padding: 12px 10px;
-                font-size: 14px;
-            }
-            
-            .phone-input {
-                width: 100%;
-                padding: 12px 10px;
-                font-size: 16px;
-            }
-            
-            .phone-submit {
-                padding: 12px 20px;
-                font-size: 15px;
-            }
-            
-            .status {
-                font-size: 11px;
-                padding: 6px 12px;
-            }
+            .message img { max-height: 150px; }
+            .chat-header h3 { font-size: 18px; }
+            .chat-header p { font-size: 11px; }
+            .chat-input { font-size: 14px; padding: 10px 14px; }
+            .send-btn, .file-btn { padding: 10px 14px; min-width: 40px; min-height: 40px; }
+            .phone-card { padding: 16px; }
+            .phone-card h4 { font-size: 20px; }
+            .phone-card p { font-size: 13px; margin-bottom: 16px; }
+            .phone-input-wrapper { flex-direction: column; gap: 10px; }
+            .country-select { width: 100%; padding: 12px 10px; font-size: 14px; min-width: auto; }
+            .phone-input { width: 100%; padding: 12px 10px; font-size: 16px; letter-spacing: 1px; }
+            .phone-submit { padding: 12px 20px; font-size: 15px; }
+            .status { font-size: 11px; padding: 6px 12px; }
         }
         
-        /* ========== АДАПТАЦИЯ ДЛЯ ПЛАНШЕТОВ ========== */
         @media (min-width: 481px) and (max-width: 768px) {
-            .chat-widget {
-                width: 450px;
-                height: 650px;
-            }
-            
-            .phone-input-wrapper {
-                gap: 12px;
-            }
-            
-            .country-select {
-                font-size: 15px;
-                padding: 13px 11px;
-            }
-            
-            .phone-input {
-                font-size: 17px;
-                padding: 13px 11px;
-            }
+            .chat-widget { width: 450px; height: 650px; }
+            .phone-input-wrapper { gap: 12px; }
+            .country-select { font-size: 15px; padding: 13px 11px; }
+            .phone-input { font-size: 17px; padding: 13px 11px; }
         }
         
-        /* ========== АДАПТАЦИЯ ДЛЯ КОМПЬЮТЕРОВ ========== */
         @media (min-width: 769px) {
-            .chat-widget {
-                width: 450px;
-                height: 700px;
-            }
-            
-            .message {
-                max-width: 75%;
-                font-size: 16px;
-            }
-            
-            .message img {
-                max-height: 250px;
-            }
-            
-            .phone-input-wrapper {
-                gap: 15px;
-            }
+            .chat-widget { width: 450px; height: 700px; }
+            .message { max-width: 75%; font-size: 16px; }
+            .message img { max-height: 250px; }
         }
     </style>
 </head>
@@ -504,16 +426,16 @@
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const countries = [
-            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, placeholder: '9123456789' },
-            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, placeholder: '612345678' },
-            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, placeholder: '501234567' },
-            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, placeholder: '7012345678' },
-            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, placeholder: '291234567' },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, placeholder: '2125551234' },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, placeholder: '7712345678' },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, placeholder: '15123456789' },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, placeholder: '612345678' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, placeholder: '3123456789' }
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, placeholder: '912 345 67 89' },
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, placeholder: '612 345 678' },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, placeholder: '50 123 45 67' },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, placeholder: '701 234 56 78' },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, placeholder: '29 123 45 67' },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, placeholder: '212 555 12 34' },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, placeholder: '77 1234 5678' },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, placeholder: '151 234 567 89' },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, placeholder: '6 12 34 56 78' },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, placeholder: '312 345 67 89' }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -618,9 +540,9 @@
                     <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам</p>
                     <div class="phone-input-wrapper">
                         <select class="country-select" id="countrySelect">
-                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-placeholder="${c.placeholder}" data-name="${c.name}">${c.name} ${c.phoneCode}</option>`).join('')}
+                            ${countries.map(c => `<option value="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}">${c.name} ${c.phoneCode}</option>`).join('')}
                         </select>
-                        <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10" inputmode="numeric">
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="" maxlength="10" inputmode="numeric">
                     </div>
                     <div id="phoneError" class="error-text" style="display: none;"></div>
                     <button class="phone-submit" id="phoneSubmit">Начать чат</button>
@@ -643,7 +565,7 @@
                 currentPhoneCode = selected.getAttribute('data-phonecode');
                 currentCountryName = selected.getAttribute('data-name');
                 phoneInput.maxLength = currentMaxDigits;
-                phoneInput.placeholder = selected.getAttribute('data-placeholder');
+                phoneInput.placeholder = `${currentMaxDigits} цифр`;
                 phoneInput.value = '';
                 phoneError.style.display = 'none';
             }
@@ -657,12 +579,29 @@
                     value = value.slice(0, currentMaxDigits);
                 }
                 this.value = value;
+                // Автоматическое форматирование для лучшего вида
+                if (value.length > 0) {
+                    let formatted = value;
+                    if (currentMaxDigits === 10 && value.length >= 3) {
+                        formatted = value.slice(0, 3) + ' ' + value.slice(3);
+                    }
+                    if (currentMaxDigits === 10 && value.length >= 6) {
+                        formatted = value.slice(0, 3) + ' ' + value.slice(3, 6) + ' ' + value.slice(6);
+                    }
+                    if (currentMaxDigits === 9 && value.length >= 2) {
+                        formatted = value.slice(0, 2) + ' ' + value.slice(2);
+                    }
+                    if (currentMaxDigits === 9 && value.length >= 5) {
+                        formatted = value.slice(0, 2) + ' ' + value.slice(2, 5) + ' ' + value.slice(5);
+                    }
+                    this.style.letterSpacing = 'normal';
+                }
             };
             
             phoneSubmit.onclick = async function() {
-                const digits = phoneInput.value.trim();
+                const digits = phoneInput.value.replace(/\D/g, '');
                 if (!digits || digits.length !== currentMaxDigits) {
-                    phoneError.textContent = `Введите ${currentMaxDigits} цифр`;
+                    phoneError.textContent = `Введите ровно ${currentMaxDigits} цифр`;
                     phoneError.style.display = 'block';
                     return;
                 }
