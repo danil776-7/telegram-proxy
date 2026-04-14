@@ -240,245 +240,227 @@
 </div>
 
 <script>
-    (function() {
-        const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
+    const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
+    
+    let userId = localStorage.getItem('chat_user_id');
+    if (!userId) {
+        userId = 'user_' + Date.now();
+        localStorage.setItem('chat_user_id', userId);
+    }
+    
+    let userPhone = localStorage.getItem('user_phone');
+    let isRegistered = !!userPhone;
+    let lastUpdateId = 0;
+    let userIp = '';
+    
+    fetch('https://api.ipify.org?format=json')
+        .then(r => r.json())
+        .then(data => userIp = data.ip)
+        .catch(() => userIp = '185.92.181.97');
+    
+    const widget = document.getElementById('chatWidget');
+    const clearBtn = document.getElementById('clearBtn');
+    const closeBtn = document.querySelector('.close-btn');
+    const messagesDiv = document.getElementById('chatMessages');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const statusDiv = document.getElementById('status');
+    
+    function addMessage(text, isUser, timestamp = null) {
+        const div = document.createElement('div');
+        div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+        div.innerText = text;
         
-        let userId = localStorage.getItem('chat_user_id');
-        if (!userId) {
-            userId = 'user_' + Date.now();
-            localStorage.setItem('chat_user_id', userId);
-        }
+        const timeSpan = document.createElement('div');
+        timeSpan.className = 'message-time';
+        const date = timestamp ? new Date(timestamp * 1000) : new Date();
+        timeSpan.innerText = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        div.appendChild(timeSpan);
         
-        let userPhone = localStorage.getItem('user_phone');
-        let isRegistered = !!userPhone;
-        let lastUpdateId = 0;
+        messagesDiv.appendChild(div);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
         
-        // ПРАВИЛЬНАЯ ГЕОЛОКАЦИЯ (Нидерланды по умолчанию)
-        let userRegion = 'Нидерланды, Амстердам';
-        let userIp = '';
-        
-        fetch('https://api.ipify.org?format=json')
-            .then(r => r.json())
-            .then(data => userIp = data.ip)
-            .catch(() => userIp = '185.92.181.97');
-        
-        // Определяем страну по IP
-        fetch('https://ipapi.co/json/')
-            .then(r => r.json())
-            .then(data => {
-                if (data && data.country_code === 'NL') {
-                    userRegion = `Нидерланды, ${data.city || 'Амстердам'}`;
-                } else if (data && data.country_name) {
-                    userRegion = `${data.country_name}, ${data.city || ''}`;
-                }
-                console.log('📍 Геолокация:', userRegion);
-            })
-            .catch(() => console.log('📍 Геолокация по умолчанию: Нидерланды'));
-        
-        const widget = document.getElementById('chatWidget');
-        const clearBtn = document.getElementById('clearBtn');
-        const closeBtn = document.querySelector('.close-btn');
-        const messagesDiv = document.getElementById('chatMessages');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const statusDiv = document.getElementById('status');
-        
-        function addMessage(text, isUser, timestamp = null) {
-            const div = document.createElement('div');
-            div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-            div.innerText = text;
-            
-            const timeSpan = document.createElement('div');
-            timeSpan.className = 'message-time';
-            const date = timestamp ? new Date(timestamp * 1000) : new Date();
-            timeSpan.innerText = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-            div.appendChild(timeSpan);
-            
-            messagesDiv.appendChild(div);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-            
-            const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, time: Date.now() });
-            localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
-        }
-        
-        function setStatus(text) {
-            if (statusDiv) statusDiv.innerHTML = text;
-        }
-        
-        async function registerPhone(phone) {
-            setStatus('⏳ Регистрация...');
-            try {
-                const response = await fetch(`${PROXY_URL}/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId, 
-                        site: window.location.hostname, 
-                        ip: userIp, 
-                        phone, 
-                        region: userRegion 
-                    })
-                });
-                const data = await response.json();
-                console.log('Регистрация:', data);
-                if (data.ok) {
-                    userPhone = phone;
-                    localStorage.setItem('user_phone', phone);
-                    isRegistered = true;
-                    setStatus('🟢 Онлайн');
-                    addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
-                    return true;
-                }
-                return false;
-            } catch (err) {
-                console.error('Ошибка:', err);
-                setStatus('❌ Ошибка');
-                return false;
+        const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        history.push({ text, isUser, time: Date.now() });
+        localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
+    }
+    
+    function setStatus(text) {
+        if (statusDiv) statusDiv.innerHTML = text;
+    }
+    
+    async function registerPhone(phone) {
+        setStatus('⏳ Регистрация...');
+        try {
+            const response = await fetch(`${PROXY_URL}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    userId, 
+                    site: window.location.hostname, 
+                    ip: userIp, 
+                    phone, 
+                    region: 'Нидерланды, Амстердам'
+                })
+            });
+            const data = await response.json();
+            console.log('Регистрация:', data);
+            if (data.ok) {
+                userPhone = phone;
+                localStorage.setItem('user_phone', phone);
+                isRegistered = true;
+                setStatus('🟢 Онлайн');
+                addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false);
+                return true;
             }
+            return false;
+        } catch (err) {
+            console.error('Ошибка:', err);
+            setStatus('❌ Ошибка');
+            return false;
         }
+    }
+    
+    function showPhoneForm() {
+        const overlay = document.createElement('div');
+        overlay.className = 'phone-overlay';
+        overlay.innerHTML = `
+            <div class="phone-card">
+                <h4>Чат с поддержкой</h4>
+                <p>Оставьте свой номер, чтобы мы могли ответить вам</p>
+                <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10" inputmode="numeric">
+                <div id="phoneError" class="error-text" style="display: none;"></div>
+                <button class="phone-submit" id="phoneSubmit">Начать чат</button>
+            </div>
+        `;
+        widget.appendChild(overlay);
         
-        function showPhoneForm() {
-            const overlay = document.createElement('div');
-            overlay.className = 'phone-overlay';
-            overlay.innerHTML = `
-                <div class="phone-card">
-                    <h4>Чат с поддержкой</h4>
-                    <p>Оставьте свой номер, чтобы мы могли ответить вам</p>
-                    <input type="tel" class="phone-input" id="phoneInput" placeholder="1234567890" maxlength="10" inputmode="numeric">
-                    <div id="phoneError" class="error-text" style="display: none;"></div>
-                    <button class="phone-submit" id="phoneSubmit">Начать чат</button>
-                </div>
-            `;
-            widget.appendChild(overlay);
-            
-            const phoneInput = document.getElementById('phoneInput');
-            const phoneError = document.getElementById('phoneError');
-            const phoneSubmit = document.getElementById('phoneSubmit');
-            
-            phoneInput.oninput = function() {
-                this.value = this.value.replace(/\D/g, '').slice(0, 10);
-            };
-            
-            phoneSubmit.onclick = async function() {
-                const digits = phoneInput.value.trim();
-                if (!digits || digits.length !== 10) {
-                    phoneError.textContent = 'Введите 10 цифр';
-                    phoneError.style.display = 'block';
-                    return;
-                }
-                const fullPhone = '+7' + digits;
-                phoneError.style.display = 'none';
-                phoneSubmit.disabled = true;
-                phoneSubmit.textContent = 'Проверка...';
-                const success = await registerPhone(fullPhone);
-                if (success) {
-                    overlay.remove();
-                } else {
-                    phoneSubmit.disabled = false;
-                    phoneSubmit.textContent = 'Начать чат';
-                    phoneError.textContent = 'Ошибка. Попробуйте позже.';
-                    phoneError.style.display = 'block';
-                }
-            };
-        }
+        const phoneInput = document.getElementById('phoneInput');
+        const phoneError = document.getElementById('phoneError');
+        const phoneSubmit = document.getElementById('phoneSubmit');
         
-        async function sendToTelegram(text) {
-            if (!isRegistered) {
-                showPhoneForm();
+        phoneInput.oninput = function() {
+            this.value = this.value.replace(/\D/g, '').slice(0, 10);
+        };
+        
+        phoneSubmit.onclick = async function() {
+            const digits = phoneInput.value.trim();
+            if (!digits || digits.length !== 10) {
+                phoneError.textContent = 'Введите 10 цифр';
+                phoneError.style.display = 'block';
                 return;
             }
-            addMessage(text, true);
-            setStatus('⏳ Отправка...');
-            try {
-                const response = await fetch(`${PROXY_URL}/send`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        userId, 
-                        site: window.location.hostname, 
-                        text: text
-                    })
-                });
-                const data = await response.json();
-                console.log('Отправка:', data);
-                if (data.ok) setStatus('🟢 Онлайн');
-                else throw new Error();
-            } catch (err) {
-                setStatus('🔴 Ошибка');
-                setTimeout(() => setStatus('🟢 Онлайн'), 3000);
+            const fullPhone = '+7' + digits;
+            phoneError.style.display = 'none';
+            phoneSubmit.disabled = true;
+            phoneSubmit.textContent = 'Проверка...';
+            const success = await registerPhone(fullPhone);
+            if (success) {
+                overlay.remove();
+            } else {
+                phoneSubmit.disabled = false;
+                phoneSubmit.textContent = 'Начать чат';
+                phoneError.textContent = 'Ошибка. Попробуйте позже.';
+                phoneError.style.display = 'block';
             }
+        };
+    }
+    
+    async function sendToTelegram(text) {
+        if (!isRegistered) {
+            showPhoneForm();
+            return;
         }
-        
-        async function checkReplies() {
-            try {
-                const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}`);
-                const data = await response.json();
-                if (data.ok && data.result) {
-                    for (const update of data.result) {
-                        lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
-                        if (update.message && update.message.text && 
-                            !update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
-                            addMessage(update.message.text, false, update.message.date);
-                        }
+        addMessage(text, true);
+        setStatus('⏳ Отправка...');
+        try {
+            const response = await fetch(`${PROXY_URL}/send`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    userId, 
+                    site: window.location.hostname, 
+                    text: text
+                })
+            });
+            const data = await response.json();
+            console.log('Отправка:', data);
+            if (data.ok) setStatus('🟢 Онлайн');
+            else throw new Error();
+        } catch (err) {
+            setStatus('🔴 Ошибка');
+            setTimeout(() => setStatus('🟢 Онлайн'), 3000);
+        }
+    }
+    
+    async function checkReplies() {
+        try {
+            const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}`);
+            const data = await response.json();
+            if (data.ok && data.result) {
+                for (const update of data.result) {
+                    lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
+                    if (update.message && update.message.text && 
+                        !update.message.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
+                        addMessage(update.message.text, false, update.message.date);
                     }
                 }
-            } catch (err) {
-                console.error('Ошибка:', err);
             }
+        } catch (err) {
+            console.error('Ошибка:', err);
         }
-        
-        function loadHistory() {
-            const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-                div.innerText = msg.text;
-                const timeSpan = document.createElement('div');
-                timeSpan.className = 'message-time';
-                timeSpan.innerText = new Date(msg.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-                div.appendChild(timeSpan);
-                messagesDiv.appendChild(div);
-            });
-            if (history.length === 0 && isRegistered) {
-                setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false), 500);
-            }
+    }
+    
+    function loadHistory() {
+        const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+        history.forEach(msg => {
+            const div = document.createElement('div');
+            div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+            div.innerText = msg.text;
+            const timeSpan = document.createElement('div');
+            timeSpan.className = 'message-time';
+            timeSpan.innerText = new Date(msg.time).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            div.appendChild(timeSpan);
+            messagesDiv.appendChild(div);
+        });
+        if (history.length === 0 && isRegistered) {
+            setTimeout(() => addMessage('Здравствуйте! Напишите ваш вопрос, и мы ответим в течение пары минут.', false), 500);
         }
-        
-        widget.onclick = (e) => {
-            if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
-                widget.classList.remove('closed');
-                if (!isRegistered) setTimeout(() => showPhoneForm(), 100);
-            }
-        };
-        
-        if (closeBtn) closeBtn.onclick = () => widget.classList.add('closed');
-        if (clearBtn) clearBtn.onclick = () => {
-            if (confirm('Очистить историю чата?')) {
-                localStorage.clear();
-                location.reload();
-            }
-        };
-        
-        sendBtn.onclick = () => {
+    }
+    
+    widget.onclick = (e) => {
+        if (widget.classList.contains('closed') && e.target.closest('.open-icon')) {
+            widget.classList.remove('closed');
+            if (!isRegistered) setTimeout(() => showPhoneForm(), 100);
+        }
+    };
+    
+    if (closeBtn) closeBtn.onclick = () => widget.classList.add('closed');
+    if (clearBtn) clearBtn.onclick = () => {
+        if (confirm('Очистить историю чата?')) {
+            localStorage.clear();
+            location.reload();
+        }
+    };
+    
+    sendBtn.onclick = () => {
+        const text = messageInput.value.trim();
+        if (text) sendToTelegram(text);
+        messageInput.value = '';
+    };
+    
+    messageInput.onkeypress = (e) => {
+        if (e.key === 'Enter') {
             const text = messageInput.value.trim();
             if (text) sendToTelegram(text);
             messageInput.value = '';
-        };
-        
-        messageInput.onkeypress = (e) => {
-            if (e.key === 'Enter') {
-                const text = messageInput.value.trim();
-                if (text) sendToTelegram(text);
-                messageInput.value = '';
-            }
-        };
-        
-        loadHistory();
-        setInterval(checkReplies, 5000);
-        
-        if (!isRegistered) setTimeout(() => showPhoneForm(), 500);
-    })();
+        }
+    };
+    
+    loadHistory();
+    setInterval(checkReplies, 5000);
+    
+    if (!isRegistered) setTimeout(() => showPhoneForm(), 500);
 </script>
 </body>
 </html>
