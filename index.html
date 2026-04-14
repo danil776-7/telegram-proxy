@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Тест чата</title>
+    <title>Чат с поддержкой</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -174,16 +174,10 @@
 </div>
 
 <script>
-    // ПРОСТЕЙШАЯ ВЕРСИЯ - ВСЁ РАБОТАЕТ
+    // ПРОСТАЯ РАБОЧАЯ ВЕРСИЯ
     const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
     let userId = 'user_' + Date.now();
-    let userIp = '';
     let isRegistered = false;
-    
-    fetch('https://api.ipify.org?format=json')
-        .then(r => r.json())
-        .then(data => userIp = data.ip)
-        .catch(() => userIp = '127.0.0.1');
     
     const widget = document.getElementById('chatWidget');
     const closeBtn = document.querySelector('.close-btn');
@@ -205,7 +199,11 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId, site: window.location.hostname, ip: userIp, phone, region: 'Россия'
+                    userId: userId,
+                    site: window.location.hostname,
+                    ip: '185.92.181.97',
+                    phone: phone,
+                    region: 'Россия'
                 })
             });
             const data = await response.json();
@@ -270,13 +268,21 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    userId, site: window.location.hostname, ip: userIp, text, region: 'Россия'
+                    userId: userId,
+                    site: window.location.hostname,
+                    ip: '185.92.181.97',
+                    text: text,
+                    region: 'Россия'
                 })
             });
             const data = await response.json();
             console.log('Отправка:', data);
+            if (!data.ok) {
+                addMessage('Ошибка отправки. Попробуйте позже.', false);
+            }
         } catch (err) {
             console.error('Ошибка:', err);
+            addMessage('Ошибка соединения. Попробуйте позже.', false);
         }
     }
     
