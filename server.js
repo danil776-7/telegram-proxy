@@ -12,19 +12,8 @@ const GROUP_CHAT_ID = -1003765383331;
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
-const userData = new Map();
-
-async function callTelegram(method, params) {
-    const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
-    });
-    const data = await response.json();
-    console.log(`📡 ${method}:`, data.ok ? 'OK' : 'ERROR', data.description || '');
-    return data;
-}
+// Простое хранилище
+const users = new Map();
 
 app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Proxy работает!' });
@@ -32,94 +21,82 @@ app.get('/', (req, res) => {
 
 // РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
-    console.log('📞 РЕГИСТРАЦИЯ ПОЛУЧЕНА:', req.body);
+    console.log('📞 РЕГИСТРАЦИЯ:', req.body);
     const { userId, ip, phone, region } = req.body;
     
     if (!phone) {
-        console.log('❌ Нет телефона');
         return res.status(400).json({ ok: false, error: 'phone required' });
     }
     
     try {
         // Создаём топик
-        const topic = await callTelegram('createForumTopic', {
-            chat_id: GROUP_CHAT_ID,
-            name: `👤 ${userId.substring(0, 20)}`
-        });
+        const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: GROUP_CHAT_ID,
+                name: `👤 ${userId.substring(0, 20)}`
+            })
+        }).then(r => r.json());
         
         if (!topic.ok) {
+            console.error('Ошибка создания топика:', topic);
             return res.status(500).json({ ok: false, error: topic.description });
         }
         
         const topicId = topic.result.message_thread_id;
-        userData.set(ip, { topicId, phone, region, userId });
+        users.set(ip, { topicId, phone, region, userId });
         
         const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
         
-        // Отправляем информацию о пользователе
-        const infoText = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 **ID:** ${userId}\n📡 **IP:** ${ip}\n📍 **Регион:** ${region || 'не определён'}\n📞 **Телефон:** ${phone}\n⏰ **Время:** ${time}`;
+        // Отправляем информацию
+        const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: GROUP_CHAT_ID,
+                message_thread_id: topicId,
+                text: `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 ID: ${userId}\n📡 IP: ${ip}\n📍 Регион: ${region || 'не определён'}\n📞 Телефон: ${phone}\n⏰ Время: ${time}`,
+                parse_mode: 'Markdown'
+            })
+        }).then(r => r.json());
         
-        console.log('📤 Отправка информации в топик:', topicId);
-        const sent = await callTelegram('sendMessage', {
-            chat_id: GROUP_CHAT_ID,
-            message_thread_id: topicId,
-            text: infoText,
-            parse_mode: 'Markdown'
-        });
-        
-        if (sent.ok) {
-            console.log('✅ Информация отправлена!');
-        } else {
-            console.log('❌ Ошибка отправки информации:', sent);
-        }
-        
+        console.log('✅ Информация отправлена, ok:', sent.ok);
         res.json({ ok: true, topicId });
         
     } catch (err) {
-        console.error('❌ Ошибка:', err);
+        console.error('Ошибка:', err);
         res.status(500).json({ ok: false, error: err.message });
     }
 });
 
 // ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
-    console.log('📨 СООБЩЕНИЕ ПОЛУЧЕНО:', { userId: req.body.userId, ip: req.body.ip, text: req.body.text?.substring(0, 50) });
+    console.log('📨 СООБЩЕНИЕ:', { ip: req.body.ip, text: req.body.text?.substring(0, 50) });
     const { userId, ip, text, imageBase64 } = req.body;
     
-    const data = userData.get(ip);
-    if (!data) {
+    const user = users.get(ip);
+    if (!user) {
         console.log('❌ Нет регистрации для IP:', ip);
         return res.status(400).json({ ok: false, error: 'Please register first' });
     }
     
     try {
-        if (imageBase64) {
-            const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
-            if (matches) {
-                const buffer = Buffer.from(matches[2], 'base64');
-                const formData = new FormData();
-                formData.append('chat_id', GROUP_CHAT_ID);
-                formData.append('message_thread_id', data.topicId);
-                formData.append('photo', new Blob([buffer]), 'image.jpg');
-                if (text) formData.append('caption', `💬 **${userId}:**\n\n${text}`);
-                
-                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-                    method: 'POST',
-                    body: formData
-                });
-            }
-        } else if (text) {
-            await callTelegram('sendMessage', {
+        const sent = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
-                message_thread_id: data.topicId,
+                message_thread_id: user.topicId,
                 text: `💬 **${userId}:**\n\n${text}`,
                 parse_mode: 'Markdown'
-            });
-        }
-        console.log('✅ Сообщение отправлено');
+            })
+        }).then(r => r.json());
+        
+        console.log('✅ Сообщение отправлено, ok:', sent.ok);
         res.json({ ok: true });
     } catch (err) {
-        console.error('❌ Ошибка:', err);
+        console.error('Ошибка:', err);
         res.status(500).json({ ok: false });
     }
 });
