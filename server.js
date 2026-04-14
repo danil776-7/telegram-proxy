@@ -12,24 +12,18 @@ const GROUP_CHAT_ID = -1003765383331;
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
-// Хранилище
 const userData = new Map();
 
 async function callTelegram(method, params) {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/${method}`;
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(params)
-        });
-        const data = await response.json();
-        console.log(`📡 ${method}:`, data.ok ? 'OK' : 'ERROR', data.description || '');
-        return data;
-    } catch (err) {
-        console.error(`❌ Ошибка ${method}:`, err);
-        return { ok: false, error: err.message };
-    }
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+    });
+    const data = await response.json();
+    console.log(`📡 ${method}:`, data.ok ? 'OK' : 'ERROR', data.description || '');
+    return data;
 }
 
 app.get('/', (req, res) => {
@@ -38,10 +32,11 @@ app.get('/', (req, res) => {
 
 // РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
-    console.log('📞 РЕГИСТРАЦИЯ:', req.body);
+    console.log('📞 РЕГИСТРАЦИЯ ПОЛУЧЕНА:', req.body);
     const { userId, ip, phone, region } = req.body;
     
     if (!phone) {
+        console.log('❌ Нет телефона');
         return res.status(400).json({ ok: false, error: 'phone required' });
     }
     
@@ -62,14 +57,22 @@ app.post('/register', async (req, res) => {
         const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Moscow' });
         
         // Отправляем информацию о пользователе
-        await callTelegram('sendMessage', {
+        const infoText = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 **ID:** ${userId}\n📡 **IP:** ${ip}\n📍 **Регион:** ${region || 'не определён'}\n📞 **Телефон:** ${phone}\n⏰ **Время:** ${time}`;
+        
+        console.log('📤 Отправка информации в топик:', topicId);
+        const sent = await callTelegram('sendMessage', {
             chat_id: GROUP_CHAT_ID,
             message_thread_id: topicId,
-            text: `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n🆔 **ID:** ${userId}\n📡 **IP:** ${ip}\n📍 **Регион:** ${region || 'не определён'}\n📞 **Телефон:** ${phone}\n⏰ **Время:** ${time}`,
+            text: infoText,
             parse_mode: 'Markdown'
         });
         
-        console.log('✅ Регистрация успешна, топик:', topicId);
+        if (sent.ok) {
+            console.log('✅ Информация отправлена!');
+        } else {
+            console.log('❌ Ошибка отправки информации:', sent);
+        }
+        
         res.json({ ok: true, topicId });
         
     } catch (err) {
@@ -80,7 +83,7 @@ app.post('/register', async (req, res) => {
 
 // ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
-    console.log('📨 СООБЩЕНИЕ:', { userId: req.body.userId, ip: req.body.ip, text: req.body.text?.substring(0, 50) });
+    console.log('📨 СООБЩЕНИЕ ПОЛУЧЕНО:', { userId: req.body.userId, ip: req.body.ip, text: req.body.text?.substring(0, 50) });
     const { userId, ip, text, imageBase64 } = req.body;
     
     const data = userData.get(ip);
@@ -128,26 +131,6 @@ app.get('/getUpdates', async (req, res) => {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
         const response = await fetch(url);
         const data = await response.json();
-        
-        if (data.ok && data.result) {
-            const filtered = [];
-            for (const update of data.result) {
-                const msg = update.message;
-                if (msg && msg.chat.id === GROUP_CHAT_ID && !msg.from?.is_bot) {
-                    if (msg.text && !msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
-                        filtered.push({
-                            update_id: update.update_id,
-                            message: {
-                                text: msg.text || '',
-                                from: msg.from?.first_name || 'Поддержка',
-                                date: msg.date
-                            }
-                        });
-                    }
-                }
-            }
-            data.result = filtered;
-        }
         res.json(data);
     } catch (err) {
         res.status(500).json({ ok: false });
