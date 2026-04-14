@@ -23,7 +23,6 @@
             align-items: center;
             padding: 16px;
             -webkit-text-size-adjust: 100%;
-            touch-action: pan-y pinch-zoom;
         }
         
         .demo-content {
@@ -70,7 +69,6 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1000;
             font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-            touch-action: pan-y pinch-zoom;
         }
         
         .chat-widget.closed {
@@ -280,7 +278,7 @@
             line-height: 1.5;
         }
         
-        /* ========== ПОЛЕ ВВОДА (фикс сжатия экрана) ========== */
+        /* ========== ПОЛЕ ВВОДА ========== */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -312,7 +310,7 @@
         /* Запрещаем масштабирование на телефонах */
         @media (max-width: 768px) {
             .chat-input, .phone-input, .custom-select-trigger {
-                font-size: 16px;
+                font-size: 16px !important;
             }
             input, textarea, select {
                 font-size: 16px !important;
@@ -610,17 +608,16 @@
                 padding: 10px 14px; 
             }
             
+            .message img { 
+                max-height: 150px; 
+            }
+            
             .phone-overlay {
                 padding: 24px 20px;
             }
             
             .phone-card h4 {
                 font-size: 22px;
-            }
-            
-            /* Запрещаем масштабирование */
-            input, textarea, select {
-                font-size: 16px !important;
             }
         }
         
@@ -633,8 +630,8 @@
         
         @media (min-width: 769px) {
             .chat-widget { 
-                width: 420px; 
-                height: 680px; 
+                width: 440px; 
+                height: 700px; 
             }
             
             .message { 
@@ -643,10 +640,6 @@
         }
         
         /* Запрет на выделение элементов на телефонах */
-        .no-tap-highlight {
-            -webkit-tap-highlight-color: transparent;
-        }
-        
         button, input, textarea, select {
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
@@ -693,19 +686,26 @@
 
 <script>
     (function() {
-        const PROXY_URL = 'http://localhost:3000'; // Ваш сервер
+        const PROXY_URL = 'http://localhost:3000';
         
+        // РАЗНАЯ ДЛИНА НОМЕРА ДЛЯ КАЖДОЙ СТРАНЫ
         const countries = [
-            { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'BY', name: 'Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'GB', name: 'Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'DE', name: 'Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'FR', name: 'Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/ }
+            { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 34 56 789' },
+            { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
+            { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '912 345 67 89' },
+            { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
+            { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '712 345 67 89' },
+            { code: 'BY', name: '🇧🇾 Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '212 555 1234' },
+            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '7911 123456' },
+            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '151 12345678' },
+            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '6 12 34 56 78' },
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '312 345 6789' },
+            { code: 'ES', name: '🇪🇸 Испания', phoneCode: '+34', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '612 34 56 78' },
+            { code: 'PL', name: '🇵🇱 Польша', phoneCode: '+48', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '512 345 678' },
+            { code: 'TR', name: '🇹🇷 Турция', phoneCode: '+90', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '531 123 45 67' },
+            { code: 'AE', name: '🇦🇪 ОАЭ', phoneCode: '+971', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '50 123 4567' },
+            { code: 'IN', name: '🇮🇳 Индия', phoneCode: '+91', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '98765 43210' }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -721,14 +721,17 @@
         let detectedCountry = null;
         let detectedCountryName = '';
         
+        // Форматирование времени Amsterdam
         function formatMessageTime(timestamp) {
             const date = timestamp ? new Date(timestamp * 1000) : new Date();
             return date.toLocaleTimeString('ru-RU', { 
                 hour: '2-digit', 
-                minute: '2-digit'
+                minute: '2-digit',
+                timeZone: 'Europe/Amsterdam'
             });
         }
         
+        // Геолокация
         async function detectGeo() {
             try {
                 const ipRes = await fetch('https://api.ipify.org?format=json');
@@ -762,6 +765,7 @@
             return { country: detectedCountry, name: detectedCountryName };
         }
         
+        // Добавление сообщения
         function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
             const messagesDiv = document.getElementById('chatMessages');
             if (!messagesDiv) return;
@@ -809,6 +813,7 @@
             addMessage(text, false, true);
         }
         
+        // Модальное окно очистки
         function showClearConfirm() {
             const widget = document.getElementById('chatWidget');
             const existingOverlay = document.querySelector('.clear-confirm-overlay');
@@ -858,6 +863,7 @@
             }, 100);
         }
         
+        // Форма телефона
         function showPhoneForm() {
             const widget = document.getElementById('chatWidget');
             const oldOverlay = document.querySelector('.phone-overlay');
@@ -887,7 +893,7 @@
                         </div>
                         <div class="phone-input-wrapper">
                             <span class="phone-code" id="phoneCodeDisplay">${currentCountryObj.phoneCode}</span>
-                            <input type="tel" class="phone-input" id="phoneInput" placeholder="12 34 56 78" inputmode="numeric">
+                            <input type="tel" class="phone-input" id="phoneInput" placeholder="${currentCountryObj.mask}" inputmode="numeric">
                         </div>
                         <div id="phoneError" class="error-text" style="display: none;"></div>
                     </div>
@@ -930,7 +936,7 @@
                     selectedCountryCode.innerText = currentPhoneCode;
                     phoneCodeDisplay.innerText = currentPhoneCode;
                     phoneInput.maxLength = currentMaxDigits;
-                    phoneInput.placeholder = ' '.repeat(currentMaxDigits).split('').join(' ');
+                    phoneInput.placeholder = '_'.repeat(currentMaxDigits).split('').join(' ');
                     phoneInput.value = '';
                     phoneError.style.display = 'none';
                     selectDropdown.classList.remove('show');
@@ -946,26 +952,37 @@
                 if (value.length > currentMaxDigits) {
                     value = value.slice(0, currentMaxDigits);
                 }
-                let formatted = '';
-                for (let i = 0; i < value.length; i++) {
-                    if (i > 0 && i % 2 === 0) formatted += ' ';
-                    formatted += value[i];
-                }
-                this.value = formatted;
+                this.value = value;
                 phoneError.style.display = 'none';
+                
+                if (value.length > 0 && value.length < currentMaxDigits) {
+                    phoneError.style.display = 'block';
+                    phoneError.style.color = '#8e8e93';
+                    phoneError.textContent = `Осталось ${currentMaxDigits - value.length} цифр из ${currentMaxDigits}`;
+                }
             };
             
             phoneSubmit.onclick = async function() {
                 const digits = phoneInput.value.replace(/\D/g, '');
-                if (!digits || digits.length !== currentMaxDigits) {
-                    phoneError.textContent = `❌ Неверно указан номер телефона`;
+                
+                if (!digits || digits.length === 0) {
                     phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = `❌ Введите номер телефона`;
+                    return;
+                }
+                
+                if (digits.length !== currentMaxDigits) {
+                    phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = `❌ Для ${currentCountryName} нужно ввести ровно ${currentMaxDigits} цифр (сейчас ${digits.length})`;
                     return;
                 }
                 
                 if (!currentPattern.test(digits)) {
-                    phoneError.textContent = `❌ Неверный формат номера для ${currentCountryName}`;
                     phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = `❌ Неверный формат номера для ${currentCountryName}`;
                     return;
                 }
                 
@@ -973,7 +990,7 @@
                 
                 phoneError.style.display = 'none';
                 phoneSubmit.disabled = true;
-                phoneSubmit.textContent = 'Проверка...';
+                phoneSubmit.textContent = 'Регистрация...';
                 
                 const success = await registerPhone(fullPhone, currentPhoneCode, currentCountryName);
                 if (success) {
@@ -981,8 +998,9 @@
                 } else {
                     phoneSubmit.disabled = false;
                     phoneSubmit.textContent = 'Начать чат';
-                    phoneError.textContent = '❌ Ошибка сервера. Попробуйте позже.';
                     phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = '❌ Ошибка сервера. Попробуйте позже.';
                 }
             };
         }
@@ -1011,6 +1029,7 @@
                     isRegistered = true;
                     addSystemMessage('✅ Вы успешно подключены к поддержке');
                     addMessage('Здравствуйте! Подскажите, о чем вы хотели бы спросить?', false, false, false, null, null, 'Оператор Анна');
+                    updateActivity(true, true);
                     return true;
                 } else {
                     console.error('Ошибка регистрации:', data.error);
@@ -1030,6 +1049,7 @@
             if (!text && !imageBase64) return;
             if (text) addMessage(text, true);
             else addMessage('📷 Изображение', true);
+            updateActivity(true, true);
             
             try {
                 await fetch(`${PROXY_URL}/send`, {
@@ -1056,6 +1076,23 @@
                     }
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                 }
+            } catch (err) {}
+        }
+        
+        let lastStatusUpdate = 0;
+        let currentStatus = false;
+        async function updateActivity(isOnline, isActive) {
+            if (!isRegistered) return;
+            const now = Date.now();
+            if (now - lastStatusUpdate < 30000 && currentStatus === isOnline) return;
+            lastStatusUpdate = now;
+            currentStatus = isOnline;
+            try {
+                await fetch(`${PROXY_URL}/updateStatus`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, isOnline, isActive })
+                });
             } catch (err) {}
         }
         
@@ -1092,9 +1129,21 @@
             };
         }
         
+        let activeTimeout;
+        function onUserActivity() {
+            if (isRegistered) {
+                updateActivity(true, true);
+                clearTimeout(activeTimeout);
+                activeTimeout = setTimeout(() => updateActivity(true, false), 5000);
+            }
+        }
+        document.addEventListener('click', onUserActivity);
+        if (messageInput) messageInput.addEventListener('focus', onUserActivity);
+        
         detectGeo().then(() => {
             if (userPhone) {
                 isRegistered = true;
+                updateActivity(true, true);
                 const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
                 if (savedHistory.length > 0) {
                     savedHistory.forEach(msg => {
