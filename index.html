@@ -2,12 +2,13 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
     <title>Чат с поддержкой</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             display: flex;
@@ -15,6 +16,7 @@
             align-items: center;
             padding: 16px;
         }
+        
         .content {
             text-align: center;
             padding: 40px 20px;
@@ -24,35 +26,51 @@
             width: 100%;
             box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
         }
-        h1 { font-size: 28px; margin-bottom: 16px; }
-        p { color: #666; font-size: 16px; }
         
+        h1 { 
+            font-size: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 16px;
+        }
+        
+        p { color: #666; line-height: 1.5; font-size: 16px; }
+        
+        /* ========== ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            width: 380px;
-            height: 600px;
+            width: 400px;
+            height: 650px;
+            max-width: calc(100vw - 40px);
+            max-height: calc(100vh - 40px);
             background: white;
-            border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            border-radius: 28px;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 1000;
         }
+        
         .chat-widget.closed {
             width: 60px;
             height: 60px;
             border-radius: 30px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             cursor: pointer;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
         }
+        
         .chat-widget.closed .chat-header,
         .chat-widget.closed .chat-messages,
         .chat-widget.closed .chat-input-area,
         .chat-widget.closed .phone-overlay { display: none; }
+        
         .open-icon {
             display: none;
             width: 100%;
@@ -62,17 +80,32 @@
             font-size: 28px;
             color: white;
         }
+        
         .chat-widget.closed .open-icon { display: flex; }
         
+        /* Шапка виджета */
         .chat-header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            padding: 20px;
+            padding: 20px 20px 16px 20px;
             text-align: center;
+            flex-shrink: 0;
             position: relative;
         }
-        .chat-header h3 { font-size: 20px; margin-bottom: 4px; }
-        .chat-header p { font-size: 13px; opacity: 0.8; }
+        
+        .chat-header h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .chat-header p {
+            font-size: 13px;
+            opacity: 0.8;
+            color: white;
+            margin-top: 4px;
+        }
+        
         .header-buttons {
             position: absolute;
             top: 16px;
@@ -80,6 +113,7 @@
             display: flex;
             gap: 8px;
         }
+        
         .clear-btn, .close-btn {
             background: rgba(255,255,255,0.2);
             border: none;
@@ -92,8 +126,12 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            transition: background 0.2s;
         }
         
+        .clear-btn:hover, .close-btn:hover { background: rgba(255,255,255,0.3); }
+        
+        /* Область сообщений */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -102,32 +140,48 @@
             display: flex;
             flex-direction: column;
             gap: 12px;
+            -webkit-overflow-scrolling: touch;
         }
+        
         .message {
-            max-width: 80%;
-            padding: 10px 14px;
-            border-radius: 18px;
-            font-size: 14px;
+            max-width: 85%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            word-wrap: break-word;
+            animation: fadeIn 0.2s ease;
+            font-size: 15px;
             line-height: 1.4;
         }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
         .user-message {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             align-self: flex-end;
+            border-bottom-right-radius: 4px;
         }
+        
         .bot-message {
             background: white;
             color: #1a1a2e;
             align-self: flex-start;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
+        
         .message img {
             max-width: 100%;
-            max-height: 150px;
-            border-radius: 10px;
-            margin-top: 5px;
+            max-height: 200px;
+            border-radius: 12px;
+            margin-top: 8px;
             cursor: pointer;
+            object-fit: contain;
         }
+        
         .message-time {
             font-size: 10px;
             opacity: 0.6;
@@ -135,42 +189,67 @@
             text-align: right;
         }
         
+        /* Поле ввода */
         .chat-input-area {
             display: flex;
-            padding: 12px;
+            padding: 12px 16px;
             border-top: 1px solid #eef2f6;
             background: white;
-            gap: 8px;
+            gap: 10px;
+            align-items: center;
+            flex-shrink: 0;
         }
+        
         .chat-input {
             flex: 1;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 25px;
+            padding: 12px 16px;
+            border: 1px solid #e0e4e8;
+            border-radius: 30px;
             outline: none;
-            font-size: 15px;
+            font-size: 16px;
+            transition: all 0.2s;
+            background: #f8f9fa;
         }
+        
+        .chat-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+            background: white;
+        }
+        
         .send-btn, .file-btn {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             border: none;
             color: white;
-            padding: 10px 16px;
-            border-radius: 25px;
+            padding: 12px 18px;
+            border-radius: 30px;
             cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.1s;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+        
         .file-btn { background: #6c757d; }
+        .send-btn:active, .file-btn:active { transform: scale(0.96); }
         
         .status {
             font-size: 12px;
-            padding: 8px;
+            padding: 8px 14px;
             text-align: center;
             background: #d4edda;
             color: #155724;
             border-radius: 20px;
+            margin-bottom: 8px;
             width: fit-content;
             align-self: center;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }
         
+        /* Форма ввода телефона */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -182,53 +261,69 @@
             align-items: center;
             justify-content: center;
             z-index: 20;
-            border-radius: 24px;
+            border-radius: 28px;
             padding: 20px;
         }
+        
         .phone-card {
             text-align: center;
             width: 100%;
             max-width: 340px;
         }
-        .phone-card h4 { font-size: 24px; margin-bottom: 12px; color: #333; }
-        .phone-card p { font-size: 14px; color: #666; margin-bottom: 16px; }
+        
+        .phone-card h4 {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .phone-card p {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
         
         .phone-input-wrapper {
             display: flex;
-            align-items: center;
-            gap: 10px;
+            gap: 12px;
             margin-bottom: 16px;
         }
+        
         .country-select {
             flex: 1;
-            padding: 14px;
+            padding: 14px 12px;
             font-size: 16px;
             border: 1px solid #ddd;
             border-radius: 12px;
             background: #f8f9fa;
             cursor: pointer;
         }
+        
         .phone-input {
             flex: 2;
-            padding: 14px;
+            padding: 14px 12px;
             font-size: 18px;
             text-align: center;
             border: 1px solid #ddd;
             border-radius: 12px;
             background: #f8f9fa;
             font-family: monospace;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
+        
         .phone-input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 2px rgba(102,126,234,0.2);
         }
+        
         .phone-submit {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            padding: 14px;
+            padding: 14px 24px;
             border-radius: 30px;
             font-size: 16px;
             font-weight: 600;
@@ -236,15 +331,144 @@
             width: 100%;
             margin-top: 16px;
         }
-        .error-text { color: #dc3545; font-size: 12px; margin-top: 8px; }
         
+        .error-text {
+            color: #dc3545;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        
+        /* ========== АДАПТАЦИЯ ДЛЯ ТЕЛЕФОНОВ ========== */
         @media (max-width: 480px) {
-            .chat-widget { width: 100%; height: 100%; bottom: 0; right: 0; border-radius: 0; }
-            .chat-widget.closed { width: 56px; height: 56px; bottom: 20px; right: 20px; border-radius: 28px; }
-            .message { max-width: 90%; }
-            .phone-input-wrapper { flex-direction: column; }
-            .country-select { width: 100%; }
-            .phone-input { width: 100%; }
+            .chat-widget {
+                width: 100%;
+                height: 100%;
+                bottom: 0;
+                right: 0;
+                border-radius: 0;
+                max-width: 100vw;
+                max-height: 100vh;
+            }
+            
+            .chat-widget.closed {
+                width: 56px;
+                height: 56px;
+                bottom: 20px;
+                right: 20px;
+                border-radius: 28px;
+            }
+            
+            .message {
+                max-width: 90%;
+                font-size: 14px;
+                padding: 10px 14px;
+            }
+            
+            .message img {
+                max-height: 150px;
+            }
+            
+            .chat-header h3 {
+                font-size: 18px;
+            }
+            
+            .chat-header p {
+                font-size: 11px;
+            }
+            
+            .chat-input {
+                font-size: 14px;
+                padding: 10px 14px;
+            }
+            
+            .send-btn, .file-btn {
+                padding: 10px 14px;
+                min-width: 40px;
+                min-height: 40px;
+            }
+            
+            .phone-card {
+                padding: 16px;
+            }
+            
+            .phone-card h4 {
+                font-size: 20px;
+            }
+            
+            .phone-card p {
+                font-size: 13px;
+                margin-bottom: 20px;
+            }
+            
+            .phone-input-wrapper {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .country-select {
+                width: 100%;
+                padding: 12px 10px;
+                font-size: 14px;
+            }
+            
+            .phone-input {
+                width: 100%;
+                padding: 12px 10px;
+                font-size: 16px;
+            }
+            
+            .phone-submit {
+                padding: 12px 20px;
+                font-size: 15px;
+            }
+            
+            .status {
+                font-size: 11px;
+                padding: 6px 12px;
+            }
+        }
+        
+        /* ========== АДАПТАЦИЯ ДЛЯ ПЛАНШЕТОВ ========== */
+        @media (min-width: 481px) and (max-width: 768px) {
+            .chat-widget {
+                width: 450px;
+                height: 650px;
+            }
+            
+            .phone-input-wrapper {
+                gap: 12px;
+            }
+            
+            .country-select {
+                font-size: 15px;
+                padding: 13px 11px;
+            }
+            
+            .phone-input {
+                font-size: 17px;
+                padding: 13px 11px;
+            }
+        }
+        
+        /* ========== АДАПТАЦИЯ ДЛЯ КОМПЬЮТЕРОВ ========== */
+        @media (min-width: 769px) {
+            .chat-widget {
+                width: 450px;
+                height: 700px;
+            }
+            
+            .message {
+                max-width: 75%;
+                font-size: 16px;
+            }
+            
+            .message img {
+                max-height: 250px;
+            }
+            
+            .phone-input-wrapper {
+                gap: 15px;
+            }
         }
     </style>
 </head>
@@ -268,7 +492,7 @@
         <div class="status online" id="status">🟢 Готов к работе</div>
     </div>
     <div class="chat-input-area">
-        <input type="text" class="chat-input" id="messageInput" placeholder="Ваше сообщение...">
+        <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение...">
         <button class="file-btn" id="fileBtn">📎</button>
         <button class="send-btn" id="sendBtn">➤</button>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
@@ -279,7 +503,6 @@
     (function() {
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
-        // Список стран с кодами
         const countries = [
             { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, placeholder: '9123456789' },
             { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, placeholder: '612345678' },
@@ -290,12 +513,7 @@
             { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, placeholder: '7712345678' },
             { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, placeholder: '15123456789' },
             { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, placeholder: '612345678' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, placeholder: '3123456789' },
-            { code: 'ES', name: '🇪🇸 Испания', phoneCode: '+34', maxDigits: 9, placeholder: '612345678' },
-            { code: 'TR', name: '🇹🇷 Турция', phoneCode: '+90', maxDigits: 10, placeholder: '5012345678' },
-            { code: 'CN', name: '🇨🇳 Китай', phoneCode: '+86', maxDigits: 11, placeholder: '13812345678' },
-            { code: 'IN', name: '🇮🇳 Индия', phoneCode: '+91', maxDigits: 10, placeholder: '9876543210' },
-            { code: 'BR', name: '🇧🇷 Бразилия', phoneCode: '+55', maxDigits: 11, placeholder: '11912345678' }
+            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, placeholder: '3123456789' }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -356,7 +574,7 @@
             if (statusDiv) statusDiv.innerHTML = text;
         }
         
-        async function registerPhone(phone, countryCode, regionName) {
+        async function registerPhone(phone, countryName) {
             setStatus('⏳ Регистрация...');
             try {
                 const response = await fetch(`${PROXY_URL}/register`, {
@@ -367,7 +585,7 @@
                         site: window.location.hostname, 
                         ip: userIp, 
                         phone: phone,
-                        region: regionName
+                        region: countryName
                     })
                 });
                 const data = await response.json();
@@ -449,13 +667,12 @@
                     return;
                 }
                 const fullPhone = currentPhoneCode + digits;
-                const regionName = `${currentCountryName}`;
                 
                 phoneError.style.display = 'none';
                 phoneSubmit.disabled = true;
                 phoneSubmit.textContent = 'Проверка...';
                 
-                const success = await registerPhone(fullPhone, currentPhoneCode, regionName);
+                const success = await registerPhone(fullPhone, currentCountryName);
                 if (success) {
                     overlay.remove();
                 } else {
