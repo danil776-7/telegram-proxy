@@ -298,7 +298,7 @@
                     })
                 });
                 const data = await response.json();
-                console.log('Регистрация:', data);
+                console.log('Регистрация ответ:', data);
                 if (data.ok) {
                     userPhone = phone;
                     localStorage.setItem('user_phone', phone);
@@ -309,6 +309,7 @@
                 }
                 return false;
             } catch (err) {
+                console.error('Ошибка регистрации:', err);
                 setStatus('❌ Ошибка');
                 return false;
             }
@@ -379,10 +380,11 @@
                     })
                 });
                 const data = await response.json();
-                console.log('Отправка:', data);
+                console.log('Отправка ответ:', data);
                 if (data.ok) setStatus('🟢 Онлайн');
                 else throw new Error();
             } catch (err) {
+                console.error('Ошибка отправки:', err);
                 setStatus('🔴 Ошибка');
                 setTimeout(() => setStatus('🟢 Онлайн'), 3000);
             }
