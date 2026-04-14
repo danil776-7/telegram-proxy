@@ -274,7 +274,7 @@
             line-height: 1.5;
         }
         
-        /* ========== ПОЛЕ ВВОДА (фикс сжатия экрана) ========== */
+        /* ========== ПОЛЕ ВВОДА ========== */
         .chat-input-area {
             display: flex;
             padding: 12px 16px;
@@ -303,9 +303,8 @@
             background: white;
         }
         
-        /* Запрещаем масштабирование на телефонах при фокусе */
         @media (max-width: 768px) {
-            .chat-input, .phone-input, .country-select {
+            .chat-input, .phone-input, .custom-select-trigger {
                 font-size: 16px;
             }
         }
@@ -335,7 +334,7 @@
             transform: scale(0.96); 
         }
         
-        /* ========== ФОРМА ТЕЛЕФОНА (исправленная верстка) ========== */
+        /* ========== ФОРМА ТЕЛЕФОНА ========== */
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -377,7 +376,6 @@
             margin-bottom: 24px;
         }
         
-        /* Кастомный выпадающий список (фикс дроплиста) */
         .custom-select {
             position: relative;
             width: 100%;
@@ -576,7 +574,7 @@
             color: white;
         }
         
-        /* ========== АДАПТИВ (фикс сжатия) ========== */
+        /* ========== АДАПТИВ ========== */
         @media (max-width: 480px) {
             .chat-widget {
                 width: 100%;
@@ -608,10 +606,6 @@
             
             .phone-card h4 {
                 font-size: 22px;
-            }
-            
-            .chat-input, .phone-input, .custom-select-trigger {
-                font-size: 16px;
             }
         }
         
@@ -676,17 +670,24 @@
     (function() {
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
+        // РАЗНОЕ КОЛИЧЕСТВО ЦИФР ДЛЯ КАЖДОЙ СТРАНЫ
         const countries = [
-            { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'BY', name: 'Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/ },
-            { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'GB', name: 'Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'DE', name: 'Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/ },
-            { code: 'FR', name: 'Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/ }
+            { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 34 56 789' },
+            { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
+            { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '912 345 67 89' },
+            { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
+            { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '712 345 67 89' },
+            { code: 'BY', name: 'Беларусь', phoneCode: '+375', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '12 345 67 89' },
+            { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(212) 555 1234' },
+            { code: 'GB', name: 'Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '7911 123456' },
+            { code: 'DE', name: 'Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '151 12345678' },
+            { code: 'FR', name: 'Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '6 12 34 56 78' },
+            { code: 'IT', name: 'Италия', phoneCode: '+39', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '312 345 6789' },
+            { code: 'ES', name: 'Испания', phoneCode: '+34', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '612 34 56 78' },
+            { code: 'PL', name: 'Польша', phoneCode: '+48', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '512 345 678' },
+            { code: 'TR', name: 'Турция', phoneCode: '+90', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '531 123 45 67' },
+            { code: 'AE', name: 'ОАЭ', phoneCode: '+971', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '50 123 4567' },
+            { code: 'IN', name: 'Индия', phoneCode: '+91', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '98765 43210' }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -840,7 +841,6 @@
             }, 100);
         }
         
-        // Исправленная форма телефона с кастомным дропдауном
         function showPhoneForm() {
             const widget = document.getElementById('chatWidget');
             const oldOverlay = document.querySelector('.phone-overlay');
@@ -862,15 +862,15 @@
                             </div>
                             <div class="custom-select-dropdown" id="selectDropdown">
                                 ${countries.map(c => `
-                                    <div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}">
-                                        ${c.name} ${c.phoneCode}
+                                    <div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" data-mask="${c.mask}">
+                                        ${c.name} ${c.phoneCode} (${c.maxDigits} цифр)
                                     </div>
                                 `).join('')}
                             </div>
                         </div>
                         <div class="phone-input-wrapper">
                             <span class="phone-code" id="phoneCodeDisplay">${currentCountryObj.phoneCode}</span>
-                            <input type="tel" class="phone-input" id="phoneInput" placeholder="12 34 56 78" inputmode="numeric">
+                            <input type="tel" class="phone-input" id="phoneInput" placeholder="${currentCountryObj.mask}" inputmode="numeric">
                         </div>
                         <div id="phoneError" class="error-text" style="display: none;"></div>
                     </div>
@@ -880,7 +880,6 @@
             `;
             widget.appendChild(overlay);
             
-            // Кастомный дропдаун
             const selectTrigger = document.getElementById('selectTrigger');
             const selectDropdown = document.getElementById('selectDropdown');
             const selectedCountryName = document.getElementById('selectedCountryName');
@@ -895,6 +894,7 @@
             let currentPhoneCode = currentCountry.phoneCode;
             let currentCountryName = currentCountry.name;
             let currentPattern = currentCountry.pattern;
+            let currentMask = currentCountry.mask;
             
             selectTrigger.onclick = (e) => {
                 e.stopPropagation();
@@ -909,12 +909,13 @@
                     currentPhoneCode = currentCountry.phoneCode;
                     currentCountryName = currentCountry.name;
                     currentPattern = currentCountry.pattern;
+                    currentMask = currentCountry.mask;
                     
                     selectedCountryName.innerText = currentCountryName;
                     selectedCountryCode.innerText = currentPhoneCode;
                     phoneCodeDisplay.innerText = currentPhoneCode;
                     phoneInput.maxLength = currentMaxDigits;
-                    phoneInput.placeholder = ' '.repeat(currentMaxDigits).split('').join(' ');
+                    phoneInput.placeholder = currentMask;
                     phoneInput.value = '';
                     phoneError.style.display = 'none';
                     selectDropdown.classList.remove('show');
@@ -925,31 +926,51 @@
                 selectDropdown.classList.remove('show');
             });
             
+            // Валидация ввода: только цифры и ограничение по количеству
             phoneInput.oninput = function() {
                 let value = this.value.replace(/\D/g, '');
                 if (value.length > currentMaxDigits) {
                     value = value.slice(0, currentMaxDigits);
                 }
-                let formatted = '';
-                for (let i = 0; i < value.length; i++) {
-                    if (i > 0 && i % 2 === 0) formatted += ' ';
-                    formatted += value[i];
-                }
-                this.value = formatted;
+                this.value = value;
                 phoneError.style.display = 'none';
+                
+                // Показываем подсказку о количестве цифр
+                if (value.length > 0 && value.length < currentMaxDigits) {
+                    phoneError.style.display = 'block';
+                    phoneError.style.color = '#8e8e93';
+                    phoneError.textContent = `Осталось ${currentMaxDigits - value.length} цифр из ${currentMaxDigits}`;
+                } else if (value.length === currentMaxDigits) {
+                    phoneError.style.display = 'none';
+                } else {
+                    phoneError.style.display = 'none';
+                }
             };
             
             phoneSubmit.onclick = async function() {
                 const digits = phoneInput.value.replace(/\D/g, '');
-                if (!digits || digits.length !== currentMaxDigits) {
-                    phoneError.textContent = `❌ Неверно указан номер телефона`;
+                
+                // Проверка на пустое поле
+                if (!digits || digits.length === 0) {
                     phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = `❌ Введите номер телефона`;
                     return;
                 }
                 
-                if (!currentPattern.test(digits)) {
-                    phoneError.textContent = `❌ Неверный формат номера для ${currentCountryName}`;
+                // Проверка на точное количество цифр
+                if (digits.length !== currentMaxDigits) {
                     phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = `❌ Для ${currentCountryName} нужно ввести ровно ${currentMaxDigits} цифр (сейчас ${digits.length})`;
+                    return;
+                }
+                
+                // Проверка по паттерну
+                if (!currentPattern.test(digits)) {
+                    phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = `❌ Неверный формат номера для ${currentCountryName}`;
                     return;
                 }
                 
@@ -965,8 +986,9 @@
                 } else {
                     phoneSubmit.disabled = false;
                     phoneSubmit.textContent = 'Начать чат';
-                    phoneError.textContent = '❌ Ошибка сервера. Попробуйте позже.';
                     phoneError.style.display = 'block';
+                    phoneError.style.color = '#ff3b30';
+                    phoneError.textContent = '❌ Ошибка сервера. Попробуйте позже.';
                 }
             };
         }
