@@ -14,7 +14,28 @@ console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
 const users = new Map();
 const topicToUser = new Map();
-let lastUpdateId = 0;
+let lastProcessedUpdateId = 0;
+const processedUpdates = new Set();
+
+// Функция для определения региона по IP
+async function getGeoByIp(ip) {
+    try {
+        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,region,query`);
+        const data = await response.json();
+        if (data.status === 'success') {
+            return {
+                country: data.country,
+                countryCode: data.countryCode,
+                city: data.city,
+                region: data.region,
+                ip: data.query
+            };
+        }
+    } catch (error) {
+        console.error('Ошибка определения геолокации:', error);
+    }
+    return { country: 'Неизвестно', countryCode: 'UN', city: '', region: '', ip: ip };
+}
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -32,6 +53,14 @@ app.post('/register', async (req, res) => {
     }
     
     try {
+        // Определяем геолокацию по IP
+        const geo = await getGeoByIp(ip);
+        const geoRegion = `${geo.country}${geo.city ? ', ' + geo.city : ''}${geo.region ? ' (' + geo.region + ')' : ''}`;
+        const finalRegion = region || geoRegion;
+        
+        console.log(`📍 IP: ${ip}, Регион: ${finalRegion}`);
+        
+        // Создаём топик
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -47,12 +76,18 @@ app.post('/register', async (req, res) => {
         }
         
         const topicId = topic.result.message_thread_id;
-        users.set(userId, { topicId, phone, region, ip });
+        users.set(userId, { topicId, phone, region: finalRegion, ip, geo });
         topicToUser.set(topicId, userId);
         
         const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Amsterdam' });
         
-        const messageText = `🔔 НОВЫЙ ПОЛЬЗОВАТЕЛЬ!\n\nID: ${userId}\nIP: ${ip}\nРегион: ${region || 'Нидерланды'}\nТелефон: ${phone}\nВремя: ${time}`;
+        // ОТПРАВЛЯЕМ ВСЮ ИНФОРМАЦИЮ В 1 СООБЩЕНИИ
+        const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n` +
+            `🆔 **ID:** ${userId}\n` +
+            `📡 **IP:** ${ip}\n` +
+            `📍 **Регион IP:** ${geoRegion}\n` +
+            `📞 **Телефон:** ${phone}\n` +
+            `⏰ **Время:** ${time}`;
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -60,12 +95,13 @@ app.post('/register', async (req, res) => {
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
                 message_thread_id: topicId,
-                text: messageText
+                text: infoMessage,
+                parse_mode: 'Markdown'
             })
         });
         
         console.log('✅ Регистрация успешна, userId:', userId);
-        res.json({ ok: true, topicId });
+        res.json({ ok: true, topicId, region: finalRegion });
         
     } catch (err) {
         console.error('Ошибка:', err);
@@ -73,7 +109,7 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// ОТПРАВКА СООБЩЕНИЯ (текст + фото)
+// ОТПРАВКА СООБЩЕНИЯ
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { userId, text, imageBase64 } = req.body;
@@ -93,26 +129,24 @@ app.post('/send', async (req, res) => {
                 formData.append('chat_id', GROUP_CHAT_ID);
                 formData.append('message_thread_id', user.topicId);
                 formData.append('photo', new Blob([buffer]), 'image.jpg');
-                if (text) formData.append('caption', `💬 ${userId}:\n\n${text}`);
+                if (text) formData.append('caption', `💬 **${userId}:**\n\n${text}`);
                 
-                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
                     method: 'POST',
                     body: formData
                 });
-                const result = await response.json();
-                console.log('📸 Фото отправлено, ok:', result.ok);
             }
         } else if (text) {
-            const result = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     chat_id: GROUP_CHAT_ID,
                     message_thread_id: user.topicId,
-                    text: `💬 ${userId}:\n\n${text}`
+                    text: `💬 **${userId}:**\n\n${text}`,
+                    parse_mode: 'Markdown'
                 })
-            }).then(r => r.json());
-            console.log('✅ Сообщение отправлено, ok:', result.ok);
+            });
         }
         res.json({ ok: true });
     } catch (err) {
@@ -121,11 +155,11 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// ПОЛУЧЕНИЕ ОТВЕТОВ ИЗ TELEGRAM (текст + фото)
+// ПОЛУЧЕНИЕ ОТВЕТОВ (с защитой от дублей)
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     const { offset, userId } = req.query;
-    const currentOffset = parseInt(offset) || lastUpdateId;
+    const currentOffset = parseInt(offset) || lastProcessedUpdateId;
     
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=30`;
@@ -136,6 +170,12 @@ app.get('/getUpdates', async (req, res) => {
             const filtered = [];
             
             for (const update of data.result) {
+                // Проверяем, не обрабатывали ли уже это обновление
+                if (processedUpdates.has(update.update_id)) {
+                    console.log(`⏭️ Пропускаем дубль: ${update.update_id}`);
+                    continue;
+                }
+                
                 const msg = update.message;
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
                     const topicId = msg.message_thread_id;
@@ -165,21 +205,25 @@ app.get('/getUpdates', async (req, res) => {
                                 if (fileData.ok) {
                                     messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
                                     messageData.message.hasImage = true;
-                                    console.log('📸 Фото получено для userId:', topicUserId);
                                 }
-                            } catch (err) {
-                                console.error('Ошибка получения фото:', err);
-                            }
+                            } catch (err) {}
                         }
                         
                         filtered.push(messageData);
-                        lastUpdateId = Math.max(lastUpdateId, update.update_id + 1);
+                        processedUpdates.add(update.update_id);
+                        lastProcessedUpdateId = Math.max(lastProcessedUpdateId, update.update_id + 1);
                     }
                 }
             }
             
+            // Очищаем старые ID (оставляем последние 100)
+            if (processedUpdates.size > 100) {
+                const toDelete = [...processedUpdates].slice(0, processedUpdates.size - 100);
+                toDelete.forEach(id => processedUpdates.delete(id));
+            }
+            
             data.result = filtered;
-            console.log(`📨 Отправлено ${filtered.length} сообщений`);
+            console.log(`📨 Отправлено ${filtered.length} новых сообщений`);
         }
         res.json(data);
     } catch (err) {
