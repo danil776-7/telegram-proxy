@@ -8,7 +8,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003911846697;
-const SITE_URL = 'https://danil776-7.github.io/telegram-proxy/'; 
+const SITE_URL = 'https://ваш-сайт.ru'; // Замените на ваш URL
 
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
@@ -17,11 +17,11 @@ const users = new Map();
 const topicToUser = new Map();
 let lastUpdateId = 0;
 
-// Функция для получения времени в часовом поясе пользователя (используем UTC+3 для Москвы, но лучше по IP)
-function getLocalTime(timestamp = null, timezone = 'Europe/Moscow') {
+// Функция для получения точного времени в Амстердаме (Нидерланды)
+function getAmsterdamTime(timestamp = null) {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
     return date.toLocaleString('ru-RU', {
-        timeZone: timezone,
+        timeZone: 'Europe/Amsterdam',
         year: 'numeric',
         month: '2-digit',
         day: '2-digit',
@@ -31,23 +31,15 @@ function getLocalTime(timestamp = null, timezone = 'Europe/Moscow') {
     });
 }
 
-// Определение часового пояса по IP
-async function getTimezoneByIp(ip) {
-    try {
-        const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,timezone`);
-        const data = await response.json();
-        if (data.status === 'success' && data.timezone) {
-            return data.timezone;
-        }
-    } catch (error) {}
-    return 'Europe/Amsterdam'; // По умолчанию Амстердам
-}
-
+// Улучшенное определение страны по IP (точное)
 async function getCountryByIp(ip) {
     try {
+        // Используем несколько сервисов для точности
         const response = await fetch(`http://ip-api.com/json/${ip}?fields=status,country,countryCode,city,timezone`);
         const data = await response.json();
+        
         if (data.status === 'success') {
+            console.log(`📍 IP ${ip} определён как: ${data.country} (${data.countryCode})`);
             return {
                 country: data.country,
                 countryCode: data.countryCode,
@@ -55,7 +47,22 @@ async function getCountryByIp(ip) {
                 timezone: data.timezone || 'Europe/Amsterdam'
             };
         }
-    } catch (error) {}
+        
+        // Fallback на другой сервис
+        const response2 = await fetch(`https://ipapi.co/${ip}/json/`);
+        const data2 = await response2.json();
+        if (data2 && data2.country_name) {
+            return {
+                country: data2.country_name,
+                countryCode: data2.country_code,
+                city: data2.city,
+                timezone: data2.timezone || 'Europe/Amsterdam'
+            };
+        }
+    } catch (error) {
+        console.error('Ошибка геолокации:', error);
+    }
+    
     return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
 }
 
@@ -74,21 +81,22 @@ app.post('/register', async (req, res) => {
     }
     
     try {
+        // Определяем точную геолокацию по IP
         let geo = { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
-        if (ip && ip !== '127.0.0.1') {
+        if (ip && ip !== '127.0.0.1' && ip !== '::1') {
             geo = await getCountryByIp(ip);
         }
         
         const finalRegion = `${geo.country}${geo.city ? ', ' + geo.city : ''}`;
-        const currentTime = getLocalTime(null, geo.timezone);
+        const currentTime = getAmsterdamTime();
         
-        // Создаём топик с иконкой статуса (🟢 для онлайн)
+        // Создаём топик с иконкой статуса и названием сайта
         const topic = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/createForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 chat_id: GROUP_CHAT_ID,
-                name: `🟢 ${SITE_URL.replace('https://', '')}`,
+                name: `🟢 ${SITE_URL.replace('https://', '').replace('http://', '')}`,
                 icon_color: 0x6FCF97
             })
         }).then(r => r.json());
@@ -107,7 +115,7 @@ app.post('/register', async (req, res) => {
             `🌍 **IP:** ${ip}\n` +
             `📍 **Регион:** ${finalRegion}\n` +
             `📞 **Телефон:** ${phone}\n` +
-            `🕐 **Время:** ${currentTime}\n` +
+            `🕐 **Время регистрации:** ${currentTime}\n` +
             `🌐 **Сайт:** ${SITE_URL}`;
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -121,6 +129,7 @@ app.post('/register', async (req, res) => {
             })
         });
         
+        console.log(`✅ Пользователь ${userId} зарегистрирован, страна: ${geo.country}`);
         res.json({ ok: true, topicId });
         
     } catch (err) {
@@ -168,11 +177,12 @@ app.post('/send', async (req, res) => {
         }
         res.json({ ok: true });
     } catch (err) {
+        console.error('Ошибка отправки:', err);
         res.status(500).json({ ok: false });
     }
 });
 
-// Обновление статуса - меняем название топика (иконка и ссылка сайта)
+// Обновление статуса - меняем иконку и название топика
 let lastStatus = new Map();
 app.post('/updateStatus', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
@@ -223,7 +233,9 @@ app.get('/getUpdates', async (req, res) => {
                     
                     // Пропускаем сообщения от ботов и системные
                     if (msg.from && msg.from.is_bot) continue;
-                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
+                    if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || 
+                                     msg.text.includes('закрепил') ||
+                                     msg.text.includes('editForumTopic'))) continue;
                     
                     if (topicUserId && (!userId || topicUserId === userId)) {
                         const messageData = {
@@ -231,11 +243,11 @@ app.get('/getUpdates', async (req, res) => {
                             message: {
                                 text: msg.caption || msg.text || '',
                                 from: msg.from?.first_name || 'Поддержка',
-                                date: msg.date // Сохраняем оригинальный timestamp из Telegram
+                                date: msg.date // Оригинальный timestamp из Telegram
                             }
                         };
                         
-                        // Обработка фото из Telegram
+                        // Обработка фото из Telegram в виджет
                         if (msg.photo && msg.photo.length > 0) {
                             try {
                                 const photo = msg.photo[msg.photo.length - 1];
@@ -272,4 +284,5 @@ app.listen(PORT, () => {
     console.log(`\n🚀 Сервер на порту ${PORT}\n`);
     console.log(`📡 Группа: ${GROUP_CHAT_ID}`);
     console.log(`🤖 Бот: ${BOT_TOKEN.substring(0, 10)}...`);
+    console.log(`🌍 Временная зона: Europe/Amsterdam\n`);
 });
