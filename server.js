@@ -2,14 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 
-// Настройки CORS - РАЗРЕШАЕМ ВСЁ
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+app.use(cors({ origin: '*', methods: ['GET', 'POST', 'OPTIONS'], allowedHeaders: ['Content-Type'] }));
 app.options('*', cors());
-
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
@@ -153,22 +147,30 @@ app.post('/send', async (req, res) => {
     }
 });
 
+// Обновление статуса - ТОЛЬКО при реальном изменении
+let lastStatus = new Map();
 app.post('/updateStatus', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    const { userId, isOnline } = req.body;
+    const { userId, isOnline, isActive } = req.body;
     
     const user = users.get(userId);
     if (user) {
-        const icon = isOnline !== false ? '🟢' : '⚫️';
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: user.topicId,
-                name: `${icon} website`
-            })
-        }).catch(() => {});
+        const prevStatus = lastStatus.get(userId) || false;
+        // Отправляем обновление ТОЛЬКО если статус изменился
+        if (prevStatus !== isOnline) {
+            lastStatus.set(userId, isOnline);
+            const icon = isOnline !== false ? '🟢' : '⚫️';
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: GROUP_CHAT_ID,
+                    message_thread_id: user.topicId,
+                    name: `${icon} website`
+                })
+            }).catch(() => {});
+            console.log(`🔄 Статус пользователя ${userId}: ${isOnline ? 'онлайн' : 'офлайн'}`);
+        }
     }
     res.json({ ok: true });
 });
