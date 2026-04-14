@@ -7,18 +7,20 @@ app.options('*', cors());
 app.use(express.json({ limit: '50mb' }));
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
-const GROUP_CHAT_ID = -1003911846697; // Убрал _1, оставил только цифры
+const GROUP_CHAT_ID = -1003911846697;
 
 console.log('🚀 СЕРВЕР ЗАПУЩЕН');
 console.log('📡 GROUP_CHAT_ID:', GROUP_CHAT_ID);
 
-const users = new Map();
+const users = new Map(); // userId -> { topicId, phone, region }
+const topicToUser = new Map(); // topicId -> userId
 
 app.get('/', (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.json({ status: 'ok', message: 'Proxy работает!' });
 });
 
+// РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
     console.log('📞 РЕГИСТРАЦИЯ:', req.body);
@@ -45,6 +47,7 @@ app.post('/register', async (req, res) => {
         
         const topicId = topic.result.message_thread_id;
         users.set(userId, { topicId, phone, region });
+        topicToUser.set(topicId, userId);
         
         const time = new Date().toLocaleString('ru-RU', { timeZone: 'Europe/Amsterdam' });
         
@@ -67,10 +70,11 @@ app.post('/register', async (req, res) => {
     }
 });
 
+// ОТПРАВКА СООБЩЕНИЯ (текст + фото)
 app.post('/send', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    const { userId, text } = req.body;
-    console.log('📨 СООБЩЕНИЕ от userId:', userId, 'текст:', text);
+    const { userId, text, imageBase64 } = req.body;
+    console.log('📨 СООБЩЕНИЕ от userId:', userId, 'текст:', text?.substring(0, 50), 'есть фото:', !!imageBase64);
     
     const user = users.get(userId);
     
@@ -80,28 +84,54 @@ app.post('/send', async (req, res) => {
     }
     
     try {
-        const result = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: user.topicId,
-                text: `💬 ${userId}:\n\n${text}`
-            })
-        }).then(r => r.json());
+        let result;
         
-        console.log('✅ Сообщение отправлено, ok:', result.ok);
-        res.json({ ok: result.ok });
+        if (imageBase64) {
+            // Отправка фото
+            const matches = imageBase64.match(/^data:image\/(\w+);base64,(.+)$/);
+            if (matches) {
+                const buffer = Buffer.from(matches[2], 'base64');
+                const formData = new FormData();
+                formData.append('chat_id', GROUP_CHAT_ID);
+                formData.append('message_thread_id', user.topicId);
+                formData.append('photo', new Blob([buffer]), 'image.jpg');
+                if (text) formData.append('caption', `💬 ${userId}:\n\n${text}`);
+                
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+                    method: 'POST',
+                    body: formData
+                });
+                result = await response.json();
+                console.log('📸 Фото отправлено, ok:', result.ok);
+            } else {
+                throw new Error('Invalid image format');
+            }
+        } else if (text) {
+            // Отправка текста
+            result = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_id: GROUP_CHAT_ID,
+                    message_thread_id: user.topicId,
+                    text: `💬 ${userId}:\n\n${text}`
+                })
+            }).then(r => r.json());
+            console.log('✅ Сообщение отправлено, ok:', result.ok);
+        }
+        
+        res.json({ ok: result?.ok || true });
         
     } catch (err) {
         console.error('Ошибка:', err);
-        res.status(500).json({ ok: false });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
+// ПОЛУЧЕНИЕ ОТВЕТОВ ИЗ TELEGRAM (текст + фото)
 app.get('/getUpdates', async (req, res) => {
     res.header('Access-Control-Allow-Origin', '*');
-    const { offset } = req.query;
+    const { offset, userId } = req.query;
     try {
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset || 0}&timeout=30`;
         const response = await fetch(url);
@@ -111,22 +141,51 @@ app.get('/getUpdates', async (req, res) => {
             const filtered = [];
             for (const update of data.result) {
                 const msg = update.message;
-                if (msg && msg.chat.id === GROUP_CHAT_ID && msg.text && !msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) {
-                    filtered.push({
-                        update_id: update.update_id,
-                        message: {
-                            text: msg.text,
-                            from: msg.from?.first_name || 'Поддержка',
-                            date: msg.date
+                if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
+                    const topicId = msg.message_thread_id;
+                    const topicUserId = topicToUser.get(topicId);
+                    
+                    // Пропускаем сообщения от бота и системные
+                    if (msg.from && msg.from.is_bot) continue;
+                    if (msg.text && msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
+                    
+                    // Фильтруем по userId
+                    if (topicUserId && (!userId || topicUserId === userId)) {
+                        const messageData = {
+                            update_id: update.update_id,
+                            message: {
+                                text: msg.caption || msg.text || '',
+                                from: msg.from?.first_name || 'Поддержка',
+                                date: msg.date
+                            }
+                        };
+                        
+                        // Обработка фото
+                        if (msg.photo && msg.photo.length > 0) {
+                            try {
+                                const photo = msg.photo[msg.photo.length - 1];
+                                const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
+                                const fileData = await fileResponse.json();
+                                if (fileData.ok) {
+                                    messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                                    messageData.message.hasImage = true;
+                                }
+                            } catch (err) {
+                                console.error('Ошибка получения фото:', err);
+                            }
                         }
-                    });
+                        
+                        filtered.push(messageData);
+                    }
                 }
             }
             data.result = filtered;
+            console.log(`📨 Отправлено ${filtered.length} сообщений для userId:`, userId);
         }
         res.json(data);
     } catch (err) {
-        res.status(500).json({ ok: false });
+        console.error('Ошибка getUpdates:', err);
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
