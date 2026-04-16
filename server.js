@@ -68,7 +68,7 @@ app.post('/register', async (req, res) => {
             })
         });
         
-        console.log(`✅ Пользователь ${userId} зарегистрирован, статус: онлайн`);
+        console.log(`✅ Пользователь ${userId} зарегистрирован`);
         res.json({ ok: true, topicId });
     } catch (err) {
         console.error('Ошибка:', err);
@@ -110,23 +110,19 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// ========== ОБНОВЛЕНИЕ СТАТУСА (ИСПРАВЛЕНО) ==========
+// ОБНОВЛЕНИЕ СТАТУСА
 let lastStatusUpdate = new Map();
 
 app.post('/updateStatus', async (req, res) => {
     const { userId, isOnline, isActive } = req.body;
-    console.log(`📊 ОБНОВЛЕНИЕ СТАТУСА: ${userId} -> ${isOnline ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+    console.log(`📊 СТАТУС: ${userId} -> ${isOnline ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
     
     const user = users.get(userId);
-    if (!user) {
-        console.log(`❌ Пользователь ${userId} не найден`);
-        return res.json({ ok: false, error: 'User not found' });
-    }
+    if (!user) return res.json({ ok: false });
     
     const now = Date.now();
     const lastUpdate = lastStatusUpdate.get(userId) || 0;
     
-    // Отправляем обновление, если статус изменился И прошло больше 5 секунд (антиспам)
     if (user.isOnline !== isOnline && (now - lastUpdate) > 5000) {
         lastStatusUpdate.set(userId, now);
         user.isOnline = isOnline;
@@ -135,7 +131,6 @@ app.post('/updateStatus', async (req, res) => {
         const newName = `${icon} ${SITE_URL.replace('https://', '').replace('http://', '')}`;
         
         try {
-            // Обновляем название топика
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -145,17 +140,12 @@ app.post('/updateStatus', async (req, res) => {
                     name: newName
                 })
             });
-            console.log(`🔄 Статус изменён: ${isOnline ? '🟢 онлайн' : '⚫️ офлайн'}`);
-        } catch (err) {
-            console.error('Ошибка обновления топика:', err);
-        }
-    } else {
-        console.log(`⏸️ Статус не изменён (${user.isOnline} -> ${isOnline})`);
+        } catch (err) {}
     }
-    
     res.json({ ok: true });
 });
 
+// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ (С ФОТО)
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
     try {
@@ -165,22 +155,62 @@ app.get('/getUpdates', async (req, res) => {
         
         if (data.ok && data.result) {
             const filtered = [];
+            
             for (const update of data.result) {
                 const msg = update.message;
                 if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
                     const topicId = msg.message_thread_id;
                     const topicUserId = topicToUser.get(topicId);
+                    
                     if (msg.from && msg.from.is_bot) continue;
-                    if (msg.text && msg.text.includes('НОВЫЙ')) continue;
+                    if (msg.text && (msg.text.includes('НОВЫЙ') || msg.text.includes('закрепил'))) continue;
+                    
                     if (topicUserId && (!userId || topicUserId === userId)) {
-                        filtered.push(update);
+                        const messageData = {
+                            update_id: update.update_id,
+                            message: {
+                                text: msg.caption || msg.text || '',
+                                from: msg.from?.first_name || 'Поддержка',
+                                date: msg.date
+                            }
+                        };
+                        
+                        // ========== ОБРАБОТКА ФОТО ==========
+                        if (msg.photo && msg.photo.length > 0) {
+                            try {
+                                const photo = msg.photo[msg.photo.length - 1];
+                                const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
+                                const fileData = await fileResponse.json();
+                                
+                                if (fileData.ok) {
+                                    const imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                                    messageData.message.hasImage = true;
+                                    messageData.message.imageUrl = imageUrl;
+                                    console.log(`📸 Фото получено: ${imageUrl}`);
+                                }
+                            } catch (err) {
+                                console.error('Ошибка получения фото:', err);
+                            }
+                        }
+                        
+                        filtered.push(messageData);
                     }
                 }
             }
+            
+            // Обновляем lastUpdateId
+            if (filtered.length > 0) {
+                const maxId = Math.max(...filtered.map(u => u.update_id));
+                if (maxId + 1 > lastUpdateId) {
+                    lastUpdateId = maxId + 1;
+                }
+            }
+            
             data.result = filtered;
         }
         res.json(data);
     } catch (err) {
+        console.error('Ошибка getUpdates:', err);
         res.status(500).json({ ok: false });
     }
 });
@@ -189,6 +219,4 @@ const PORT = 3000;
 app.listen(PORT, () => {
     console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН на порту ${PORT}`);
     console.log(`📍 http://localhost:${PORT}`);
-    console.log(`📡 Группа: ${GROUP_CHAT_ID}`);
-    console.log(`🌐 Сайт: ${SITE_URL}\n`);
 });
