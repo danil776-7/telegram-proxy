@@ -619,9 +619,8 @@
     (function() {
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
-        // ========== НАСТРОЙКИ ==========
-        const SESSION_HOURS = 36; // Сессия живёт 36 часов
-        const OFFLINE_DELAY = 30000; // 30 секунд без активности → офлайн
+        const SESSION_HOURS = 36;
+        const OFFLINE_DELAY = 30000;
         
         const countries = [
             { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '__ __ __ __' },
@@ -629,12 +628,7 @@
             { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '___ ___ __ __' },
             { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '__ __ __ __' },
             { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '___ ___ __ __' },
-            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '___ ___ __ __' },
-            { code: 'GB', name: '🇬🇧 Великобритания', phoneCode: '+44', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '____ ___ ___' },
-            { code: 'DE', name: '🇩🇪 Германия', phoneCode: '+49', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '___ ___ ___' },
-            { code: 'FR', name: '🇫🇷 Франция', phoneCode: '+33', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '_ __ __ __ __' },
-            { code: 'IT', name: '🇮🇹 Италия', phoneCode: '+39', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '___ ___ ___' },
-            { code: 'ES', name: '🇪🇸 Испания', phoneCode: '+34', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '__ __ __ __' }
+            { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '___ ___ __ __' }
         ];
         
         let userId = localStorage.getItem('chat_user_id');
@@ -643,24 +637,19 @@
             localStorage.setItem('chat_user_id', userId);
         }
         
-        // ========== ПРОВЕРКА СЕССИИ (36 часов) ==========
+        // Проверка сессии
         const sessionStart = localStorage.getItem('session_start');
         const now = Date.now();
-        
         if (sessionStart) {
             const hoursPassed = (now - parseInt(sessionStart)) / (1000 * 60 * 60);
             if (hoursPassed >= SESSION_HOURS) {
-                console.log(`⏰ Сессия истекла (${Math.floor(hoursPassed)} часов). Очистка данных...`);
                 localStorage.removeItem('user_phone');
                 localStorage.removeItem('chat_history');
                 localStorage.removeItem('chat_lastUpdateId');
                 localStorage.setItem('session_start', now.toString());
-            } else {
-                console.log(`⏰ Сессия активна: ${Math.floor(hoursPassed)}/${SESSION_HOURS} часов`);
             }
         } else {
             localStorage.setItem('session_start', now.toString());
-            console.log(`⏰ Новая сессия началась. Будет активна ${SESSION_HOURS} часов`);
         }
         
         let userPhone = localStorage.getItem('user_phone');
@@ -668,104 +657,19 @@
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let userIp = '';
         let detectedCountry = 'UZ';
+        let inactivityTimer = null;
+        let isOnline = false;
         
-     // ========== СТАТУС ОНЛАЙН/ОФЛАЙН (ИСПРАВЛЕННАЯ ВЕРСИЯ) ==========
-let inactivityTimer = null;
-let isOnline = false;
-let statusUpdateQueue = false;
-
-// Функция отправки статуса
-async function sendStatus(online) {
-    if (!isRegistered) {
-        console.log('Статус не отправлен: пользователь не зарегистрирован');
-        return;
-    }
-    
-    if (statusUpdateQueue) {
-        console.log('Статус уже отправляется, пропускаем');
-        return;
-    }
-    
-    statusUpdateQueue = true;
-    
-    try {
-        console.log(`📤 Отправка статуса: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
-        const response = await fetch(`${PROXY_URL}/updateStatus`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, isOnline: online, isActive: online })
-        });
-        const data = await response.json();
-        
-        if (data.ok) {
-            isOnline = online;
-            console.log(`✅ Статус обновлён: ${online ? '🟢 ОНЛАЙН' : '⚫️ ОФЛАЙН'}`);
-        } else {
-            console.log(`❌ Ошибка обновления статуса:`, data);
-        }
-    } catch (err) {
-        console.error('Ошибка отправки статуса:', err);
-    } finally {
-        statusUpdateQueue = false;
-    }
-}
-
-// Установить офлайн (вызывается по таймеру)
-function setOfflineStatus() {
-    if (isRegistered && isOnline) {
-        console.log('🔴 Таймер: пользователь ушёл в офлайн');
-        sendStatus(false);
-    }
-}
-
-// Сброс таймера и установка онлайн
-function resetInactivityTimer() {
-    if (!isRegistered) return;
-    
-    // Очищаем старый таймер
-    if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = null;
-    }
-    
-    // Если были офлайн или статус ещё не установлен - включаем онлайн
-    if (!isOnline) {
-        console.log('🟢 Активность: включаем онлайн');
-        sendStatus(true);
-    }
-    
-    // Запускаем новый таймер
-    inactivityTimer = setTimeout(setOfflineStatus, 30000);
-}
-
-// Принудительно установить онлайн (для отправки сообщения)
-function forceOnline() {
-    if (!isRegistered) return;
-    if (!isOnline) {
-        console.log('🟢 Принудительно: включаем онлайн (отправка сообщения)');
-        sendStatus(true);
-    }
-    // Сбрасываем таймер при любом действии
-    if (inactivityTimer) {
-        clearTimeout(inactivityTimer);
-        inactivityTimer = setTimeout(setOfflineStatus, 30000);
-    }
-}
-        
-        async function detectGeo() {
-            try {
-                const ipRes = await fetch('https://api.ipify.org?format=json');
-                const ipData = await ipRes.json();
-                userIp = ipData.ip;
-                const response = await fetch(`https://ipapi.co/${userIp}/json/`);
-                const geoData = await response.json();
-                if (geoData && geoData.country_code) {
-                    detectedCountry = geoData.country_code;
-                    console.log(`📍 Регион: ${geoData.country_name} (${detectedCountry})`);
-                }
-            } catch (error) {}
+        function formatMessageTime(timestamp) {
+            const date = timestamp ? new Date(timestamp * 1000) : new Date();
+            return date.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                timeZone: 'Europe/Amsterdam'
+            });
         }
         
+        // ========== ФУНКЦИЯ ДОБАВЛЕНИЯ СООБЩЕНИЯ (С СОХРАНЕНИЕМ) ==========
         function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
             const messagesDiv = document.getElementById('chatMessages');
             const div = document.createElement('div');
@@ -800,49 +704,76 @@ function forceOnline() {
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             
+            // СОХРАНЯЕМ В ИСТОРИЮ
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ text, isUser, isSystem, isImage, imageUrl, time: Date.now(), telegramTime: timestamp });
-            localStorage.setItem('chat_history', JSON.stringify(history.slice(-100)));
+            history.push({ 
+                text, isUser, isSystem, isImage, imageUrl, 
+                time: Date.now(), 
+                telegramTime: timestamp,
+                operatorName: operatorName
+            });
+            // Оставляем только последние 200 сообщений
+            while (history.length > 200) history.shift();
+            localStorage.setItem('chat_history', JSON.stringify(history));
+            
+            console.log(`💬 Добавлено сообщение: ${isUser ? 'Пользователь' : 'Оператор'} -> ${text?.substring(0, 30)}`);
         }
         
         function addSystemMessage(text) {
             addMessage(text, false, true);
         }
         
-        function clearChat() {
-            const overlay = document.createElement('div');
-            overlay.className = 'clear-confirm-overlay';
-            overlay.innerHTML = `
-                <div class="clear-confirm-modal">
-                    <h4>Очистить историю чата?</h4>
-                    <p>Все сообщения в этом диалоге будут удалены навсегда. Вы не сможете их восстановить.</p>
-                    <div class="clear-confirm-buttons">
-                        <button class="clear-confirm-cancel" id="clearCancel">Отменить</button>
-                        <button class="clear-confirm-ok" id="clearOk">Очистить</button>
-                    </div>
-                </div>
-            `;
-            document.getElementById('chatWidget').appendChild(overlay);
-            
-            document.getElementById('clearCancel').onclick = () => overlay.remove();
-            document.getElementById('clearOk').onclick = () => {
-                localStorage.removeItem('user_phone');
-                localStorage.removeItem('chat_history');
-                localStorage.setItem('chat_lastUpdateId', '0');
-                userPhone = null;
-                isRegistered = false;
-                lastUpdateId = 0;
-                document.getElementById('chatMessages').innerHTML = `
-                    <div class="welcome-message">
-                        <h4>Чат с поддержкой</h4>
-                        <p>Мы на связи и готовы помочь.<br>Напишите ваш вопрос ниже.<br>Мы ответим в течение пары минут.</p>
-                    </div>
-                `;
-                overlay.remove();
-                setTimeout(() => showPhoneForm(), 100);
-            };
+        // ========== ОТПРАВКА СТАТУСА ==========
+        async function sendStatus(online) {
+            if (!isRegistered) return;
+            try {
+                await fetch(`${PROXY_URL}/updateStatus`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, isOnline: online, isActive: online })
+                });
+                isOnline = online;
+                console.log(`📊 Статус: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+            } catch (err) {}
         }
         
+        function resetInactivityTimer() {
+            if (!isRegistered) return;
+            if (inactivityTimer) clearTimeout(inactivityTimer);
+            if (!isOnline) sendStatus(true);
+            inactivityTimer = setTimeout(() => {
+                if (isRegistered && isOnline) sendStatus(false);
+            }, OFFLINE_DELAY);
+        }
+        
+        window.addEventListener('beforeunload', () => {
+            if (isRegistered && isOnline) {
+                navigator.sendBeacon(`${PROXY_URL}/updateStatus`, 
+                    new Blob([JSON.stringify({ userId, isOnline: false, isActive: false })], 
+                    { type: 'application/json' }));
+            }
+        });
+        
+        document.addEventListener('click', resetInactivityTimer);
+        document.addEventListener('scroll', resetInactivityTimer);
+        document.addEventListener('keypress', resetInactivityTimer);
+        
+        // ========== ГЕОЛОКАЦИЯ ==========
+        async function detectGeo() {
+            try {
+                const ipRes = await fetch('https://api.ipify.org?format=json');
+                const ipData = await ipRes.json();
+                userIp = ipData.ip;
+                const response = await fetch(`https://ipapi.co/${userIp}/json/`);
+                const geoData = await response.json();
+                if (geoData && geoData.country_code) {
+                    detectedCountry = geoData.country_code;
+                    console.log(`📍 Регион: ${geoData.country_name}`);
+                }
+            } catch (error) {}
+        }
+        
+        // ========== ФОРМА ТЕЛЕФОНА ==========
         function showPhoneForm() {
             const widget = document.getElementById('chatWidget');
             const oldOverlay = document.querySelector('.phone-overlay');
@@ -925,7 +856,6 @@ function forceOnline() {
                 }
                 this.value = value;
                 phoneError.innerText = '';
-                
                 if (value.length > 0 && value.length < currentMaxDigits) {
                     phoneError.style.color = '#81858C';
                     phoneError.innerText = `Осталось ${currentMaxDigits - value.length} цифр из ${currentMaxDigits}`;
@@ -972,10 +902,19 @@ function forceOnline() {
                         localStorage.setItem('user_phone', fullPhone);
                         isRegistered = true;
                         overlay.remove();
-                        addSystemMessage('✅ Вы успешно подключены к поддержке');
+                        
+                        // Очищаем и загружаем начальные сообщения
+                        const messagesDiv = document.getElementById('chatMessages');
+                        messagesDiv.innerHTML = `
+                            <div class="welcome-message">
+                                <h4>Чат с поддержкой</h4>
+                                <p>О чем вы хотели бы спросить?</p>
+                            </div>
+                        `;
+                        
                         addMessage('Добрый день! Подскажите, когда будет готов мой заказ №4412?', true);
                         addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
-                        // Включаем онлайн и запускаем таймер
+                        
                         sendStatus(true);
                         resetInactivityTimer();
                     } else {
@@ -987,13 +926,14 @@ function forceOnline() {
                 } catch (err) {
                     phoneSubmit.disabled = false;
                     phoneSubmit.textContent = 'Начать чат';
-                    phoneError.innerText = '❌ Ошибка соединения с сервером';
+                    phoneError.innerText = '❌ Ошибка соединения';
                     phoneError.style.color = '#E03434';
                     console.error('Ошибка:', err);
                 }
             };
         }
         
+        // ========== ОТПРАВКА СООБЩЕНИЯ ==========
         async function sendToTelegram(text, imageBase64 = null) {
             if (!isRegistered) {
                 showPhoneForm();
@@ -1001,24 +941,28 @@ function forceOnline() {
             }
             if (!text && !imageBase64) return;
             
-            // Принудительно включаем онлайн перед отправкой
-            forceOnline();
-            
+            // Добавляем сообщение в чат
             if (text) addMessage(text, true);
             else addMessage('📷 Изображение', true);
             
+            // Сбрасываем таймер статуса
+            resetInactivityTimer();
+            
             try {
-                await fetch(`${PROXY_URL}/send`, {
+                const response = await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, text, imageBase64 })
                 });
-                console.log('📨 Сообщение отправлено');
+                const data = await response.json();
+                console.log('📨 Сообщение отправлено:', data);
             } catch (err) {
                 console.error('Ошибка отправки:', err);
+                addMessage('❌ Ошибка отправки сообщения. Попробуйте позже.', false, true);
             }
         }
         
+        // ========== ПОЛУЧЕНИЕ ОТВЕТОВ ==========
         async function checkReplies() {
             if (!isRegistered) return;
             try {
@@ -1036,10 +980,47 @@ function forceOnline() {
                     localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                 }
             } catch (err) {
-                console.error('Ошибка получения обновлений:', err);
+                console.error('Ошибка получения:', err);
             }
         }
         
+        // ========== ОЧИСТКА ЧАТА ==========
+        function clearChat() {
+            const overlay = document.createElement('div');
+            overlay.className = 'clear-confirm-overlay';
+            overlay.innerHTML = `
+                <div class="clear-confirm-modal">
+                    <h4>Очистить историю чата?</h4>
+                    <p>Все сообщения в этом диалоге будут удалены навсегда. Вы не сможете их восстановить.</p>
+                    <div class="clear-confirm-buttons">
+                        <button class="clear-confirm-cancel" id="clearCancel">Отменить</button>
+                        <button class="clear-confirm-ok" id="clearOk">Очистить</button>
+                    </div>
+                </div>
+            `;
+            document.getElementById('chatWidget').appendChild(overlay);
+            
+            document.getElementById('clearCancel').onclick = () => overlay.remove();
+            document.getElementById('clearOk').onclick = () => {
+                localStorage.removeItem('user_phone');
+                localStorage.removeItem('chat_history');
+                localStorage.setItem('chat_lastUpdateId', '0');
+                userPhone = null;
+                isRegistered = false;
+                lastUpdateId = 0;
+                
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="welcome-message">
+                        <h4>Чат с поддержкой</h4>
+                        <p>Мы на связи и готовы помочь.<br>Напишите ваш вопрос ниже.<br>Мы ответим в течение пары минут.</p>
+                    </div>
+                `;
+                overlay.remove();
+                setTimeout(() => showPhoneForm(), 100);
+            };
+        }
+        
+        // ========== ИНИЦИАЛИЗАЦИЯ ==========
         const widget = document.getElementById('chatWidget');
         const closeBtn = document.querySelector('.close-btn');
         const clearBtn = document.getElementById('clearBtn');
@@ -1052,26 +1033,22 @@ function forceOnline() {
             if (widget.classList.contains('closed')) {
                 widget.classList.remove('closed');
                 e.stopPropagation();
-                if (isRegistered) {
-                    resetInactivityTimer();
-                }
+                if (isRegistered) resetInactivityTimer();
             }
         };
         
-        if (closeBtn) closeBtn.onclick = (e) => { 
-            widget.classList.add('closed'); 
-            e.stopPropagation();
-        };
-        
+        if (closeBtn) closeBtn.onclick = (e) => { widget.classList.add('closed'); e.stopPropagation(); };
         if (clearBtn) clearBtn.onclick = (e) => { clearChat(); e.stopPropagation(); };
         
-        if (sendBtn) sendBtn.onclick = () => {
-            const text = messageInput.value.trim();
-            if (text) {
-                sendToTelegram(text);
-                messageInput.value = '';
-            }
-        };
+        if (sendBtn) {
+            sendBtn.onclick = () => {
+                const text = messageInput.value.trim();
+                if (text) {
+                    sendToTelegram(text);
+                    messageInput.value = '';
+                }
+            };
+        }
         
         if (messageInput) {
             messageInput.onkeypress = (e) => {
@@ -1101,12 +1078,42 @@ function forceOnline() {
                 isRegistered = true;
                 sendStatus(true);
                 resetInactivityTimer();
+                
+                // Восстанавливаем историю
                 const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
                 if (savedHistory.length > 0) {
                     savedHistory.forEach(msg => {
-                        if (msg.isSystem) addSystemMessage(msg.text);
-                        else addMessage(msg.text, msg.isUser, false, msg.isImage, msg.imageUrl, msg.telegramTime, msg.isUser ? null : 'Оператор Анна');
+                        const messagesDiv = document.getElementById('chatMessages');
+                        const div = document.createElement('div');
+                        
+                        if (msg.isSystem) {
+                            div.className = 'message system-message';
+                            div.innerText = msg.text;
+                        } else {
+                            div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+                            if (!msg.isUser && msg.operatorName) {
+                                const nameSpan = document.createElement('div');
+                                nameSpan.className = 'operator-name';
+                                nameSpan.innerText = msg.operatorName;
+                                div.appendChild(nameSpan);
+                            }
+                            if (msg.isImage && msg.imageUrl) {
+                                const img = document.createElement('img');
+                                img.src = msg.imageUrl;
+                                img.onclick = () => window.open(msg.imageUrl, '_blank');
+                                div.appendChild(img);
+                            }
+                            if (msg.text) div.appendChild(document.createTextNode(msg.text));
+                            
+                            const timeSpan = document.createElement('div');
+                            timeSpan.className = 'message-time';
+                            timeSpan.innerText = formatMessageTime(msg.telegramTime);
+                            div.appendChild(timeSpan);
+                        }
+                        
+                        messagesDiv.appendChild(div);
                     });
+                    messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 } else {
                     addMessage('Добрый день! Подскажите, о чем вы хотели бы спросить?', true);
                     addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
@@ -1116,7 +1123,7 @@ function forceOnline() {
             }
         });
         
-        setInterval(checkReplies, 2000);
+        setInterval(checkReplies, 3000);
         
         // Проверка сессии каждый час
         setInterval(() => {
@@ -1124,13 +1131,10 @@ function forceOnline() {
             if (sessionStart && userPhone) {
                 const hoursPassed = (Date.now() - parseInt(sessionStart)) / (1000 * 60 * 60);
                 if (hoursPassed >= SESSION_HOURS) {
-                    console.log(`⏰ Сессия истекла (${Math.floor(hoursPassed)} часов). Очистка данных...`);
                     localStorage.removeItem('user_phone');
                     localStorage.removeItem('chat_history');
                     localStorage.removeItem('chat_lastUpdateId');
                     localStorage.setItem('session_start', Date.now().toString());
-                    userPhone = null;
-                    isRegistered = false;
                     location.reload();
                 }
             }
