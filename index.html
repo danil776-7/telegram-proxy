@@ -669,92 +669,88 @@
         let userIp = '';
         let detectedCountry = 'UZ';
         
-        // ========== СТАТУС ОНЛАЙН/ОФЛАЙН ==========
-        let inactivityTimer = null;
-        let isOnline = false;
-        let isSendingStatus = false;
-        
-        // Функция отправки статуса с защитой от спама
-        async function sendStatus(online) {
-            if (!isRegistered) return;
-            if (isSendingStatus) return;
-            
-            isSendingStatus = true;
-            try {
-                await fetch(`${PROXY_URL}/updateStatus`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, isOnline: online, isActive: online })
-                });
-                console.log(`📊 Статус обновлён: ${online ? '🟢 ОНЛАЙН' : '⚫️ ОФЛАЙН'}`);
-                isOnline = online;
-            } catch (err) {
-                console.error('Ошибка отправки статуса:', err);
-            } finally {
-                isSendingStatus = false;
-            }
-        }
-        
-        // Установить офлайн (вызывается по таймеру)
-        function setOfflineStatus() {
-            if (isRegistered && isOnline) {
-                console.log('🔴 Таймер: пользователь ушёл в офлайн');
-                sendStatus(false);
-            }
-        }
-        
-        // Сброс таймера и установка онлайн
-        function resetInactivityTimer() {
-            if (!isRegistered) return;
-            
-            // Очищаем старый таймер
-            if (inactivityTimer) {
-                clearTimeout(inactivityTimer);
-                inactivityTimer = null;
-            }
-            
-            // Если были офлайн - включаем онлайн
-            if (!isOnline) {
-                console.log('🟢 Активность: включаем онлайн');
-                sendStatus(true);
-            }
-            
-            // Запускаем новый таймер
-            inactivityTimer = setTimeout(setOfflineStatus, OFFLINE_DELAY);
-        }
-        
-        // Принудительно установить онлайн (для отправки сообщения)
-        function forceOnline() {
-            if (!isRegistered) return;
-            if (!isOnline) {
-                console.log('🟢 Принудительно: включаем онлайн (отправка сообщения)');
-                sendStatus(true);
-            }
-            resetInactivityTimer();
-        }
-        
-        // Обработчик закрытия вкладки
-        window.addEventListener('beforeunload', () => {
-            if (isRegistered && isOnline) {
-                const data = JSON.stringify({ userId, isOnline: false, isActive: false });
-                navigator.sendBeacon(`${PROXY_URL}/updateStatus`, new Blob([data], { type: 'application/json' }));
-            }
+     // ========== СТАТУС ОНЛАЙН/ОФЛАЙН (ИСПРАВЛЕННАЯ ВЕРСИЯ) ==========
+let inactivityTimer = null;
+let isOnline = false;
+let statusUpdateQueue = false;
+
+// Функция отправки статуса
+async function sendStatus(online) {
+    if (!isRegistered) {
+        console.log('Статус не отправлен: пользователь не зарегистрирован');
+        return;
+    }
+    
+    if (statusUpdateQueue) {
+        console.log('Статус уже отправляется, пропускаем');
+        return;
+    }
+    
+    statusUpdateQueue = true;
+    
+    try {
+        console.log(`📤 Отправка статуса: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+        const response = await fetch(`${PROXY_URL}/updateStatus`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, isOnline: online, isActive: online })
         });
+        const data = await response.json();
         
-        // Отслеживаем активность пользователя
-        const activityEvents = ['click', 'scroll', 'keypress', 'touchstart', 'mousemove'];
-        activityEvents.forEach(event => {
-            document.addEventListener(event, resetInactivityTimer);
-        });
-        
-        function formatMessageTime(timestamp) {
-            const date = timestamp ? new Date(timestamp * 1000) : new Date();
-            return date.toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                timeZone: 'Europe/Amsterdam'
-            });
+        if (data.ok) {
+            isOnline = online;
+            console.log(`✅ Статус обновлён: ${online ? '🟢 ОНЛАЙН' : '⚫️ ОФЛАЙН'}`);
+        } else {
+            console.log(`❌ Ошибка обновления статуса:`, data);
         }
+    } catch (err) {
+        console.error('Ошибка отправки статуса:', err);
+    } finally {
+        statusUpdateQueue = false;
+    }
+}
+
+// Установить офлайн (вызывается по таймеру)
+function setOfflineStatus() {
+    if (isRegistered && isOnline) {
+        console.log('🔴 Таймер: пользователь ушёл в офлайн');
+        sendStatus(false);
+    }
+}
+
+// Сброс таймера и установка онлайн
+function resetInactivityTimer() {
+    if (!isRegistered) return;
+    
+    // Очищаем старый таймер
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = null;
+    }
+    
+    // Если были офлайн или статус ещё не установлен - включаем онлайн
+    if (!isOnline) {
+        console.log('🟢 Активность: включаем онлайн');
+        sendStatus(true);
+    }
+    
+    // Запускаем новый таймер
+    inactivityTimer = setTimeout(setOfflineStatus, 30000);
+}
+
+// Принудительно установить онлайн (для отправки сообщения)
+function forceOnline() {
+    if (!isRegistered) return;
+    if (!isOnline) {
+        console.log('🟢 Принудительно: включаем онлайн (отправка сообщения)');
+        sendStatus(true);
+    }
+    // Сбрасываем таймер при любом действии
+    if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(setOfflineStatus, 30000);
+    }
+}
         
         async function detectGeo() {
             try {
