@@ -13,8 +13,10 @@ const users = new Map();
 const topicToUser = new Map();
 let lastUpdateId = 0;
 
-// Храним время последнего обновления статуса для антиспама
+// Храним время последнего обновления статуса
 const lastStatusUpdate = new Map();
+// Храним последний отправленный статус пользователя
+const lastSentStatus = new Map();
 
 function getAmsterdamTime(timestamp = null) {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
@@ -49,7 +51,7 @@ app.get('/', (req, res) => {
     res.json({ status: 'ok', message: 'Proxy работает!' });
 });
 
-// ========== РЕГИСТРАЦИЯ - ОДНО СООБЩЕНИЕ ==========
+// ========== РЕГИСТРАЦИЯ ==========
 app.post('/register', async (req, res) => {
     console.log('📞 РЕГИСТРАЦИЯ:', req.body);
     const { userId, ip, phone, region } = req.body;
@@ -94,7 +96,6 @@ app.post('/register', async (req, res) => {
             `🕐 **Время:** ${currentTime}\n` +
             `✅ **Статус:** Онлайн`;
         
-        // Отправляем ОДНО сообщение
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -116,6 +117,7 @@ app.post('/register', async (req, res) => {
             isOnline: true
         });
         topicToUser.set(topicId, userId);
+        lastSentStatus.set(userId, true);
         
         console.log(`✅ Пользователь ${userId} зарегистрирован`);
         res.json({ ok: true, topicId });
@@ -171,27 +173,35 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// ========== ОБНОВЛЕНИЕ СТАТУСА (БЕЗ СПАМА В ЧАТ) ==========
+// ========== ОБНОВЛЕНИЕ СТАТУСА (с отправкой сообщения в чат) ==========
 app.post('/updateStatus', async (req, res) => {
-    const { userId, isOnline, isActive } = req.body;
+    const { userId, isOnline, isActive, heartbeat } = req.body;
     
     const user = users.get(userId);
     if (!user) {
-        return res.json({ ok: false });
+        return res.json({ ok: false, error: 'User not found' });
     }
     
     const now = Date.now();
     const lastUpdate = lastStatusUpdate.get(userId) || 0;
+    const lastSent = lastSentStatus.get(userId);
     
-    // Обновляем ТОЛЬКО если статус изменился И прошло больше 30 секунд
-    if (user.isOnline !== isOnline && (now - lastUpdate) > 30000) {
+    // Для heartbeat просто подтверждаем, не спамим
+    if (heartbeat) {
+        return res.json({ ok: true, heartbeat: true });
+    }
+    
+    // Обновляем только если статус изменился И прошло больше 10 секунд
+    if (lastSent !== isOnline && (now - lastUpdate) > 10000) {
         lastStatusUpdate.set(userId, now);
+        lastSentStatus.set(userId, isOnline);
         user.isOnline = isOnline;
         
         const icon = isOnline ? '🟢' : '⚫️';
+        const statusText = isOnline ? 'ОНЛАЙН' : 'ОФЛАЙН';
         const newName = `${icon} ${SITE_URL.replace('https://', '').replace('http://', '')}`;
         
-        // Обновляем название топика (без отправки сообщения в чат)
+        // Обновляем название топика
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -200,14 +210,30 @@ app.post('/updateStatus', async (req, res) => {
                 message_thread_id: user.topicId,
                 name: newName
             })
-        }).catch(() => {});
+        }).catch(err => console.error('Ошибка обновления топика:', err));
         
-        console.log(`🔄 Статус ${userId}: ${isOnline ? 'онлайн' : 'офлайн'}`);
+        // ОТПРАВЛЯЕМ СООБЩЕНИЕ В ЧАТ О СМЕНЕ СТАТУСА
+        const statusMessage = isOnline 
+            ? `🟢 **Пользователь вернулся в чат**\nСтатус: ${statusText}`
+            : `⚫️ **Пользователь вышел из чата**\nСтатус: ${statusText}\n_Неактивен более 30 секунд или закрыл вкладку_`;
+        
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                chat_id: GROUP_CHAT_ID,
+                message_thread_id: user.topicId,
+                text: statusMessage,
+                parse_mode: 'Markdown'
+            })
+        }).catch(err => console.error('Ошибка отправки статуса в чат:', err));
+        
+        console.log(`🔄 Статус ${userId}: ${statusText} (отправлено уведомление в чат)`);
     }
     res.json({ ok: true });
 });
 
-// ========== ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ (СКИПАЕМ СПАМ) ==========
+// ========== ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ ==========
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
     const currentOffset = parseInt(offset) || lastUpdateId;
@@ -226,10 +252,10 @@ app.get('/getUpdates', async (req, res) => {
                     const topicId = msg.message_thread_id;
                     const topicUserId = topicToUser.get(topicId);
                     
-                    // ПРОПУСКАЕМ сообщения от ботов
+                    // Пропускаем сообщения от ботов
                     if (msg.from && msg.from.is_bot) continue;
                     
-                    // ПРОПУСКАЕМ системные сообщения (спам)
+                    // Пропускаем системные сообщения о статусе
                     if (msg.text) {
                         if (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
                         if (msg.text.includes('закрепил')) continue;
@@ -237,6 +263,9 @@ app.get('/getUpdates', async (req, res) => {
                         if (msg.text.includes('changed the topic name')) continue;
                         if (msg.text.includes('изменил')) continue;
                         if (msg.text.includes('название темы')) continue;
+                        if (msg.text.includes('вернулся в чат')) continue;
+                        if (msg.text.includes('вышел из чата')) continue;
+                        if (msg.text.includes('Пользователь')) continue;
                     }
                     
                     if (topicUserId && (!userId || topicUserId === userId)) {
@@ -285,5 +314,5 @@ app.listen(PORT, () => {
     console.log(`📡 Порт: ${PORT}`);
     console.log(`📡 Группа Telegram: ${GROUP_CHAT_ID}`);
     console.log(`🌐 Сайт: ${SITE_URL}`);
-    console.log(`\n💡 Логи приходят в Telegram чат (одно сообщение, без спама)\n`);
+    console.log(`\n💡 Логи приходят в Telegram чат (статус отправляется с уведомлением)\n`);
 });
