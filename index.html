@@ -133,6 +133,21 @@
             margin: 0;
         }
         
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #C7FF2E;
+            margin-left: 6px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        
         .header-buttons {
             display: flex;
             gap: 8px;
@@ -592,7 +607,7 @@
         <div class="chat-header-info">
             <div class="operator-avatar">👩‍💼</div>
             <div class="chat-header-text">
-                <h3>Чат с поддержкой</h3>
+                <h3>Чат с поддержкой <span class="status-indicator" id="statusIndicator"></span></h3>
                 <p>Оператор Анна</p>
             </div>
         </div>
@@ -620,7 +635,7 @@
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         
         const SESSION_HOURS = 36;
-        const OFFLINE_DELAY = 30000;
+        const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности до офлайн
         
         const countries = [
             { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '__ __ __ __' },
@@ -657,8 +672,28 @@
         let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
         let userIp = '';
         let detectedCountry = 'UZ';
+        
+        // Улучшенная система отслеживания активности
         let inactivityTimer = null;
         let isOnline = false;
+        let isPageVisible = true;
+        let lastActivityTime = Date.now();
+        let statusCheckInterval = null;
+        
+        const statusIndicator = document.getElementById('statusIndicator');
+        
+        // Функция обновления индикатора статуса в UI
+        function updateStatusIndicator() {
+            if (statusIndicator) {
+                if (isOnline) {
+                    statusIndicator.style.backgroundColor = '#C7FF2E';
+                    statusIndicator.style.animation = 'pulse 2s infinite';
+                } else {
+                    statusIndicator.style.backgroundColor = '#81858C';
+                    statusIndicator.style.animation = 'none';
+                }
+            }
+        }
         
         function formatMessageTime(timestamp) {
             const date = timestamp ? new Date(timestamp * 1000) : new Date();
@@ -669,7 +704,7 @@
             });
         }
         
-        // ========== ФУНКЦИЯ ДОБАВЛЕНИЯ СООБЩЕНИЯ (С СОХРАНЕНИЕМ) ==========
+        // ========== ФУНКЦИЯ ДОБАВЛЕНИЯ СООБЩЕНИЯ ==========
         function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
             const messagesDiv = document.getElementById('chatMessages');
             const div = document.createElement('div');
@@ -704,7 +739,7 @@
             messagesDiv.appendChild(div);
             messagesDiv.scrollTop = messagesDiv.scrollHeight;
             
-            // СОХРАНЯЕМ В ИСТОРИЮ
+            // Сохраняем историю
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
             history.push({ 
                 text, isUser, isSystem, isImage, imageUrl, 
@@ -712,51 +747,118 @@
                 telegramTime: timestamp,
                 operatorName: operatorName
             });
-            // Оставляем только последние 200 сообщений
             while (history.length > 200) history.shift();
             localStorage.setItem('chat_history', JSON.stringify(history));
-            
-            console.log(`💬 Добавлено сообщение: ${isUser ? 'Пользователь' : 'Оператор'} -> ${text?.substring(0, 30)}`);
         }
         
         function addSystemMessage(text) {
             addMessage(text, false, true);
         }
         
-        // ========== ОТПРАВКА СТАТУСА ==========
+        // ========== ОТПРАВКА СТАТУСА (с проверкой изменений) ==========
         async function sendStatus(online) {
-            if (!isRegistered) return;
+            if (!isRegistered) return false;
+            
+            // Не отправляем тот же статус повторно
+            if (isOnline === online) return false;
+            
             try {
-                await fetch(`${PROXY_URL}/updateStatus`, {
+                const response = await fetch(`${PROXY_URL}/updateStatus`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, isOnline: online, isActive: online })
                 });
-                isOnline = online;
-                console.log(`📊 Статус: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
-            } catch (err) {}
-        }
-        
-        function resetInactivityTimer() {
-            if (!isRegistered) return;
-            if (inactivityTimer) clearTimeout(inactivityTimer);
-            if (!isOnline) sendStatus(true);
-            inactivityTimer = setTimeout(() => {
-                if (isRegistered && isOnline) sendStatus(false);
-            }, OFFLINE_DELAY);
-        }
-        
-        window.addEventListener('beforeunload', () => {
-            if (isRegistered && isOnline) {
-                navigator.sendBeacon(`${PROXY_URL}/updateStatus`, 
-                    new Blob([JSON.stringify({ userId, isOnline: false, isActive: false })], 
-                    { type: 'application/json' }));
+                
+                if (response.ok) {
+                    isOnline = online;
+                    updateStatusIndicator();
+                    console.log(`📊 Статус изменён: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'} (активность: ${Math.floor((Date.now() - lastActivityTime)/1000)}с назад)`);
+                    return true;
+                }
+            } catch (err) {
+                console.error('Ошибка отправки статуса:', err);
             }
-        });
+            return false;
+        }
         
-        document.addEventListener('click', resetInactivityTimer);
-        document.addEventListener('scroll', resetInactivityTimer);
-        document.addEventListener('keypress', resetInactivityTimer);
+        // ========== ПРОВЕРКА АКТИВНОСТИ И ОБНОВЛЕНИЕ СТАТУСА ==========
+        function checkActivityAndUpdateStatus() {
+            if (!isRegistered) return;
+            
+            const now = Date.now();
+            const inactiveTime = now - lastActivityTime;
+            const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
+            
+            // Логируем только при изменении статуса
+            if (shouldBeOnline !== isOnline) {
+                if (shouldBeOnline) {
+                    console.log(`🟢 Восстановление активности после ${Math.floor(inactiveTime/1000)}с`);
+                    sendStatus(true);
+                } else {
+                    console.log(`🔴 Переход в офлайн (неактивен ${Math.floor(inactiveTime/1000)}с)`);
+                    sendStatus(false);
+                }
+            }
+        }
+        
+        // ========== СБРОС ТАЙМЕРА АКТИВНОСТИ ==========
+        function resetActivityTimer() {
+            if (!isRegistered) return;
+            
+            const wasInactive = (Date.now() - lastActivityTime) >= INACTIVITY_TIMEOUT;
+            lastActivityTime = Date.now();
+            
+            // Если были неактивны и страница видима - включаем онлайн
+            if (wasInactive && isPageVisible && !isOnline) {
+                sendStatus(true);
+            }
+        }
+        
+        // ========== ОБРАБОТЧИКИ СОБЫТИЙ АКТИВНОСТИ ==========
+        function setupActivityTracking() {
+            const events = ['click', 'mousemove', 'keypress', 'scroll', 'touchstart', 'touchmove'];
+            events.forEach(event => {
+                document.addEventListener(event, resetActivityTimer);
+            });
+            
+            // Отслеживание фокуса на инпуте
+            const messageInput = document.getElementById('messageInput');
+            if (messageInput) {
+                messageInput.addEventListener('focus', resetActivityTimer);
+                messageInput.addEventListener('input', resetActivityTimer);
+            }
+            
+            // Видимость страницы (Page Visibility API)
+            document.addEventListener('visibilitychange', () => {
+                isPageVisible = !document.hidden;
+                console.log(`👁️ Видимость страницы: ${isPageVisible ? 'видима' : 'скрыта'}`);
+                
+                if (isPageVisible) {
+                    // Страница стала видимой - обновляем активность
+                    resetActivityTimer();
+                    // Немедленно проверяем статус
+                    setTimeout(() => checkActivityAndUpdateStatus(), 100);
+                } else {
+                    // Страница скрыта - сразу проверяем, нужно ли уйти в офлайн
+                    checkActivityAndUpdateStatus();
+                }
+            });
+            
+            // Отслеживание закрытия/перезагрузки страницы
+            window.addEventListener('beforeunload', () => {
+                if (isRegistered && isOnline) {
+                    // Отправляем офлайн статус синхронно через beacon
+                    navigator.sendBeacon(`${PROXY_URL}/updateStatus`, 
+                        new Blob([JSON.stringify({ userId, isOnline: false, isActive: false })], 
+                        { type: 'application/json' }));
+                }
+            });
+            
+            // Периодическая проверка статуса (каждые 10 секунд)
+            statusCheckInterval = setInterval(() => {
+                checkActivityAndUpdateStatus();
+            }, 10000);
+        }
         
         // ========== ГЕОЛОКАЦИЯ ==========
         async function detectGeo() {
@@ -915,8 +1017,9 @@
                         addMessage('Добрый день! Подскажите, когда будет готов мой заказ №4412?', true);
                         addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
                         
-                        sendStatus(true);
-                        resetInactivityTimer();
+                        // Активируем онлайн статус
+                        lastActivityTime = Date.now();
+                        await sendStatus(true);
                     } else {
                         phoneSubmit.disabled = false;
                         phoneSubmit.textContent = 'Начать чат';
@@ -939,14 +1042,15 @@
                 showPhoneForm();
                 return;
             }
+            
+            // Обновляем активность при отправке сообщения
+            resetActivityTimer();
+            
             if (!text && !imageBase64) return;
             
             // Добавляем сообщение в чат
             if (text) addMessage(text, true);
             else addMessage('📷 Изображение', true);
-            
-            // Сбрасываем таймер статуса
-            resetInactivityTimer();
             
             try {
                 const response = await fetch(`${PROXY_URL}/send`, {
@@ -1008,6 +1112,7 @@
                 userPhone = null;
                 isRegistered = false;
                 lastUpdateId = 0;
+                isOnline = false;
                 
                 document.getElementById('chatMessages').innerHTML = `
                     <div class="welcome-message">
@@ -1033,7 +1138,7 @@
             if (widget.classList.contains('closed')) {
                 widget.classList.remove('closed');
                 e.stopPropagation();
-                if (isRegistered) resetInactivityTimer();
+                if (isRegistered) resetActivityTimer();
             }
         };
         
@@ -1057,7 +1162,6 @@
                     sendBtn.click();
                 }
             };
-            messageInput.addEventListener('focus', resetInactivityTimer);
         }
         
         if (fileBtn && fileInput) {
@@ -1073,11 +1177,13 @@
             };
         }
         
+        // Настраиваем отслеживание активности
+        setupActivityTracking();
+        
         detectGeo().then(() => {
             if (userPhone) {
                 isRegistered = true;
-                sendStatus(true);
-                resetInactivityTimer();
+                lastActivityTime = Date.now();
                 
                 // Восстанавливаем историю
                 const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
@@ -1113,11 +1219,17 @@
                         
                         messagesDiv.appendChild(div);
                     });
+                    const messagesDiv = document.getElementById('chatMessages');
                     messagesDiv.scrollTop = messagesDiv.scrollHeight;
                 } else {
                     addMessage('Добрый день! Подскажите, о чем вы хотели бы спросить?', true);
                     addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
                 }
+                
+                // Устанавливаем онлайн статус
+                setTimeout(() => {
+                    sendStatus(true);
+                }, 500);
             } else {
                 setTimeout(() => showPhoneForm(), 500);
             }
