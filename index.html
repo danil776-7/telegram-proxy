@@ -753,6 +753,7 @@
             let heartbeatInterval = null;
             let lastSentStatus = null;
             let lastSentTime = 0;
+            let isUnloading = false; // Флаг для предотвращения повторных отправок при выгрузке
             
             // Получаем элементы с проверкой
             const statusIndicator = document.getElementById('statusIndicator');
@@ -785,24 +786,41 @@
                 }
             }
             
-            async function sendStatusToServer(online) {
+            async function sendStatusToServer(online, isSync = false) {
                 if (!isRegistered) return false;
                 if (lastSentStatus === online && (Date.now() - lastSentTime) < 5000) return false;
                 
+                const payload = { userId, isOnline: online, isActive: online };
+                
                 try {
-                    const response = await fetch(`${PROXY_URL}/updateStatus`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId, isOnline: online, isActive: online })
-                    });
-                    
-                    if (response.ok) {
-                        lastSentStatus = online;
-                        lastSentTime = Date.now();
-                        currentStatus = online;
-                        updateStatusUI(online);
-                        console.log(`📊 Статус отправлен: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
-                        return true;
+                    if (isSync) {
+                        // Синхронная отправка через sendBeacon для закрытия страницы
+                        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                        const sent = navigator.sendBeacon(`${PROXY_URL}/updateStatus`, blob);
+                        if (sent) {
+                            lastSentStatus = online;
+                            lastSentTime = Date.now();
+                            currentStatus = online;
+                            updateStatusUI(online);
+                            console.log(`📊 Статус отправлен (beacon): ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+                        }
+                        return sent;
+                    } else {
+                        // Асинхронная отправка
+                        const response = await fetch(`${PROXY_URL}/updateStatus`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        
+                        if (response.ok) {
+                            lastSentStatus = online;
+                            lastSentTime = Date.now();
+                            currentStatus = online;
+                            updateStatusUI(online);
+                            console.log(`📊 Статус отправлен: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+                            return true;
+                        }
                     }
                 } catch (err) {
                     console.error('Ошибка отправки статуса:', err);
@@ -811,7 +829,7 @@
             }
             
             function checkAndUpdateStatus() {
-                if (!isRegistered) return;
+                if (!isRegistered || isUnloading) return;
                 const now = Date.now();
                 const inactiveTime = now - lastActivityTime;
                 const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
@@ -822,7 +840,7 @@
             }
             
             function onUserActivity() {
-                if (!isRegistered) return;
+                if (!isRegistered || isUnloading) return;
                 lastActivityTime = Date.now();
                 if (!currentStatus && isPageVisible) {
                     sendStatusToServer(true);
@@ -832,7 +850,7 @@
             function startHeartbeat() {
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
                 heartbeatInterval = setInterval(() => {
-                    if (isRegistered && currentStatus && isPageVisible) {
+                    if (isRegistered && currentStatus && isPageVisible && !isUnloading) {
                         fetch(`${PROXY_URL}/updateStatus`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -857,13 +875,13 @@
                 }
                 
                 document.addEventListener('visibilitychange', () => {
+                    if (isUnloading) return;
                     isPageVisible = !document.hidden;
                     console.log(`👁️ Видимость страницы: ${isPageVisible ? 'видима' : 'скрыта'}`);
                     
                     if (isPageVisible) {
                         lastActivityTime = Date.now();
                         checkAndUpdateStatus();
-                        // Принудительно отправляем онлайн при возвращении
                         if (!currentStatus) {
                             sendStatusToServer(true);
                         }
@@ -874,11 +892,30 @@
                     }
                 });
                 
+                // Обработка закрытия страницы - МНОЖЕСТВЕННАЯ ЗАЩИТА
                 window.addEventListener('beforeunload', () => {
+                    isUnloading = true;
                     if (isRegistered && currentStatus) {
-                        navigator.sendBeacon(`${PROXY_URL}/updateStatus`, 
-                            new Blob([JSON.stringify({ userId, isOnline: false, isActive: false })], 
-                            { type: 'application/json' }));
+                        console.log('🚪 Страница закрывается, отправляем офлайн статус...');
+                        // Отправляем через sendBeacon (самый надёжный способ)
+                        sendStatusToServer(false, true);
+                        
+                        // Дополнительная отправка через fetch с keepalive
+                        fetch(`${PROXY_URL}/updateStatus`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId, isOnline: false, isActive: false }),
+                            keepalive: true
+                        }).catch(() => {});
+                    }
+                });
+                
+                // Страница выгружается (перезагрузка)
+                window.addEventListener('pagehide', () => {
+                    isUnloading = true;
+                    if (isRegistered && currentStatus) {
+                        console.log('🚪 Pagehide, отправляем офлайн статус...');
+                        sendStatusToServer(false, true);
                     }
                 });
                 
