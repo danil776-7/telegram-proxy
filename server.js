@@ -22,7 +22,7 @@ function getAmsterdamTime(timestamp = null) {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
     return date.toLocaleString('ru-RU', {
         timeZone: 'Europe/Amsterdam',
-        year: 'numeric',
+        year: '2-digit',
         month: '2-digit',
         day: '2-digit',
         hour: '2-digit',
@@ -86,15 +86,14 @@ app.post('/register', async (req, res) => {
         
         const topicId = topic.result.message_thread_id;
         
-        // ОДНО СООБЩЕНИЕ со ВСЕМИ данными
+        // ОДНО СООБЩЕНИЕ со ВСЕМИ данными (только при регистрации)
         const infoMessage = `🔔 **НОВЫЙ ПОЛЬЗОВАТЕЛЬ!**\n\n` +
             `🆔 **ID:** ${userId}\n` +
             `🌐 **Сайт:** ${SITE_URL}\n` +
             `🌍 **IP:** ${ip}\n` +
             `📍 **Регион:** ${finalRegion}\n` +
             `📞 **Телефон:** ${phone}\n` +
-            `🕐 **Время:** ${currentTime}\n` +
-            `✅ **Статус:** Онлайн`;
+            `🕐 **Время:** ${currentTime}`;
         
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
@@ -173,7 +172,7 @@ app.post('/send', async (req, res) => {
     }
 });
 
-// ========== ОБНОВЛЕНИЕ СТАТУСА (с отправкой сообщения в чат) ==========
+// ========== ОБНОВЛЕНИЕ СТАТУСА (ТОЛЬКО ИЗМЕНЕНИЕ ИКОНКИ, БЕЗ СООБЩЕНИЙ) ==========
 app.post('/updateStatus', async (req, res) => {
     const { userId, isOnline, isActive, heartbeat } = req.body;
     
@@ -186,7 +185,7 @@ app.post('/updateStatus', async (req, res) => {
     const lastUpdate = lastStatusUpdate.get(userId) || 0;
     const lastSent = lastSentStatus.get(userId);
     
-    // Для heartbeat просто подтверждаем, не спамим
+    // Для heartbeat просто подтверждаем
     if (heartbeat) {
         return res.json({ ok: true, heartbeat: true });
     }
@@ -198,10 +197,9 @@ app.post('/updateStatus', async (req, res) => {
         user.isOnline = isOnline;
         
         const icon = isOnline ? '🟢' : '⚫️';
-        const statusText = isOnline ? 'ОНЛАЙН' : 'ОФЛАЙН';
         const newName = `${icon} ${SITE_URL.replace('https://', '').replace('http://', '')}`;
         
-        // Обновляем название топика
+        // ТОЛЬКО обновляем название топика (иконку) - БЕЗ сообщений в чат
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/editForumTopic`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -212,23 +210,7 @@ app.post('/updateStatus', async (req, res) => {
             })
         }).catch(err => console.error('Ошибка обновления топика:', err));
         
-        // ОТПРАВЛЯЕМ СООБЩЕНИЕ В ЧАТ О СМЕНЕ СТАТУСА
-        const statusMessage = isOnline 
-            ? `🟢 **Пользователь вернулся в чат**\nСтатус: ${statusText}`
-            : `⚫️ **Пользователь вышел из чата**\nСтатус: ${statusText}\n_Неактивен более 30 секунд или закрыл вкладку_`;
-        
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: GROUP_CHAT_ID,
-                message_thread_id: user.topicId,
-                text: statusMessage,
-                parse_mode: 'Markdown'
-            })
-        }).catch(err => console.error('Ошибка отправки статуса в чат:', err));
-        
-        console.log(`🔄 Статус ${userId}: ${statusText} (отправлено уведомление в чат)`);
+        console.log(`🔄 Статус ${userId}: ${isOnline ? 'ОНЛАЙН' : 'ОФЛАЙН'} (обновлена иконка топика)`);
     }
     res.json({ ok: true });
 });
@@ -255,18 +237,8 @@ app.get('/getUpdates', async (req, res) => {
                     // Пропускаем сообщения от ботов
                     if (msg.from && msg.from.is_bot) continue;
                     
-                    // Пропускаем системные сообщения о статусе
-                    if (msg.text) {
-                        if (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
-                        if (msg.text.includes('закрепил')) continue;
-                        if (msg.text.includes('editForumTopic')) continue;
-                        if (msg.text.includes('changed the topic name')) continue;
-                        if (msg.text.includes('изменил')) continue;
-                        if (msg.text.includes('название темы')) continue;
-                        if (msg.text.includes('вернулся в чат')) continue;
-                        if (msg.text.includes('вышел из чата')) continue;
-                        if (msg.text.includes('Пользователь')) continue;
-                    }
+                    // Пропускаем системные сообщения (только при регистрации)
+                    if (msg.text && msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
                     
                     if (topicUserId && (!userId || topicUserId === userId)) {
                         const messageData = {
@@ -314,5 +286,6 @@ app.listen(PORT, () => {
     console.log(`📡 Порт: ${PORT}`);
     console.log(`📡 Группа Telegram: ${GROUP_CHAT_ID}`);
     console.log(`🌐 Сайт: ${SITE_URL}`);
-    console.log(`\n💡 Логи приходят в Telegram чат (статус отправляется с уведомлением)\n`);
+    console.log(`\n💡 Статус пользователя отображается иконкой в списке топиков: 🟢 - онлайн, ⚫️ - офлайн`);
+    console.log(`💡 Сообщения о смене статуса НЕ отправляются в чат\n`);
 });
