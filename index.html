@@ -86,8 +86,14 @@
             height: 100%;
             align-items: center;
             justify-content: center;
-            font-size: 28px;
-            color: #FFFFFF;
+        }
+        
+        .open-icon svg {
+            width: 28px;
+            height: 28px;
+            stroke: #FFFFFF;
+            stroke-width: 1.5;
+            fill: none;
         }
         
         .chat-widget.closed .open-icon { 
@@ -119,8 +125,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-            color: #FFFFFF;
+        }
+        
+        .operator-avatar svg {
+            width: 24px;
+            height: 24px;
+            stroke: #FFFFFF;
+            stroke-width: 1.5;
+            fill: none;
         }
         
         .chat-header-text h3 {
@@ -182,12 +194,19 @@
             width: 36px;
             height: 36px;
             border-radius: 18px;
-            font-size: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s;
             color: #8b8b9e;
+        }
+        
+        .clear-btn svg, .close-btn svg {
+            width: 18px;
+            height: 18px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
         }
         
         .clear-btn:hover, .close-btn:hover {
@@ -349,23 +368,28 @@
         .send-btn, .file-btn {
             background: #f0f0f0;
             border: none;
-            color: #6366f1;
-            padding: 10px 18px;
-            border-radius: 24px;
             cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s;
-            min-width: 44px;
-            min-height: 44px;
+            width: 44px;
+            height: 44px;
+            border-radius: 24px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: 500;
+            transition: all 0.2s;
+            color: #6366f1;
+        }
+        
+        .send-btn svg, .file-btn svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            stroke-width: 1.5;
+            fill: none;
         }
         
         .send-btn:hover, .file-btn:hover {
             background: #e8e8e8;
-            transform: scale(0.98);
+            transform: scale(0.96);
         }
         
         /* ========== ФОРМА ТЕЛЕФОНА ========== */
@@ -658,15 +682,24 @@
 </head>
 <body>
 <div class="demo-content">
-    <h1>💬 Чат с поддержкой</h1>
+    <h1>Чат с поддержкой</h1>
     <p>Напишите нам — мы ответим в Telegram</p>
 </div>
 
 <div class="chat-widget closed" id="chatWidget">
-    <div class="open-icon">💬</div>
+    <div class="open-icon">
+        <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+    </div>
     <div class="chat-header">
         <div class="chat-header-info">
-            <div class="operator-avatar">👩‍💼</div>
+            <div class="operator-avatar">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+            </div>
             <div class="chat-header-text">
                 <h3>
                     Чат с поддержкой
@@ -677,8 +710,20 @@
             </div>
         </div>
         <div class="header-buttons">
-            <button class="clear-btn" id="clearBtn">🗑️</button>
-            <button class="close-btn">✕</button>
+            <button class="clear-btn" id="clearBtn">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <path d="M10 11v5"/>
+                    <path d="M14 11v5"/>
+                </svg>
+            </button>
+            <button class="close-btn">
+                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6L6 18"/>
+                    <path d="M6 6l12 12"/>
+                </svg>
+            </button>
         </div>
     </div>
     <div class="chat-messages" id="chatMessages">
@@ -689,15 +734,23 @@
     </div>
     <div class="chat-input-area">
         <input type="text" class="chat-input" id="messageInput" placeholder="Введите сообщение">
-        <button class="file-btn" id="fileBtn">📎</button>
-        <button class="send-btn" id="sendBtn">➤</button>
+        <button class="file-btn" id="fileBtn">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+            </svg>
+        </button>
+        <button class="send-btn" id="sendBtn">
+            <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 2L11 13"/>
+                <path d="M22 2l-7 20-4-9-9-4 20-7z"/>
+            </svg>
+        </button>
         <input type="file" id="fileInput" accept="image/*" style="display: none;">
     </div>
 </div>
 
 <script>
     (function() {
-        // Ждём полной загрузки DOM перед инициализацией
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', init);
         } else {
@@ -706,17 +759,18 @@
         
         function init() {
             const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
+            const WS_URL = PROXY_URL.replace('https://', 'wss://').replace('http://', 'ws://');
             
             const SESSION_HOURS = 36;
             const INACTIVITY_TIMEOUT = 30000;
             
             const countries = [
-                { code: 'UZ', name: '🇺🇿 Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
-                { code: 'NL', name: '🇳🇱 Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
-                { code: 'RU', name: '🇷🇺 Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
-                { code: 'UA', name: '🇺🇦 Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
-                { code: 'KZ', name: '🇰🇿 Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
-                { code: 'US', name: '🇺🇸 США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' }
+                { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
+                { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
+                { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
+                { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
+                { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
+                { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' }
             ];
             
             let userId = localStorage.getItem('chat_user_id');
@@ -745,6 +799,10 @@
             let userIp = '';
             let detectedCountry = 'UZ';
             
+            // WebSocket
+            let ws = null;
+            let wsReconnectTimer = null;
+            
             // Статус система
             let currentStatus = false;
             let lastActivityTime = Date.now();
@@ -753,9 +811,9 @@
             let heartbeatInterval = null;
             let lastSentStatus = null;
             let lastSentTime = 0;
-            let isUnloading = false; // Флаг для предотвращения повторных отправок при выгрузке
+            let isUnloading = false;
             
-            // Получаем элементы с проверкой
+            // DOM элементы
             const statusIndicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('statusText');
             const widget = document.getElementById('chatWidget');
@@ -767,22 +825,60 @@
             const fileInput = document.getElementById('fileInput');
             const chatMessages = document.getElementById('chatMessages');
             
+            function connectWebSocket() {
+                if (!isRegistered) return;
+                if (ws && ws.readyState === WebSocket.OPEN) return;
+                
+                try {
+                    ws = new WebSocket(WS_URL);
+                    
+                    ws.onopen = () => {
+                        console.log('WebSocket подключен');
+                        ws.send(JSON.stringify({ type: 'register', userId: userId }));
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'message') {
+                                addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
+                            }
+                        } catch (err) {
+                            console.error('WebSocket сообщение ошибка:', err);
+                        }
+                    };
+                    
+                    ws.onerror = (error) => {
+                        console.error('WebSocket ошибка:', error);
+                    };
+                    
+                    ws.onclose = () => {
+                        console.log('WebSocket отключен, переподключение...');
+                        if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+                        wsReconnectTimer = setTimeout(() => {
+                            if (isRegistered) connectWebSocket();
+                        }, 3000);
+                    };
+                } catch (err) {
+                    console.error('WebSocket создание ошибка:', err);
+                }
+            }
+            
+            function disconnectWebSocket() {
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+            }
+            
             function updateStatusUI(online) {
                 if (statusIndicator) {
-                    if (online) {
-                        statusIndicator.className = 'status-indicator online';
-                    } else {
-                        statusIndicator.className = 'status-indicator';
-                    }
+                    statusIndicator.className = online ? 'status-indicator online' : 'status-indicator';
                 }
                 if (statusText) {
-                    if (online) {
-                        statusText.textContent = 'онлайн';
-                        statusText.className = 'status-text online';
-                    } else {
-                        statusText.textContent = 'офлайн';
-                        statusText.className = 'status-text';
-                    }
+                    statusText.textContent = online ? 'онлайн' : 'офлайн';
+                    statusText.className = online ? 'status-text online' : 'status-text';
                 }
             }
             
@@ -794,7 +890,6 @@
                 
                 try {
                     if (isSync) {
-                        // Синхронная отправка через sendBeacon для закрытия страницы
                         const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
                         const sent = navigator.sendBeacon(`${PROXY_URL}/updateStatus`, blob);
                         if (sent) {
@@ -802,11 +897,9 @@
                             lastSentTime = Date.now();
                             currentStatus = online;
                             updateStatusUI(online);
-                            console.log(`📊 Статус отправлен (beacon): ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
                         }
                         return sent;
                     } else {
-                        // Асинхронная отправка
                         const response = await fetch(`${PROXY_URL}/updateStatus`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -818,7 +911,6 @@
                             lastSentTime = Date.now();
                             currentStatus = online;
                             updateStatusUI(online);
-                            console.log(`📊 Статус отправлен: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
                             return true;
                         }
                     }
@@ -856,7 +948,6 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId, isOnline: true, isActive: true, heartbeat: true })
                         }).catch(() => {});
-                        console.log('💓 Heartbeat отправлен');
                     }
                 }, 20000);
             }
@@ -877,7 +968,6 @@
                 document.addEventListener('visibilitychange', () => {
                     if (isUnloading) return;
                     isPageVisible = !document.hidden;
-                    console.log(`👁️ Видимость страницы: ${isPageVisible ? 'видима' : 'скрыта'}`);
                     
                     if (isPageVisible) {
                         lastActivityTime = Date.now();
@@ -892,30 +982,16 @@
                     }
                 });
                 
-                // Обработка закрытия страницы - МНОЖЕСТВЕННАЯ ЗАЩИТА
                 window.addEventListener('beforeunload', () => {
                     isUnloading = true;
                     if (isRegistered && currentStatus) {
-                        console.log('🚪 Страница закрывается, отправляем офлайн статус...');
-                        // Отправляем через sendBeacon (самый надёжный способ)
                         sendStatusToServer(false, true);
-                        
-                        // Дополнительная отправка через fetch с keepalive
                         fetch(`${PROXY_URL}/updateStatus`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId, isOnline: false, isActive: false }),
                             keepalive: true
                         }).catch(() => {});
-                    }
-                });
-                
-                // Страница выгружается (перезагрузка)
-                window.addEventListener('pagehide', () => {
-                    isUnloading = true;
-                    if (isRegistered && currentStatus) {
-                        console.log('🚪 Pagehide, отправляем офлайн статус...');
-                        sendStatusToServer(false, true);
                     }
                 });
                 
@@ -941,7 +1017,7 @@
                 const div = document.createElement('div');
                 
                 const welcomeMsg = chatMessages.querySelector('.welcome-message');
-                if (welcomeMsg && !isSystem && !isUser) {
+                if (welcomeMsg && !isSystem) {
                     welcomeMsg.remove();
                 }
                 
@@ -1017,7 +1093,7 @@
                                 <span id="selectedCountryCode">${currentCountry.phoneCode} ▼</span>
                             </div>
                             <div class="custom-select-dropdown" id="selectDropdown">
-                                ${countries.map(c => `<div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" data-mask="${c.mask}">${c.name} ${c.phoneCode} (${c.maxDigits} цифр)</div>`).join('')}
+                                ${countries.map(c => `<div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" data-mask="${c.mask}">${c.name} ${c.phoneCode}</div>`).join('')}
                             </div>
                         </div>
                         <div class="phone-input-wrapper">
@@ -1096,7 +1172,7 @@
                         
                         if (!digits || digits.length === 0 || digits.length !== currentMaxDigits || !currentPattern.test(digits)) {
                             if (phoneError) {
-                                phoneError.innerText = '❌ Неверно указан номер телефона';
+                                phoneError.innerText = 'Неверно указан номер телефона';
                                 phoneError.style.color = '#ef4444';
                             }
                             return;
@@ -1127,18 +1203,19 @@
                                     chatMessages.innerHTML = '';
                                 }
                                 
-                                addMessage('Добрый день! Подскажите, когда будет готов мой заказ №4412?', true);
+                                addMessage('Добрый день! Подскажите, когда будет готов мой заказ 4412?', true);
                                 addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
                                 
                                 lastActivityTime = Date.now();
                                 await sendStatusToServer(true);
+                                connectWebSocket();
                             } else {
                                 if (phoneSubmit) {
                                     phoneSubmit.disabled = false;
                                     phoneSubmit.textContent = 'Начать чат';
                                 }
                                 if (phoneError) {
-                                    phoneError.innerText = '❌ Ошибка сервера';
+                                    phoneError.innerText = 'Ошибка сервера';
                                     phoneError.style.color = '#ef4444';
                                 }
                             }
@@ -1148,7 +1225,7 @@
                                 phoneSubmit.textContent = 'Начать чат';
                             }
                             if (phoneError) {
-                                phoneError.innerText = '❌ Ошибка соединения';
+                                phoneError.innerText = 'Ошибка соединения';
                                 phoneError.style.color = '#ef4444';
                             }
                             console.error('Ошибка:', err);
@@ -1168,7 +1245,7 @@
                 if (!text && !imageBase64) return;
                 
                 if (text) addMessage(text, true);
-                else addMessage('📷 Изображение', true);
+                else addMessage('Изображение', true);
                 
                 try {
                     const response = await fetch(`${PROXY_URL}/send`, {
@@ -1177,31 +1254,10 @@
                         body: JSON.stringify({ userId, text, imageBase64 })
                     });
                     const data = await response.json();
-                    console.log('📨 Сообщение отправлено:', data);
+                    console.log('Сообщение отправлено:', data);
                 } catch (err) {
                     console.error('Ошибка отправки:', err);
-                    addMessage('❌ Ошибка отправки сообщения. Попробуйте позже.', false, true);
-                }
-            }
-            
-            async function checkReplies() {
-                if (!isRegistered) return;
-                try {
-                    const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
-                    const data = await response.json();
-                    if (data.ok && data.result) {
-                        for (const update of data.result) {
-                            if (update.update_id > lastUpdateId) {
-                                lastUpdateId = update.update_id;
-                                if (update.message && !update.message.text?.includes('НОВЫЙ')) {
-                                    addMessage(update.message.text || '📷 Изображение', false, false, update.message.hasImage, update.message.imageUrl, update.message.date, 'Оператор Анна');
-                                }
-                            }
-                        }
-                        localStorage.setItem('chat_lastUpdateId', lastUpdateId);
-                    }
-                } catch (err) {
-                    console.error('Ошибка получения:', err);
+                    addMessage('Ошибка отправки сообщения. Попробуйте позже.', false, true);
                 }
             }
             
@@ -1226,6 +1282,7 @@
                 if (cancelBtn) cancelBtn.onclick = () => overlay.remove();
                 if (okBtn) {
                     okBtn.onclick = () => {
+                        disconnectWebSocket();
                         localStorage.removeItem('user_phone');
                         localStorage.removeItem('chat_history');
                         localStorage.setItem('chat_lastUpdateId', '0');
@@ -1248,7 +1305,7 @@
                 }
             }
             
-            // Инициализация обработчиков событий
+            // Обработчики событий
             if (widget) {
                 widget.onclick = (e) => {
                     if (widget.classList.contains('closed')) {
@@ -1351,27 +1408,12 @@
                     
                     setTimeout(() => {
                         sendStatusToServer(true);
+                        connectWebSocket();
                     }, 500);
                 } else {
                     setTimeout(() => showPhoneForm(), 500);
                 }
             });
-            
-            setInterval(checkReplies, 3000);
-            
-            setInterval(() => {
-                const sessionStart = localStorage.getItem('session_start');
-                if (sessionStart && userPhone) {
-                    const hoursPassed = (Date.now() - parseInt(sessionStart)) / (1000 * 60 * 60);
-                    if (hoursPassed >= SESSION_HOURS) {
-                        localStorage.removeItem('user_phone');
-                        localStorage.removeItem('chat_history');
-                        localStorage.removeItem('chat_lastUpdateId');
-                        localStorage.setItem('session_start', Date.now().toString());
-                        location.reload();
-                    }
-                }
-            }, 3600000);
         }
     })();
 </script>
