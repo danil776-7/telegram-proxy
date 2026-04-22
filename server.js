@@ -13,48 +13,31 @@ const SITE_URL = 'https://danil776-7.github.io';
 
 const users = new Map();
 const topicToUser = new Map();
-const wsClients = new Map(); // userId -> WebSocket connection
+const wsClients = new Map(); // userId -> WebSocket
+let lastUpdateId = 0;
 
 const lastStatusUpdate = new Map();
 const lastSentStatus = new Map();
 
 // Создаем HTTP сервер
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({ server, path: '/ws' });
 
 // WebSocket соединения
 wss.on('connection', (ws, req) => {
     console.log('🔌 Новое WebSocket соединение');
-    
     let userId = null;
     
     ws.on('message', async (data) => {
         try {
-            const message = JSON.parse(data);
+            const message = JSON.parse(data.toString());
+            console.log('📨 WebSocket сообщение:', message.type);
             
             if (message.type === 'register') {
                 userId = message.userId;
                 wsClients.set(userId, ws);
                 console.log(`✅ WebSocket зарегистрирован для ${userId}`);
-                
-                // Отправляем подтверждение
                 ws.send(JSON.stringify({ type: 'registered', ok: true }));
-            }
-            
-            if (message.type === 'new_message') {
-                // Новое сообщение от оператора - отправляем клиенту
-                const targetUserId = message.userId;
-                const clientWs = wsClients.get(targetUserId);
-                if (clientWs && clientWs.readyState === WebSocket.OPEN) {
-                    clientWs.send(JSON.stringify({
-                        type: 'message',
-                        text: message.text,
-                        isImage: message.isImage,
-                        imageUrl: message.imageUrl,
-                        timestamp: message.timestamp,
-                        operatorName: message.operatorName
-                    }));
-                }
             }
         } catch (err) {
             console.error('WebSocket ошибка:', err);
@@ -67,7 +50,22 @@ wss.on('connection', (ws, req) => {
             wsClients.delete(userId);
         }
     });
+    
+    ws.on('error', (err) => {
+        console.error('WebSocket ошибка соединения:', err);
+    });
 });
+
+// Отправка сообщения через WebSocket
+function sendViaWebSocket(userId, message) {
+    const ws = wsClients.get(userId);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+        console.log(`📨 WebSocket сообщение отправлено ${userId}`);
+        return true;
+    }
+    return false;
+}
 
 function getAmsterdamTime(timestamp = null) {
     const date = timestamp ? new Date(timestamp * 1000) : new Date();
@@ -98,10 +96,12 @@ async function getCountryByIp(ip) {
     return { country: 'Нидерланды', countryCode: 'NL', city: 'Амстердам', timezone: 'Europe/Amsterdam' };
 }
 
+// Главная страница
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Proxy работает с WebSocket!' });
+    res.json({ status: 'ok', message: 'Proxy работает с WebSocket!', websocket: 'wss://telegram-proxy-wyqq.onrender.com/ws' });
 });
 
+// РЕГИСТРАЦИЯ
 app.post('/register', async (req, res) => {
     console.log('📞 РЕГИСТРАЦИЯ:', req.body);
     const { userId, ip, phone, region } = req.body;
@@ -166,7 +166,7 @@ app.post('/register', async (req, res) => {
         topicToUser.set(topicId, userId);
         lastSentStatus.set(userId, true);
         
-        console.log(`✅ Пользователь ${userId} зарегистрирован`);
+        console.log(`✅ Пользователь ${userId} зарегистрирован, topicId: ${topicId}`);
         res.json({ ok: true, topicId });
         
     } catch (err) {
@@ -175,6 +175,7 @@ app.post('/register', async (req, res) => {
     }
 });
 
+// ОТПРАВКА СООБЩЕНИЯ ОТ ПОЛЬЗОВАТЕЛЯ
 app.post('/send', async (req, res) => {
     const { userId, text, imageBase64 } = req.body;
     console.log('📨 Сообщение от:', userId);
@@ -212,13 +213,15 @@ app.post('/send', async (req, res) => {
                 })
             });
         }
+        console.log('✅ Сообщение отправлено в Telegram');
         res.json({ ok: true });
     } catch (err) {
         console.error('Ошибка отправки:', err);
-        res.status(500).json({ ok: false });
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
+// ОБНОВЛЕНИЕ СТАТУСА
 app.post('/updateStatus', async (req, res) => {
     const { userId, isOnline, isActive, heartbeat } = req.body;
     
@@ -258,7 +261,7 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// Webhook для получения сообщений из Telegram
+// Webhook для получения сообщений из Telegram и отправки через WebSocket
 app.post('/webhook', async (req, res) => {
     const update = req.body;
     res.sendStatus(200);
@@ -272,39 +275,104 @@ app.post('/webhook', async (req, res) => {
         const userId = topicToUser.get(topicId);
         if (!userId) return;
         
-        // Пропускаем сообщения от ботов и системные
+        // Пропускаем сообщения от ботов
         if (msg.from && msg.from.is_bot) return;
-        if (msg.text && msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) return;
         
-        const ws = wsClients.get(userId);
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            let imageUrl = null;
-            let hasImage = false;
-            
-            if (msg.photo && msg.photo.length > 0) {
-                try {
-                    const photo = msg.photo[msg.photo.length - 1];
-                    const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
-                    const fileData = await fileResponse.json();
-                    if (fileData.ok) {
-                        imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
-                        hasImage = true;
-                    }
-                } catch (err) {}
-            }
-            
-            ws.send(JSON.stringify({
-                type: 'message',
-                text: msg.caption || msg.text || '',
-                isImage: hasImage,
-                imageUrl: imageUrl,
-                timestamp: msg.date,
-                operatorName: msg.from?.first_name || 'Оператор'
-            }));
-            console.log(`📨 WebSocket сообщение отправлено ${userId}`);
+        // Пропускаем системные сообщения
+        if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) return;
+        
+        let imageUrl = null;
+        let hasImage = false;
+        
+        if (msg.photo && msg.photo.length > 0) {
+            try {
+                const photo = msg.photo[msg.photo.length - 1];
+                const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
+                const fileData = await fileResponse.json();
+                if (fileData.ok) {
+                    imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                    hasImage = true;
+                }
+            } catch (err) {}
         }
+        
+        // Отправляем через WebSocket
+        sendViaWebSocket(userId, {
+            type: 'message',
+            text: msg.caption || msg.text || '',
+            isImage: hasImage,
+            imageUrl: imageUrl,
+            timestamp: msg.date,
+            operatorName: msg.from?.first_name || 'Оператор'
+        });
+        
+        console.log(`📨 WebSocket сообщение отправлено ${userId}`);
     } catch (err) {
         console.error('Webhook ошибка:', err);
+    }
+});
+
+// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ (Polling fallback)
+app.get('/getUpdates', async (req, res) => {
+    const { offset, userId } = req.query;
+    
+    const currentOffset = parseInt(offset) || lastUpdateId;
+    
+    try {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=5`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (!data.ok) {
+            return res.json({ ok: false, error: data.description });
+        }
+        
+        const filtered = [];
+        
+        for (const update of data.result) {
+            const msg = update.message;
+            if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
+                const topicId = msg.message_thread_id;
+                const topicUserId = topicToUser.get(topicId);
+                
+                if (msg.from && msg.from.is_bot) continue;
+                if (msg.text && msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
+                
+                if (topicUserId && (!userId || topicUserId === userId)) {
+                    const messageData = {
+                        update_id: update.update_id,
+                        message: {
+                            text: msg.caption || msg.text || '',
+                            from: msg.from?.first_name || 'Поддержка',
+                            date: msg.date
+                        }
+                    };
+                    
+                    if (msg.photo && msg.photo.length > 0) {
+                        try {
+                            const photo = msg.photo[msg.photo.length - 1];
+                            const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${photo.file_id}`);
+                            const fileData = await fileResponse.json();
+                            if (fileData.ok) {
+                                messageData.message.imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${fileData.result.file_path}`;
+                                messageData.message.hasImage = true;
+                            }
+                        } catch (err) {}
+                    }
+                    
+                    filtered.push(messageData);
+                    if (update.update_id + 1 > lastUpdateId) {
+                        lastUpdateId = update.update_id + 1;
+                    }
+                }
+            }
+        }
+        
+        res.json({ ok: true, result: filtered });
+        
+    } catch (err) {
+        console.error('Ошибка getUpdates:', err);
+        res.status(500).json({ ok: false, error: err.message });
     }
 });
 
@@ -312,8 +380,15 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН!`);
     console.log(`📡 Порт: ${PORT}`);
-    console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+    console.log(`🔌 WebSocket: wss://telegram-proxy-wyqq.onrender.com/ws`);
     console.log(`📡 Группа Telegram: ${GROUP_CHAT_ID}`);
     console.log(`🌐 Сайт: ${SITE_URL}`);
-    console.log(`\n💡 Статус пользователя отображается иконкой в списке топиков: 🟢 - онлайн, ⚫️ - офлайн\n`);
+    console.log(`\n📋 Доступные эндпоинты:`);
+    console.log(`   GET  /            - статус сервера`);
+    console.log(`   GET  /ws          - WebSocket соединение`);
+    console.log(`   POST /register    - регистрация пользователя`);
+    console.log(`   POST /send        - отправка сообщения`);
+    console.log(`   POST /updateStatus - обновление статуса`);
+    console.log(`   GET  /getUpdates  - получение ответов (polling fallback)`);
+    console.log(`   POST /webhook     - вебхук от Telegram\n`);
 });
