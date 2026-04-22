@@ -28,7 +28,7 @@ const wss = new WebSocket.Server({ server, path: '/ws' });
 
 // WebSocket соединения
 wss.on('connection', (ws, req) => {
-    console.log('🔌 Новое WebSocket соединение');
+    console.log(' Новое WebSocket соединение');
     let userId = null;
     
     ws.on('message', async (data) => {
@@ -37,7 +37,7 @@ wss.on('connection', (ws, req) => {
             if (message.type === 'register') {
                 userId = message.userId;
                 wsClients.set(userId, ws);
-                console.log(`✅ WebSocket зарегистрирован для ${userId}`);
+                console.log(` WebSocket зарегистрирован для ${userId}`);
                 ws.send(JSON.stringify({ type: 'registered', ok: true }));
             }
         } catch (err) {
