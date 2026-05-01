@@ -495,8 +495,7 @@
         function init() {
             const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
             const SESSION_HOURS = 36;
-            const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности
-            const OFFLINE_DELAY = 5000; // Задержка перед отправкой офлайн
+            const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности до офлайн
             
             const countries = [
                 { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
@@ -536,16 +535,15 @@
             // WebSocket
             let ws = null;
             let wsReconnectTimer = null;
-            let wsConnected = false;
             
             // Статус система
             let currentStatus = false;
             let lastActivityTime = Date.now();
             let isPageVisible = true;
             let heartbeatInterval = null;
-            let lastSentStatus = false;
-            let offlineTimer = null;
+            let lastSentStatus = null;
             let isUnloading = false;
+            let statusCheckInterval = null;
             
             // DOM элементы
             const statusIndicator = document.getElementById('statusIndicator');
@@ -571,6 +569,8 @@
             
             async function sendStatusToServer(online, isSync = false) {
                 if (!isRegistered) return false;
+                
+                // Не отправляем тот же статус слишком часто
                 if (lastSentStatus === online && !isSync) return false;
                 
                 const payload = { userId, isOnline: online, isActive: online };
@@ -583,7 +583,7 @@
                             lastSentStatus = online;
                             currentStatus = online;
                             updateStatusUI(online);
-                            console.log(`📊 Статус отправлен (beacon): ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+                            console.log(`📊 Статус (beacon): ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
                         }
                         return sent;
                     } else {
@@ -597,7 +597,7 @@
                             lastSentStatus = online;
                             currentStatus = online;
                             updateStatusUI(online);
-                            console.log(`📊 Статус отправлен: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
+                            console.log(`📊 Статус: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
                             return true;
                         }
                     }
@@ -607,35 +607,32 @@
                 return false;
             }
             
-            // Функция для перехода в офлайн с задержкой
-            function scheduleOffline() {
-                if (offlineTimer) clearTimeout(offlineTimer);
-                offlineTimer = setTimeout(() => {
-                    if (currentStatus && !isUnloading) {
-                        sendStatusToServer(false);
-                    }
-                }, OFFLINE_DELAY);
-            }
-            
-            function cancelOffline() {
-                if (offlineTimer) {
-                    clearTimeout(offlineTimer);
-                    offlineTimer = null;
+            // Функция для проверки и обновления статуса
+            function checkAndUpdateStatus() {
+                if (!isRegistered || isUnloading) return;
+                
+                const now = Date.now();
+                const inactiveTime = now - lastActivityTime;
+                const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
+                
+                if (shouldBeOnline !== currentStatus) {
+                    sendStatusToServer(shouldBeOnline);
                 }
             }
             
+            // Сброс активности (пользователь что-то делает)
             function onUserActivity() {
                 if (!isRegistered || isUnloading) return;
                 
-                const wasInactive = (Date.now() - lastActivityTime) >= INACTIVITY_TIMEOUT;
+                const wasOffline = !currentStatus;
                 lastActivityTime = Date.now();
-                cancelOffline();
                 
-                if (wasInactive && !currentStatus && isPageVisible) {
+                // Если были офлайн и страница видима - включаем онлайн
+                if (wasOffline && isPageVisible) {
                     sendStatusToServer(true);
                 } else if (currentStatus) {
-                    // Продлеваем онлайн статус
-                    scheduleOffline();
+                    // Если уже онлайн - просто обновляем время активности
+                    // и отправляем heartbeat если нужно
                 }
             }
             
@@ -648,9 +645,9 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId, isOnline: true, isActive: true, heartbeat: true })
                         }).catch(() => {});
-                        console.log('💓 Heartbeat отправлен');
+                        console.log('💓 Heartbeat');
                     }
-                }, 15000); // Каждые 15 секунд
+                }, 15000);
             }
             
             function setupActivityTracking() {
@@ -666,51 +663,49 @@
                     messageInput.addEventListener('keypress', onUserActivity);
                 }
                 
-                // Отслеживание видимости страницы
+                // Видимость страницы
                 document.addEventListener('visibilitychange', () => {
                     if (isUnloading) return;
                     isPageVisible = !document.hidden;
-                    console.log(`👁️ Видимость страницы: ${isPageVisible ? 'видима' : 'скрыта'}`);
+                    console.log(`👁️ Видимость: ${isPageVisible ? 'видима' : 'скрыта'}`);
                     
                     if (isPageVisible) {
-                        // Страница стала видимой - сбрасываем таймер и включаем онлайн
+                        // Страница стала видимой - сбрасываем активность и включаем онлайн
                         lastActivityTime = Date.now();
-                        cancelOffline();
                         if (!currentStatus) {
                             sendStatusToServer(true);
-                        } else {
-                            scheduleOffline();
                         }
                     } else {
-                        // Страница скрыта - планируем офлайн через 5 секунд
-                        if (currentStatus) {
-                            scheduleOffline();
-                        }
+                        // Страница скрыта - проверяем статус
+                        checkAndUpdateStatus();
                     }
                 });
                 
-                // Закрытие вкладки - немедленно отправляем офлайн
+                // Закрытие вкладки
                 window.addEventListener('beforeunload', () => {
                     isUnloading = true;
-                    cancelOffline();
                     if (isRegistered && currentStatus) {
-                        console.log('🚪 Страница закрывается, отправляем офлайн...');
+                        console.log('🚪 Закрытие, офлайн');
                         sendStatusToServer(false, true);
                     }
                 });
                 
                 window.addEventListener('pagehide', () => {
                     isUnloading = true;
-                    cancelOffline();
                     if (isRegistered && currentStatus) {
                         sendStatusToServer(false, true);
                     }
                 });
                 
+                // Периодическая проверка статуса
+                statusCheckInterval = setInterval(() => {
+                    checkAndUpdateStatus();
+                }, 5000);
+                
                 startHeartbeat();
             }
             
-            // WebSocket соединение
+            // WebSocket
             function connectWebSocket() {
                 if (!isRegistered) return;
                 if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
@@ -720,8 +715,7 @@
                     ws = new WebSocket(`${wsUrl}/ws`);
                     
                     ws.onopen = () => {
-                        console.log('🔌 WebSocket подключен');
-                        wsConnected = true;
+                        console.log('🔌 WebSocket connected');
                         ws.send(JSON.stringify({ type: 'register', userId: userId }));
                     };
                     
@@ -732,30 +726,27 @@
                                 addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
                             }
                         } catch (err) {
-                            console.error('WebSocket сообщение ошибка:', err);
+                            console.error('WebSocket message error:', err);
                         }
                     };
                     
                     ws.onerror = (error) => {
-                        console.error('WebSocket ошибка:', error);
-                        wsConnected = false;
+                        console.error('WebSocket error:', error);
                     };
                     
                     ws.onclose = () => {
-                        console.log('🔌 WebSocket отключен');
-                        wsConnected = false;
+                        console.log('🔌 WebSocket disconnected');
                         if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
                         wsReconnectTimer = setTimeout(() => {
                             if (isRegistered) connectWebSocket();
                         }, 5000);
                     };
                 } catch (err) {
-                    console.error('WebSocket создание ошибка:', err);
+                    console.error('WebSocket creation error:', err);
                 }
             }
             
             function disconnectWebSocket() {
-                wsConnected = false;
                 if (ws) {
                     ws.close();
                     ws = null;
@@ -772,8 +763,15 @@
                 });
             }
             
+            let lastMessageId = 0;
+            
             function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
                 if (!chatMessages) return;
+                
+                // Защита от дублирования сообщений
+                const messageKey = `${text}_${timestamp}_${isUser}`;
+                if (lastMessageId === messageKey) return;
+                lastMessageId = messageKey;
                 
                 const div = document.createElement('div');
                 const welcomeMsg = chatMessages.querySelector('.welcome-message');
@@ -964,7 +962,6 @@
                                 
                                 lastActivityTime = Date.now();
                                 await sendStatusToServer(true);
-                                scheduleOffline();
                                 connectWebSocket();
                             } else {
                                 if (phoneSubmit) {
@@ -997,6 +994,7 @@
                     return;
                 }
                 
+                // Обновляем активность при отправке
                 onUserActivity();
                 
                 if (!text && !imageBase64) return;
@@ -1060,7 +1058,6 @@
                 if (okBtn) {
                     okBtn.onclick = () => {
                         disconnectWebSocket();
-                        cancelOffline();
                         localStorage.removeItem('user_phone');
                         localStorage.removeItem('chat_history');
                         localStorage.setItem('chat_lastUpdateId', '0');
@@ -1068,7 +1065,7 @@
                         isRegistered = false;
                         lastUpdateId = 0;
                         currentStatus = false;
-                        lastSentStatus = false;
+                        lastSentStatus = null;
                         
                         if (chatMessages) {
                             chatMessages.innerHTML = `
@@ -1185,7 +1182,6 @@
                     
                     setTimeout(() => {
                         sendStatusToServer(true);
-                        scheduleOffline();
                         connectWebSocket();
                     }, 500);
                 } else {
