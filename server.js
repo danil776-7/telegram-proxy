@@ -19,8 +19,6 @@ const imageCache = new Map();
 
 // Хранилище последнего update_id для каждого пользователя
 const userLastUpdateId = new Map();
-// Глобальный lastUpdateId для отслеживания
-let globalLastUpdateId = 0;
 
 const lastStatusUpdate = new Map();
 const lastSentStatus = new Map();
@@ -310,11 +308,10 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ - ИСПРАВЛЕННАЯ ВЕРСИЯ
+// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
     
-    // Получаем правильный offset для пользователя
     let currentOffset = 0;
     if (userId && userLastUpdateId.has(userId)) {
         currentOffset = userLastUpdateId.get(userId);
@@ -322,10 +319,9 @@ app.get('/getUpdates', async (req, res) => {
         currentOffset = parseInt(offset);
     }
     
-    console.log(`📡 getUpdates для ${userId}: offset=${currentOffset}, globalOffset=${globalLastUpdateId}`);
+    console.log(`📡 getUpdates для ${userId}: offset=${currentOffset}`);
     
     try {
-        // Получаем новые сообщения из Telegram начиная с currentOffset
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=2`;
         const response = await fetch(url);
         const data = await response.json();
@@ -349,11 +345,9 @@ app.get('/getUpdates', async (req, res) => {
             const topicId = msg.message_thread_id;
             const topicUserId = topicToUser.get(topicId);
             
-            // Пропускаем сообщения от ботов и системные
             if (msg.from && msg.from.is_bot) continue;
             if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
             
-            // Если сообщение для нашего пользователя
             if (topicUserId === userId) {
                 const messageData = {
                     update_id: update.update_id,
@@ -373,32 +367,25 @@ app.get('/getUpdates', async (req, res) => {
                 filtered.push(messageData);
                 console.log(`📨 Новое сообщение для ${userId}: ${messageData.message.text?.substring(0, 30)} (update_id: ${update.update_id})`);
                 
-                // Отправляем через WebSocket
                 sendViaWebSocket(topicUserId, {
                     type: 'message',
                     text: msg.caption || msg.text || '',
                     isImage: !!(msg.photo && msg.photo.length > 0),
                     imageUrl: msg.photo ? `${baseUrl}/image/${msg.photo[msg.photo.length - 1].file_id}` : null,
                     timestamp: msg.date,
-                    operatorName: msg.from?.first_name || 'Оператор'
+                    operatorName: msg.from?.first_name || 'Оператор',
+                    updateId: update.update_id
                 });
             }
             
-            // Обновляем максимальный update_id
             if (update.update_id + 1 > maxUpdateId) {
                 maxUpdateId = update.update_id + 1;
             }
         }
         
-        // Сохраняем новый offset для пользователя ТОЛЬКО если есть новые сообщения
         if (userId && maxUpdateId > currentOffset) {
             userLastUpdateId.set(userId, maxUpdateId);
-            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId} (было ${currentOffset})`);
-        }
-        
-        // Обновляем глобальный offset
-        if (maxUpdateId > globalLastUpdateId) {
-            globalLastUpdateId = maxUpdateId;
+            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId}`);
         }
         
         res.json({ ok: true, result: filtered });
