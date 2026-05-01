@@ -19,6 +19,8 @@ const imageCache = new Map();
 
 // Хранилище последнего update_id для каждого пользователя
 const userLastUpdateId = new Map();
+// Глобальный lastUpdateId для отслеживания
+let globalLastUpdateId = 0;
 
 const lastStatusUpdate = new Map();
 const lastSentStatus = new Map();
@@ -308,7 +310,7 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ (только новые сообщения)
+// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ - ИСПРАВЛЕННАЯ ВЕРСИЯ
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
     
@@ -320,10 +322,10 @@ app.get('/getUpdates', async (req, res) => {
         currentOffset = parseInt(offset);
     }
     
-    console.log(`📡 getUpdates для ${userId}: offset=${currentOffset}`);
+    console.log(`📡 getUpdates для ${userId}: offset=${currentOffset}, globalOffset=${globalLastUpdateId}`);
     
     try {
-        // Получаем новые сообщения из Telegram
+        // Получаем новые сообщения из Telegram начиная с currentOffset
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=2`;
         const response = await fetch(url);
         const data = await response.json();
@@ -369,7 +371,7 @@ app.get('/getUpdates', async (req, res) => {
                 }
                 
                 filtered.push(messageData);
-                console.log(`📨 Новое сообщение для ${userId}: ${messageData.message.text?.substring(0, 30)}`);
+                console.log(`📨 Новое сообщение для ${userId}: ${messageData.message.text?.substring(0, 30)} (update_id: ${update.update_id})`);
                 
                 // Отправляем через WebSocket
                 sendViaWebSocket(topicUserId, {
@@ -388,10 +390,15 @@ app.get('/getUpdates', async (req, res) => {
             }
         }
         
-        // Сохраняем новый offset для пользователя
+        // Сохраняем новый offset для пользователя ТОЛЬКО если есть новые сообщения
         if (userId && maxUpdateId > currentOffset) {
             userLastUpdateId.set(userId, maxUpdateId);
-            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId}`);
+            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId} (было ${currentOffset})`);
+        }
+        
+        // Обновляем глобальный offset
+        if (maxUpdateId > globalLastUpdateId) {
+            globalLastUpdateId = maxUpdateId;
         }
         
         res.json({ ok: true, result: filtered });
