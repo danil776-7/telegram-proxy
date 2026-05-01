@@ -17,8 +17,7 @@ const topicToUser = new Map();
 const wsClients = new Map();
 const imageCache = new Map();
 
-// Хранилище последних обновлений для каждого пользователя
-let lastUpdateId = 0;
+// Хранилище последнего update_id для каждого пользователя
 const userLastUpdateId = new Map();
 
 const lastStatusUpdate = new Map();
@@ -313,16 +312,18 @@ app.post('/updateStatus', async (req, res) => {
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
     
-    // Для каждого пользователя свой offset
-    let currentOffset;
+    // Получаем правильный offset для пользователя
+    let currentOffset = 0;
     if (userId && userLastUpdateId.has(userId)) {
         currentOffset = userLastUpdateId.get(userId);
-    } else {
-        currentOffset = parseInt(offset) || 0;
+    } else if (offset) {
+        currentOffset = parseInt(offset);
     }
     
+    console.log(`📡 getUpdates для ${userId}: offset=${currentOffset}`);
+    
     try {
-        // Получаем только новые сообщения (timeout=2 для быстрого ответа)
+        // Получаем новые сообщения из Telegram
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=2`;
         const response = await fetch(url);
         const data = await response.json();
@@ -336,7 +337,7 @@ app.get('/getUpdates', async (req, res) => {
         const baseUrl = `${protocol}://${host}`;
         
         const filtered = [];
-        let newOffset = currentOffset;
+        let maxUpdateId = currentOffset;
         
         for (const update of data.result) {
             const msg = update.message;
@@ -368,8 +369,9 @@ app.get('/getUpdates', async (req, res) => {
                 }
                 
                 filtered.push(messageData);
+                console.log(`📨 Новое сообщение для ${userId}: ${messageData.message.text?.substring(0, 30)}`);
                 
-                // Отправляем также через WebSocket
+                // Отправляем через WebSocket
                 sendViaWebSocket(topicUserId, {
                     type: 'message',
                     text: msg.caption || msg.text || '',
@@ -380,19 +382,16 @@ app.get('/getUpdates', async (req, res) => {
                 });
             }
             
-            // Обновляем offset
-            if (update.update_id + 1 > newOffset) {
-                newOffset = update.update_id + 1;
+            // Обновляем максимальный update_id
+            if (update.update_id + 1 > maxUpdateId) {
+                maxUpdateId = update.update_id + 1;
             }
         }
         
         // Сохраняем новый offset для пользователя
-        if (userId && newOffset > currentOffset) {
-            userLastUpdateId.set(userId, newOffset);
-        }
-        
-        if (newOffset > lastUpdateId) {
-            lastUpdateId = newOffset;
+        if (userId && maxUpdateId > currentOffset) {
+            userLastUpdateId.set(userId, maxUpdateId);
+            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId}`);
         }
         
         res.json({ ok: true, result: filtered });
