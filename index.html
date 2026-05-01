@@ -477,752 +477,697 @@
 </div>
 
 <script>
-    // Перехват ошибок
-    window.addEventListener('error', function(e) {
-        if (e.filename && (e.filename.includes('override.js') || e.message.includes('CORS'))) {
-            e.preventDefault();
-            e.stopPropagation();
-            return false;
-        }
-        return true;
-    });
-    window.addEventListener('unhandledrejection', function(e) {
-        e.preventDefault();
-        return false;
-    });
-
     (function() {
-        function init() {
-            const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
-            const SESSION_HOURS = 36;
-            const INACTIVITY_TIMEOUT = 30000;
+        // Простая функция добавления сообщения для теста
+        function testAddMessage() {
+            const chatMessages = document.getElementById('chatMessages');
+            if (!chatMessages) return;
             
-            const countries = [
-                { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
-                { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
-                { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
-                { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
-                { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
-                { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' }
-            ];
+            // Убираем welcome message
+            const welcome = chatMessages.querySelector('.welcome-message');
+            if (welcome) welcome.remove();
             
-            let userId = localStorage.getItem('chat_user_id');
-            if (!userId) {
-                userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-                localStorage.setItem('chat_user_id', userId);
-                console.log('🆕 Создан новый userId:', userId);
-            } else {
-                console.log('🆔 Загружен userId:', userId);
-            }
-            
-            const sessionStart = localStorage.getItem('session_start');
-            const now = Date.now();
-            if (sessionStart) {
-                const hoursPassed = (now - parseInt(sessionStart)) / (1000 * 60 * 60);
-                if (hoursPassed >= SESSION_HOURS) {
-                    localStorage.removeItem('user_phone');
-                    localStorage.removeItem('chat_history');
-                    localStorage.removeItem('chat_lastUpdateId');
-                    localStorage.setItem('session_start', now.toString());
-                    console.log('🔄 Сессия обновлена');
-                }
-            } else {
+            const div = document.createElement('div');
+            div.className = 'message user-message';
+            div.innerHTML = 'Тестовое сообщение <div class="message-time">' + new Date().toLocaleTimeString() + '</div>';
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Запускаем тест через 2 секунды
+        setTimeout(testAddMessage, 2000);
+        
+        const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
+        const SESSION_HOURS = 36;
+        const INACTIVITY_TIMEOUT = 30000;
+        
+        const countries = [
+            { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
+            { code: 'NL', name: 'Нидерланды', phoneCode: '+31', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
+            { code: 'RU', name: 'Россия', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
+            { code: 'UA', name: 'Украина', phoneCode: '+380', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
+            { code: 'KZ', name: 'Казахстан', phoneCode: '+7', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' },
+            { code: 'US', name: 'США', phoneCode: '+1', maxDigits: 10, pattern: /^[0-9]{10}$/, mask: '(___) ___ __ __' }
+        ];
+        
+        let userId = localStorage.getItem('chat_user_id');
+        if (!userId) {
+            userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+            localStorage.setItem('chat_user_id', userId);
+        }
+        
+        const sessionStart = localStorage.getItem('session_start');
+        const now = Date.now();
+        if (sessionStart) {
+            const hoursPassed = (now - parseInt(sessionStart)) / (1000 * 60 * 60);
+            if (hoursPassed >= SESSION_HOURS) {
+                localStorage.removeItem('user_phone');
+                localStorage.removeItem('chat_history');
+                localStorage.removeItem('chat_lastUpdateId');
                 localStorage.setItem('session_start', now.toString());
             }
-            
-            let userPhone = localStorage.getItem('user_phone');
-            let isRegistered = !!userPhone;
-            let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
-            let userIp = '';
-            let detectedCountry = 'UZ';
-            
-            console.log('📱 Статус регистрации:', isRegistered ? 'зарегистрирован' : 'не зарегистрирован');
-            
-            // WebSocket
-            let ws = null;
-            let wsReconnectTimer = null;
-            
-            // Статус система
-            let currentStatus = false;
-            let lastActivityTime = Date.now();
-            let isPageVisible = true;
-            let heartbeatInterval = null;
-            let lastSentStatus = null;
-            let isUnloading = false;
-            let statusCheckInterval = null;
-            
-            // DOM элементы
-            const statusIndicator = document.getElementById('statusIndicator');
-            const statusText = document.getElementById('statusText');
-            const widget = document.getElementById('chatWidget');
-            const closeBtn = document.querySelector('.close-btn');
-            const clearBtn = document.getElementById('clearBtn');
-            const sendBtn = document.getElementById('sendBtn');
-            const messageInput = document.getElementById('messageInput');
-            const fileBtn = document.getElementById('fileBtn');
-            const fileInput = document.getElementById('fileInput');
-            const chatMessages = document.getElementById('chatMessages');
-            
-            function updateStatusUI(online) {
-                if (statusIndicator) {
-                    statusIndicator.className = online ? 'status-indicator online' : 'status-indicator';
-                }
-                if (statusText) {
-                    statusText.textContent = online ? 'онлайн' : 'офлайн';
-                    statusText.className = online ? 'status-text online' : 'status-text';
-                }
+        } else {
+            localStorage.setItem('session_start', now.toString());
+        }
+        
+        let userPhone = localStorage.getItem('user_phone');
+        let isRegistered = !!userPhone;
+        let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
+        let userIp = '';
+        let detectedCountry = 'UZ';
+        
+        // WebSocket
+        let ws = null;
+        let wsReconnectTimer = null;
+        
+        // Статус система
+        let currentStatus = false;
+        let lastActivityTime = Date.now();
+        let isPageVisible = true;
+        let heartbeatInterval = null;
+        let lastSentStatus = null;
+        let isUnloading = false;
+        let statusCheckInterval = null;
+        
+        // DOM элементы
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const widget = document.getElementById('chatWidget');
+        const closeBtn = document.querySelector('.close-btn');
+        const clearBtn = document.getElementById('clearBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const messageInput = document.getElementById('messageInput');
+        const fileBtn = document.getElementById('fileBtn');
+        const fileInput = document.getElementById('fileInput');
+        const chatMessages = document.getElementById('chatMessages');
+        
+        function updateStatusUI(online) {
+            if (statusIndicator) {
+                statusIndicator.className = online ? 'status-indicator online' : 'status-indicator';
             }
+            if (statusText) {
+                statusText.textContent = online ? 'онлайн' : 'офлайн';
+                statusText.className = online ? 'status-text online' : 'status-text';
+            }
+        }
+        
+        async function sendStatusToServer(online, isSync = false) {
+            if (!isRegistered) return false;
+            if (lastSentStatus === online && !isSync) return false;
             
-            async function sendStatusToServer(online, isSync = false) {
-                if (!isRegistered) return false;
-                if (lastSentStatus === online && !isSync) return false;
-                
-                const payload = { userId, isOnline: online, isActive: online };
-                
-                try {
-                    if (isSync) {
-                        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
-                        const sent = navigator.sendBeacon(`${PROXY_URL}/updateStatus`, blob);
-                        if (sent) {
-                            lastSentStatus = online;
-                            currentStatus = online;
-                            updateStatusUI(online);
-                            console.log(`📊 Статус (beacon): ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
-                        }
-                        return sent;
-                    } else {
-                        const response = await fetch(`${PROXY_URL}/updateStatus`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-                        
-                        if (response.ok) {
-                            lastSentStatus = online;
-                            currentStatus = online;
-                            updateStatusUI(online);
-                            console.log(`📊 Статус: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
-                            return true;
-                        }
+            const payload = { userId, isOnline: online, isActive: online };
+            
+            try {
+                if (isSync) {
+                    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+                    const sent = navigator.sendBeacon(`${PROXY_URL}/updateStatus`, blob);
+                    if (sent) {
+                        lastSentStatus = online;
+                        currentStatus = online;
+                        updateStatusUI(online);
                     }
-                } catch (err) {
-                    console.error('Ошибка отправки статуса:', err);
-                }
-                return false;
-            }
-            
-            function checkAndUpdateStatus() {
-                if (!isRegistered || isUnloading) return;
-                
-                const now = Date.now();
-                const inactiveTime = now - lastActivityTime;
-                const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
-                
-                if (shouldBeOnline !== currentStatus) {
-                    console.log(`📊 Смена статуса: ${shouldBeOnline ? 'ОНЛАЙН' : 'ОФЛАЙН'} (неактивен ${Math.floor(inactiveTime/1000)}с)`);
-                    sendStatusToServer(shouldBeOnline);
-                }
-            }
-            
-            function onUserActivity() {
-                if (!isRegistered || isUnloading) return;
-                
-                const wasOffline = !currentStatus;
-                lastActivityTime = Date.now();
-                
-                if (wasOffline) {
-                    console.log('🟢 Активность: включаем онлайн');
-                    sendStatusToServer(true);
-                }
-            }
-            
-            function startHeartbeat() {
-                if (heartbeatInterval) clearInterval(heartbeatInterval);
-                heartbeatInterval = setInterval(() => {
-                    if (isRegistered && currentStatus && isPageVisible && !isUnloading) {
-                        fetch(`${PROXY_URL}/updateStatus`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ userId, isOnline: true, isActive: true, heartbeat: true })
-                        }).catch(() => {});
-                        console.log('💓 Heartbeat');
-                    }
-                }, 15000);
-            }
-            
-            function setupActivityTracking() {
-                const events = ['click', 'mousemove', 'keydown', 'keypress', 'scroll', 'touchstart', 'touchmove', 'focus'];
-                events.forEach(event => {
-                    document.addEventListener(event, onUserActivity);
-                    window.addEventListener(event, onUserActivity);
-                });
-                
-                if (messageInput) {
-                    messageInput.addEventListener('focus', onUserActivity);
-                    messageInput.addEventListener('input', onUserActivity);
-                    messageInput.addEventListener('keypress', onUserActivity);
-                }
-                
-                document.addEventListener('visibilitychange', () => {
-                    if (isUnloading) return;
-                    isPageVisible = !document.hidden;
-                    console.log(`👁️ Видимость: ${isPageVisible ? 'видима' : 'скрыта'}`);
-                    
-                    if (isPageVisible) {
-                        lastActivityTime = Date.now();
-                        if (!currentStatus) {
-                            sendStatusToServer(true);
-                        }
-                    } else {
-                        checkAndUpdateStatus();
-                    }
-                });
-                
-                window.addEventListener('beforeunload', () => {
-                    isUnloading = true;
-                    if (isRegistered && currentStatus) {
-                        console.log('🚪 Закрытие, офлайн');
-                        sendStatusToServer(false, true);
-                    }
-                });
-                
-                window.addEventListener('pagehide', () => {
-                    isUnloading = true;
-                    if (isRegistered && currentStatus) {
-                        sendStatusToServer(false, true);
-                    }
-                });
-                
-                statusCheckInterval = setInterval(() => {
-                    checkAndUpdateStatus();
-                }, 5000);
-                
-                startHeartbeat();
-            }
-            
-            function connectWebSocket() {
-                if (!isRegistered) return;
-                if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-                
-                try {
-                    const wsUrl = PROXY_URL.replace('https://', 'wss://').replace('http://', 'ws://');
-                    console.log('🔌 Подключение к WebSocket:', `${wsUrl}/ws`);
-                    ws = new WebSocket(`${wsUrl}/ws`);
-                    
-                    ws.onopen = () => {
-                        console.log('🔌 WebSocket connected');
-                        ws.send(JSON.stringify({ type: 'register', userId: userId }));
-                    };
-                    
-                    ws.onmessage = (event) => {
-                        try {
-                            const data = JSON.parse(event.data);
-                            console.log('📨 WebSocket сообщение:', data);
-                            if (data.type === 'message') {
-                                addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
-                            }
-                        } catch (err) {
-                            console.error('WebSocket message error:', err);
-                        }
-                    };
-                    
-                    ws.onerror = (error) => {
-                        console.error('WebSocket error:', error);
-                    };
-                    
-                    ws.onclose = () => {
-                        console.log('🔌 WebSocket disconnected');
-                        if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-                        wsReconnectTimer = setTimeout(() => {
-                            if (isRegistered) connectWebSocket();
-                        }, 5000);
-                    };
-                } catch (err) {
-                    console.error('WebSocket creation error:', err);
-                }
-            }
-            
-            function disconnectWebSocket() {
-                if (ws) {
-                    ws.close();
-                    ws = null;
-                }
-                if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-            }
-            
-            function formatMessageTime(timestamp) {
-                const date = timestamp ? new Date(timestamp * 1000) : new Date();
-                return date.toLocaleTimeString('ru-RU', { 
-                    hour: '2-digit', 
-                    minute: '2-digit',
-                    timeZone: 'Europe/Amsterdam'
-                });
-            }
-            
-            let lastMessageId = 0;
-            
-            function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
-                console.log('💬 addMessage вызван:', { text, isUser, isSystem, isImage, imageUrl, timestamp, operatorName });
-                
-                if (!chatMessages) {
-                    console.error('❌ chatMessages не найден!');
-                    return;
-                }
-                
-                const messageKey = `${text}_${timestamp}_${isUser}`;
-                if (lastMessageId === messageKey) {
-                    console.log('⚠️ Дубликат сообщения, пропускаем');
-                    return;
-                }
-                lastMessageId = messageKey;
-                
-                const div = document.createElement('div');
-                const welcomeMsg = chatMessages.querySelector('.welcome-message');
-                if (welcomeMsg && !isSystem) welcomeMsg.remove();
-                
-                if (isSystem) {
-                    div.className = 'message system-message';
-                    div.innerText = text;
+                    return sent;
                 } else {
-                    div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
-                    if (!isUser && operatorName) {
-                        const nameSpan = document.createElement('div');
-                        nameSpan.className = 'operator-name';
-                        nameSpan.innerText = operatorName;
-                        div.appendChild(nameSpan);
+                    const response = await fetch(`${PROXY_URL}/updateStatus`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (response.ok) {
+                        lastSentStatus = online;
+                        currentStatus = online;
+                        updateStatusUI(online);
+                        return true;
                     }
-                    if (isImage && imageUrl) {
-                        const img = document.createElement('img');
-                        img.src = imageUrl;
-                        img.onclick = () => window.open(imageUrl, '_blank');
-                        div.appendChild(img);
-                        if (text) div.appendChild(document.createTextNode(' ' + text));
-                    } else if (text) {
-                        div.appendChild(document.createTextNode(text));
+                }
+            } catch (err) {
+                console.error('Ошибка отправки статуса:', err);
+            }
+            return false;
+        }
+        
+        function checkAndUpdateStatus() {
+            if (!isRegistered || isUnloading) return;
+            
+            const now = Date.now();
+            const inactiveTime = now - lastActivityTime;
+            const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
+            
+            if (shouldBeOnline !== currentStatus) {
+                sendStatusToServer(shouldBeOnline);
+            }
+        }
+        
+        function onUserActivity() {
+            if (!isRegistered || isUnloading) return;
+            
+            const wasOffline = !currentStatus;
+            lastActivityTime = Date.now();
+            
+            if (wasOffline) {
+                sendStatusToServer(true);
+            }
+        }
+        
+        function startHeartbeat() {
+            if (heartbeatInterval) clearInterval(heartbeatInterval);
+            heartbeatInterval = setInterval(() => {
+                if (isRegistered && currentStatus && isPageVisible && !isUnloading) {
+                    fetch(`${PROXY_URL}/updateStatus`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId, isOnline: true, isActive: true, heartbeat: true })
+                    }).catch(() => {});
+                }
+            }, 15000);
+        }
+        
+        function setupActivityTracking() {
+            const events = ['click', 'mousemove', 'keydown', 'keypress', 'scroll', 'touchstart', 'touchmove', 'focus'];
+            events.forEach(event => {
+                document.addEventListener(event, onUserActivity);
+                window.addEventListener(event, onUserActivity);
+            });
+            
+            if (messageInput) {
+                messageInput.addEventListener('focus', onUserActivity);
+                messageInput.addEventListener('input', onUserActivity);
+                messageInput.addEventListener('keypress', onUserActivity);
+            }
+            
+            document.addEventListener('visibilitychange', () => {
+                if (isUnloading) return;
+                isPageVisible = !document.hidden;
+                
+                if (isPageVisible) {
+                    lastActivityTime = Date.now();
+                    if (!currentStatus) {
+                        sendStatusToServer(true);
+                    }
+                } else {
+                    checkAndUpdateStatus();
+                }
+            });
+            
+            window.addEventListener('beforeunload', () => {
+                isUnloading = true;
+                if (isRegistered && currentStatus) {
+                    sendStatusToServer(false, true);
+                }
+            });
+            
+            window.addEventListener('pagehide', () => {
+                isUnloading = true;
+                if (isRegistered && currentStatus) {
+                    sendStatusToServer(false, true);
+                }
+            });
+            
+            statusCheckInterval = setInterval(() => {
+                checkAndUpdateStatus();
+            }, 5000);
+            
+            startHeartbeat();
+        }
+        
+        function connectWebSocket() {
+            if (!isRegistered) return;
+            if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+            
+            try {
+                const wsUrl = PROXY_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+                ws = new WebSocket(`${wsUrl}/ws`);
+                
+                ws.onopen = () => {
+                    ws.send(JSON.stringify({ type: 'register', userId: userId }));
+                };
+                
+                ws.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.type === 'message') {
+                            addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
+                        }
+                    } catch (err) {}
+                };
+                
+                ws.onerror = (error) => {};
+                
+                ws.onclose = () => {
+                    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+                    wsReconnectTimer = setTimeout(() => {
+                        if (isRegistered) connectWebSocket();
+                    }, 5000);
+                };
+            } catch (err) {}
+        }
+        
+        function disconnectWebSocket() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+            if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+        }
+        
+        function formatMessageTime(timestamp) {
+            const date = timestamp ? new Date(timestamp * 1000) : new Date();
+            return date.toLocaleTimeString('ru-RU', { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                timeZone: 'Europe/Amsterdam'
+            });
+        }
+        
+        // Глобальная функция добавления сообщения
+        window.addMessage = function(text, isUser, isSystem, isImage, imageUrl, timestamp, operatorName) {
+            if (!chatMessages) {
+                console.error('chatMessages не найден');
+                return;
+            }
+            
+            // Убираем welcome message
+            const welcome = chatMessages.querySelector('.welcome-message');
+            if (welcome && !isSystem) welcome.remove();
+            
+            const div = document.createElement('div');
+            
+            if (isSystem) {
+                div.className = 'message system-message';
+                div.innerText = text;
+            } else {
+                div.className = `message ${isUser ? 'user-message' : 'bot-message'}`;
+                if (!isUser && operatorName) {
+                    const nameSpan = document.createElement('div');
+                    nameSpan.className = 'operator-name';
+                    nameSpan.innerText = operatorName;
+                    div.appendChild(nameSpan);
+                }
+                if (isImage && imageUrl) {
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    img.onclick = () => window.open(imageUrl, '_blank');
+                    div.appendChild(img);
+                    if (text) div.appendChild(document.createTextNode(' ' + text));
+                } else if (text) {
+                    div.appendChild(document.createTextNode(text));
+                }
+                
+                const timeSpan = document.createElement('div');
+                timeSpan.className = 'message-time';
+                timeSpan.innerText = formatMessageTime(timestamp);
+                div.appendChild(timeSpan);
+            }
+            
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            // Сохраняем историю
+            const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
+            history.push({ 
+                text, isUser, isSystem, isImage, imageUrl, 
+                time: Date.now(), 
+                telegramTime: timestamp,
+                operatorName: operatorName
+            });
+            while (history.length > 200) history.shift();
+            localStorage.setItem('chat_history', JSON.stringify(history));
+        };
+        
+        // Алиас для простоты
+        const addMessage = window.addMessage;
+        
+        async function detectGeo() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const ipData = await response.json();
+                userIp = ipData.ip;
+                detectedCountry = 'UZ';
+            } catch (error) {
+                detectedCountry = 'UZ';
+            }
+        }
+        
+        function showPhoneForm() {
+            const oldOverlay = document.querySelector('.phone-overlay');
+            if (oldOverlay) oldOverlay.remove();
+            
+            const currentCountry = countries.find(c => c.code === detectedCountry) || countries[0];
+            
+            const overlay = document.createElement('div');
+            overlay.className = 'phone-overlay';
+            overlay.innerHTML = `
+                <div class="phone-card">
+                    <h4>Чат с поддержкой</h4>
+                    <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
+                    <div class="custom-select" id="customSelect">
+                        <div class="custom-select-trigger" id="selectTrigger">
+                            <span id="selectedCountryName">${currentCountry.name}</span>
+                            <span id="selectedCountryCode">${currentCountry.phoneCode} ▼</span>
+                        </div>
+                        <div class="custom-select-dropdown" id="selectDropdown">
+                            ${countries.map(c => `<div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" data-mask="${c.mask}">${c.name} ${c.phoneCode}</div>`).join('')}
+                        </div>
+                    </div>
+                    <div class="phone-input-wrapper">
+                        <span class="phone-code" id="phoneCodeDisplay">${currentCountry.phoneCode}</span>
+                        <input type="tel" class="phone-input" id="phoneInput" placeholder="${currentCountry.mask}" inputmode="numeric">
+                    </div>
+                    <div id="phoneError" class="error-text"></div>
+                    <button class="phone-submit" id="phoneSubmit">Начать чат</button>
+                    <div class="agreement-text">Нажимая кнопку "Начать чат", вы соглашаетесь с обработкой персональных данных</div>
+                </div>
+            `;
+            if (widget) widget.appendChild(overlay);
+            
+            let currentMaxDigits = currentCountry.maxDigits;
+            let currentPhoneCode = currentCountry.phoneCode;
+            let currentCountryName = currentCountry.name;
+            let currentPattern = currentCountry.pattern;
+            let currentMask = currentCountry.mask;
+            
+            const selectTrigger = document.getElementById('selectTrigger');
+            const selectDropdown = document.getElementById('selectDropdown');
+            const phoneInput = document.getElementById('phoneInput');
+            const phoneError = document.getElementById('phoneError');
+            const phoneSubmit = document.getElementById('phoneSubmit');
+            const phoneCodeDisplay = document.getElementById('phoneCodeDisplay');
+            const selectedCountryName = document.getElementById('selectedCountryName');
+            const selectedCountryCode = document.getElementById('selectedCountryCode');
+            
+            if (selectTrigger) {
+                selectTrigger.onclick = (e) => {
+                    e.stopPropagation();
+                    if (selectDropdown) selectDropdown.classList.toggle('show');
+                };
+            }
+            
+            document.querySelectorAll('.custom-select-option').forEach(opt => {
+                opt.onclick = () => {
+                    currentMaxDigits = parseInt(opt.dataset.maxdigits);
+                    currentPhoneCode = opt.dataset.phonecode;
+                    currentCountryName = opt.dataset.name;
+                    currentMask = opt.dataset.mask;
+                    currentPattern = new RegExp(`^[0-9]{${currentMaxDigits}}$`);
+                    
+                    if (selectedCountryName) selectedCountryName.innerText = currentCountryName;
+                    if (selectedCountryCode) selectedCountryCode.innerText = currentPhoneCode + ' ▼';
+                    if (phoneCodeDisplay) phoneCodeDisplay.innerText = currentPhoneCode;
+                    if (phoneInput) phoneInput.placeholder = currentMask;
+                    if (phoneInput) phoneInput.value = '';
+                    if (phoneError) phoneError.innerText = '';
+                    if (selectDropdown) selectDropdown.classList.remove('show');
+                };
+            });
+            
+            document.addEventListener('click', () => {
+                if (selectDropdown) selectDropdown.classList.remove('show');
+            });
+            
+            if (phoneInput) {
+                phoneInput.oninput = function() {
+                    let value = this.value.replace(/\D/g, '');
+                    if (value.length > currentMaxDigits) {
+                        value = value.slice(0, currentMaxDigits);
+                    }
+                    this.value = value;
+                    if (phoneError) phoneError.innerText = '';
+                    if (value.length > 0 && value.length < currentMaxDigits && phoneError) {
+                        phoneError.style.color = '#8b8b9e';
+                        phoneError.innerText = `Осталось ${currentMaxDigits - value.length} цифр из ${currentMaxDigits}`;
+                    }
+                };
+            }
+            
+            if (phoneSubmit) {
+                phoneSubmit.onclick = async () => {
+                    const digits = phoneInput ? phoneInput.value.replace(/\D/g, '') : '';
+                    
+                    if (!digits || digits.length === 0 || digits.length !== currentMaxDigits || !currentPattern.test(digits)) {
+                        if (phoneError) {
+                            phoneError.innerText = 'Неверно указан номер телефона';
+                            phoneError.style.color = '#ef4444';
+                        }
+                        return;
                     }
                     
-                    const timeSpan = document.createElement('div');
-                    timeSpan.className = 'message-time';
-                    timeSpan.innerText = formatMessageTime(timestamp);
-                    div.appendChild(timeSpan);
-                }
-                
-                chatMessages.appendChild(div);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-                console.log('✅ Сообщение добавлено в чат');
-                
-                const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-                history.push({ 
-                    text, isUser, isSystem, isImage, imageUrl, 
-                    time: Date.now(), 
-                    telegramTime: timestamp,
-                    operatorName: operatorName
-                });
-                while (history.length > 200) history.shift();
-                localStorage.setItem('chat_history', JSON.stringify(history));
-            }
-            
-            async function detectGeo() {
-                try {
-                    const response = await fetch('https://api.ipify.org?format=json');
-                    const ipData = await response.json();
-                    userIp = ipData.ip;
-                    detectedCountry = 'UZ';
-                    console.log('🌍 IP определен:', userIp);
-                } catch (error) {
-                    console.log('🌍 Ошибка определения IP:', error);
-                    detectedCountry = 'UZ';
-                }
-            }
-            
-            function showPhoneForm() {
-                console.log('📞 Показываем форму телефона');
-                const oldOverlay = document.querySelector('.phone-overlay');
-                if (oldOverlay) oldOverlay.remove();
-                
-                const currentCountry = countries.find(c => c.code === detectedCountry) || countries[0];
-                
-                const overlay = document.createElement('div');
-                overlay.className = 'phone-overlay';
-                overlay.innerHTML = `
-                    <div class="phone-card">
-                        <h4>Чат с поддержкой</h4>
-                        <p>Мы на связи и готовы помочь.<br>Оставьте свой номер, чтобы мы могли ответить вам, даже если вы уйдете с сайта.</p>
-                        <div class="custom-select" id="customSelect">
-                            <div class="custom-select-trigger" id="selectTrigger">
-                                <span id="selectedCountryName">${currentCountry.name}</span>
-                                <span id="selectedCountryCode">${currentCountry.phoneCode} ▼</span>
-                            </div>
-                            <div class="custom-select-dropdown" id="selectDropdown">
-                                ${countries.map(c => `<div class="custom-select-option" data-code="${c.code}" data-phonecode="${c.phoneCode}" data-maxdigits="${c.maxDigits}" data-name="${c.name}" data-mask="${c.mask}">${c.name} ${c.phoneCode}</div>`).join('')}
-                            </div>
-                        </div>
-                        <div class="phone-input-wrapper">
-                            <span class="phone-code" id="phoneCodeDisplay">${currentCountry.phoneCode}</span>
-                            <input type="tel" class="phone-input" id="phoneInput" placeholder="${currentCountry.mask}" inputmode="numeric">
-                        </div>
-                        <div id="phoneError" class="error-text"></div>
-                        <button class="phone-submit" id="phoneSubmit">Начать чат</button>
-                        <div class="agreement-text">Нажимая кнопку "Начать чат", вы соглашаетесь с обработкой персональных данных</div>
-                    </div>
-                `;
-                if (widget) widget.appendChild(overlay);
-                
-                let currentMaxDigits = currentCountry.maxDigits;
-                let currentPhoneCode = currentCountry.phoneCode;
-                let currentCountryName = currentCountry.name;
-                let currentPattern = currentCountry.pattern;
-                let currentMask = currentCountry.mask;
-                
-                const selectTrigger = document.getElementById('selectTrigger');
-                const selectDropdown = document.getElementById('selectDropdown');
-                const phoneInput = document.getElementById('phoneInput');
-                const phoneError = document.getElementById('phoneError');
-                const phoneSubmit = document.getElementById('phoneSubmit');
-                const phoneCodeDisplay = document.getElementById('phoneCodeDisplay');
-                const selectedCountryName = document.getElementById('selectedCountryName');
-                const selectedCountryCode = document.getElementById('selectedCountryCode');
-                
-                if (selectTrigger) {
-                    selectTrigger.onclick = (e) => {
-                        e.stopPropagation();
-                        if (selectDropdown) selectDropdown.classList.toggle('show');
-                    };
-                }
-                
-                document.querySelectorAll('.custom-select-option').forEach(opt => {
-                    opt.onclick = () => {
-                        currentMaxDigits = parseInt(opt.dataset.maxdigits);
-                        currentPhoneCode = opt.dataset.phonecode;
-                        currentCountryName = opt.dataset.name;
-                        currentMask = opt.dataset.mask;
-                        currentPattern = new RegExp(`^[0-9]{${currentMaxDigits}}$`);
+                    const fullPhone = currentPhoneCode + digits;
+                    
+                    if (phoneSubmit) {
+                        phoneSubmit.disabled = true;
+                        phoneSubmit.textContent = 'Регистрация...';
+                    }
+                    
+                    try {
+                        const response = await fetch(`${PROXY_URL}/register`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId, ip: userIp, phone: fullPhone, region: currentCountryName })
+                        });
+                        const data = await response.json();
                         
-                        if (selectedCountryName) selectedCountryName.innerText = currentCountryName;
-                        if (selectedCountryCode) selectedCountryCode.innerText = currentPhoneCode + ' ▼';
-                        if (phoneCodeDisplay) phoneCodeDisplay.innerText = currentPhoneCode;
-                        if (phoneInput) phoneInput.placeholder = currentMask;
-                        if (phoneInput) phoneInput.value = '';
-                        if (phoneError) phoneError.innerText = '';
-                        if (selectDropdown) selectDropdown.classList.remove('show');
-                    };
-                });
-                
-                document.addEventListener('click', () => {
-                    if (selectDropdown) selectDropdown.classList.remove('show');
-                });
-                
-                if (phoneInput) {
-                    phoneInput.oninput = function() {
-                        let value = this.value.replace(/\D/g, '');
-                        if (value.length > currentMaxDigits) {
-                            value = value.slice(0, currentMaxDigits);
-                        }
-                        this.value = value;
-                        if (phoneError) phoneError.innerText = '';
-                        if (value.length > 0 && value.length < currentMaxDigits && phoneError) {
-                            phoneError.style.color = '#8b8b9e';
-                            phoneError.innerText = `Осталось ${currentMaxDigits - value.length} цифр из ${currentMaxDigits}`;
-                        }
-                    };
-                }
-                
-                if (phoneSubmit) {
-                    phoneSubmit.onclick = async () => {
-                        const digits = phoneInput ? phoneInput.value.replace(/\D/g, '') : '';
-                        
-                        if (!digits || digits.length === 0 || digits.length !== currentMaxDigits || !currentPattern.test(digits)) {
-                            if (phoneError) {
-                                phoneError.innerText = 'Неверно указан номер телефона';
-                                phoneError.style.color = '#ef4444';
-                            }
-                            return;
-                        }
-                        
-                        const fullPhone = currentPhoneCode + digits;
-                        console.log('📞 Отправка регистрации:', { userId, fullPhone });
-                        
-                        if (phoneSubmit) {
-                            phoneSubmit.disabled = true;
-                            phoneSubmit.textContent = 'Регистрация...';
-                        }
-                        
-                        try {
-                            const response = await fetch(`${PROXY_URL}/register`, {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ userId, ip: userIp, phone: fullPhone, region: currentCountryName })
-                            });
-                            const data = await response.json();
-                            console.log('📞 Ответ регистрации:', data);
+                        if (data.ok) {
+                            userPhone = fullPhone;
+                            localStorage.setItem('user_phone', fullPhone);
+                            isRegistered = true;
+                            overlay.remove();
                             
-                            if (data.ok) {
-                                userPhone = fullPhone;
-                                localStorage.setItem('user_phone', fullPhone);
-                                isRegistered = true;
-                                overlay.remove();
-                                
-                                if (chatMessages) {
-                                    chatMessages.innerHTML = '';
-                                }
-                                
-                                addMessage('Добрый день! Подскажите, когда будет готов мой заказ 4412?', true);
-                                addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
-                                
-                                lastActivityTime = Date.now();
-                                await sendStatusToServer(true);
-                                connectWebSocket();
-                            } else {
-                                if (phoneSubmit) {
-                                    phoneSubmit.disabled = false;
-                                    phoneSubmit.textContent = 'Начать чат';
-                                }
-                                if (phoneError) {
-                                    phoneError.innerText = 'Ошибка сервера';
-                                    phoneError.style.color = '#ef4444';
-                                }
+                            if (chatMessages) {
+                                chatMessages.innerHTML = '';
                             }
-                        } catch (err) {
-                            console.error('❌ Ошибка регистрации:', err);
+                            
+                            addMessage('Добрый день! Подскажите, когда будет готов мой заказ 4412?', true);
+                            addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
+                            
+                            lastActivityTime = Date.now();
+                            await sendStatusToServer(true);
+                            connectWebSocket();
+                        } else {
                             if (phoneSubmit) {
                                 phoneSubmit.disabled = false;
                                 phoneSubmit.textContent = 'Начать чат';
                             }
                             if (phoneError) {
-                                phoneError.innerText = 'Ошибка соединения';
+                                phoneError.innerText = 'Ошибка сервера';
                                 phoneError.style.color = '#ef4444';
                             }
                         }
-                    };
-                }
-            }
-            
-            async function sendToTelegram(text, imageBase64 = null) {
-                console.log('📤 sendToTelegram вызван:', { text, isRegistered });
-                
-                if (!isRegistered) {
-                    console.log('📞 Не зарегистрирован, показываем форму');
-                    showPhoneForm();
-                    return;
-                }
-                
-                onUserActivity();
-                
-                if (!text && !imageBase64) return;
-                
-                if (text) {
-                    console.log('➕ Добавляем сообщение пользователя в чат:', text);
-                    addMessage(text, true);
-                } else {
-                    addMessage('Изображение', true);
-                }
-                
-                try {
-                    console.log('📡 Отправка на сервер...');
-                    const response = await fetch(`${PROXY_URL}/send`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId, text, imageBase64 })
-                    });
-                    const data = await response.json();
-                    console.log('✅ Ответ сервера:', data);
-                } catch (err) {
-                    console.error('❌ Ошибка отправки:', err);
-                    addMessage('Ошибка отправки сообщения. Попробуйте позже.', false, true);
-                }
-            }
-            
-            async function checkReplies() {
-                if (!isRegistered) return;
-                try {
-                    const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
-                    if (!response.ok) return;
-                    const data = await response.json();
-                    if (data.ok && data.result) {
-                        for (const update of data.result) {
-                            if (update.update_id > lastUpdateId) {
-                                lastUpdateId = update.update_id;
-                                if (update.message && !update.message.text?.includes('НОВЫЙ')) {
-                                    addMessage(update.message.text || 'Изображение', false, false, update.message.hasImage, update.message.imageUrl, update.message.date, 'Оператор Анна');
-                                }
-                            }
+                    } catch (err) {
+                        if (phoneSubmit) {
+                            phoneSubmit.disabled = false;
+                            phoneSubmit.textContent = 'Начать чат';
                         }
-                        localStorage.setItem('chat_lastUpdateId', lastUpdateId);
-                    }
-                } catch (err) {
-                    console.error('Ошибка получения:', err);
-                }
-            }
-            
-            function clearChat() {
-                const overlay = document.createElement('div');
-                overlay.className = 'clear-confirm-overlay';
-                overlay.innerHTML = `
-                    <div class="clear-confirm-modal">
-                        <h4>Очистить историю чата?</h4>
-                        <p>Все сообщения в этом диалоге будут удалены навсегда. Вы не сможете их восстановить.</p>
-                        <div class="clear-confirm-buttons">
-                            <button class="clear-confirm-cancel" id="clearCancel">Отменить</button>
-                            <button class="clear-confirm-ok" id="clearOk">Очистить</button>
-                        </div>
-                    </div>
-                `;
-                if (widget) widget.appendChild(overlay);
-                
-                const cancelBtn = document.getElementById('clearCancel');
-                const okBtn = document.getElementById('clearOk');
-                
-                if (cancelBtn) cancelBtn.onclick = () => overlay.remove();
-                if (okBtn) {
-                    okBtn.onclick = () => {
-                        disconnectWebSocket();
-                        localStorage.removeItem('user_phone');
-                        localStorage.removeItem('chat_history');
-                        localStorage.setItem('chat_lastUpdateId', '0');
-                        userPhone = null;
-                        isRegistered = false;
-                        lastUpdateId = 0;
-                        currentStatus = false;
-                        lastSentStatus = null;
-                        
-                        if (chatMessages) {
-                            chatMessages.innerHTML = `
-                                <div class="welcome-message">
-                                    <h4>Чат с поддержкой</h4>
-                                    <p>Мы на связи и готовы помочь.<br>Напишите ваш вопрос ниже.<br>Мы ответим в течение пары минут.</p>
-                                </div>
-                            `;
+                        if (phoneError) {
+                            phoneError.innerText = 'Ошибка соединения';
+                            phoneError.style.color = '#ef4444';
                         }
-                        overlay.remove();
-                        setTimeout(() => showPhoneForm(), 100);
-                    };
-                }
-            }
-            
-            // Обработчики событий
-            if (widget) {
-                widget.onclick = (e) => {
-                    if (widget.classList.contains('closed')) {
-                        widget.classList.remove('closed');
-                        e.stopPropagation();
-                        if (isRegistered) onUserActivity();
+                        console.error('Ошибка:', err);
                     }
                 };
             }
-            
-            if (closeBtn) closeBtn.onclick = (e) => { 
-                if (widget) widget.classList.add('closed'); 
-                e.stopPropagation(); 
-            };
-            
-            if (clearBtn) clearBtn.onclick = (e) => { 
-                clearChat(); 
-                e.stopPropagation(); 
-            };
-            
-            if (sendBtn) {
-                sendBtn.onclick = () => {
-                    if (messageInput) {
-                        const text = messageInput.value.trim();
-                        console.log('🔘 Кнопка отправки нажата, текст:', text);
-                        if (text) {
-                            sendToTelegram(text);
-                            messageInput.value = '';
-                        }
-                    }
-                };
-            }
-            
-            if (messageInput) {
-                messageInput.onkeypress = (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        console.log('⏎ Enter нажат');
-                        if (sendBtn) sendBtn.click();
-                    }
-                };
-            }
-            
-            if (fileBtn && fileInput) {
-                fileBtn.onclick = () => fileInput.click();
-                fileInput.onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (file && file.type.startsWith('image/')) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => sendToTelegram('', event.target.result);
-                        reader.readAsDataURL(file);
-                    }
-                    fileInput.value = '';
-                };
-            }
-            
-            // Запуск
-            console.log('🚀 Инициализация виджета...');
-            setupActivityTracking();
-            
-            detectGeo().then(() => {
-                if (userPhone) {
-                    console.log('✅ Пользователь уже зарегистрирован:', userPhone);
-                    isRegistered = true;
-                    lastActivityTime = Date.now();
-                    
-                    const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
-                    console.log('📜 Загружено сообщений из истории:', savedHistory.length);
-                    
-                    if (chatMessages && savedHistory.length > 0) {
-                        chatMessages.innerHTML = '';
-                        savedHistory.forEach(msg => {
-                            const div = document.createElement('div');
-                            
-                            if (msg.isSystem) {
-                                div.className = 'message system-message';
-                                div.innerText = msg.text;
-                            } else {
-                                div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
-                                if (!msg.isUser && msg.operatorName) {
-                                    const nameSpan = document.createElement('div');
-                                    nameSpan.className = 'operator-name';
-                                    nameSpan.innerText = msg.operatorName;
-                                    div.appendChild(nameSpan);
-                                }
-                                if (msg.isImage && msg.imageUrl) {
-                                    const img = document.createElement('img');
-                                    img.src = msg.imageUrl;
-                                    img.onclick = () => window.open(msg.imageUrl, '_blank');
-                                    div.appendChild(img);
-                                }
-                                if (msg.text) div.appendChild(document.createTextNode(msg.text));
-                                
-                                const timeSpan = document.createElement('div');
-                                timeSpan.className = 'message-time';
-                                timeSpan.innerText = formatMessageTime(msg.telegramTime);
-                                div.appendChild(timeSpan);
-                            }
-                            
-                            chatMessages.appendChild(div);
-                        });
-                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                    }
-                    
-                    setTimeout(() => {
-                        sendStatusToServer(true);
-                        connectWebSocket();
-                    }, 500);
-                } else {
-                    console.log('❌ Пользователь не зарегистрирован, показываем форму');
-                    setTimeout(() => showPhoneForm(), 500);
-                }
-            });
-            
-            setInterval(checkReplies, 3000);
-            console.log('🚀 Инициализация завершена');
         }
         
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', init);
-        } else {
-            init();
+        async function sendToTelegram(text, imageBase64 = null) {
+            if (!isRegistered) {
+                showPhoneForm();
+                return;
+            }
+            
+            onUserActivity();
+            
+            if (!text && !imageBase64) return;
+            
+            if (text) addMessage(text, true);
+            else addMessage('Изображение', true);
+            
+            try {
+                const response = await fetch(`${PROXY_URL}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, text, imageBase64 })
+                });
+                await response.json();
+            } catch (err) {
+                console.error('Ошибка отправки:', err);
+                addMessage('Ошибка отправки сообщения. Попробуйте позже.', false, true);
+            }
         }
+        
+        async function checkReplies() {
+            if (!isRegistered) return;
+            try {
+                const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data.ok && data.result) {
+                    for (const update of data.result) {
+                        if (update.update_id > lastUpdateId) {
+                            lastUpdateId = update.update_id;
+                            if (update.message && !update.message.text?.includes('НОВЫЙ')) {
+                                addMessage(update.message.text || 'Изображение', false, false, update.message.hasImage, update.message.imageUrl, update.message.date, 'Оператор Анна');
+                            }
+                        }
+                    }
+                    localStorage.setItem('chat_lastUpdateId', lastUpdateId);
+                }
+            } catch (err) {}
+        }
+        
+        function clearChat() {
+            const overlay = document.createElement('div');
+            overlay.className = 'clear-confirm-overlay';
+            overlay.innerHTML = `
+                <div class="clear-confirm-modal">
+                    <h4>Очистить историю чата?</h4>
+                    <p>Все сообщения в этом диалоге будут удалены навсегда. Вы не сможете их восстановить.</p>
+                    <div class="clear-confirm-buttons">
+                        <button class="clear-confirm-cancel" id="clearCancel">Отменить</button>
+                        <button class="clear-confirm-ok" id="clearOk">Очистить</button>
+                    </div>
+                </div>
+            `;
+            if (widget) widget.appendChild(overlay);
+            
+            const cancelBtn = document.getElementById('clearCancel');
+            const okBtn = document.getElementById('clearOk');
+            
+            if (cancelBtn) cancelBtn.onclick = () => overlay.remove();
+            if (okBtn) {
+                okBtn.onclick = () => {
+                    disconnectWebSocket();
+                    localStorage.removeItem('user_phone');
+                    localStorage.removeItem('chat_history');
+                    localStorage.setItem('chat_lastUpdateId', '0');
+                    userPhone = null;
+                    isRegistered = false;
+                    lastUpdateId = 0;
+                    currentStatus = false;
+                    lastSentStatus = null;
+                    
+                    if (chatMessages) {
+                        chatMessages.innerHTML = `
+                            <div class="welcome-message">
+                                <h4>Чат с поддержкой</h4>
+                                <p>Мы на связи и готовы помочь.<br>Напишите ваш вопрос ниже.<br>Мы ответим в течение пары минут.</p>
+                            </div>
+                        `;
+                    }
+                    overlay.remove();
+                    setTimeout(() => showPhoneForm(), 100);
+                };
+            }
+        }
+        
+        // Обработчики событий
+        if (widget) {
+            widget.onclick = (e) => {
+                if (widget.classList.contains('closed')) {
+                    widget.classList.remove('closed');
+                    e.stopPropagation();
+                    if (isRegistered) onUserActivity();
+                }
+            };
+        }
+        
+        if (closeBtn) closeBtn.onclick = (e) => { 
+            if (widget) widget.classList.add('closed'); 
+            e.stopPropagation(); 
+        };
+        
+        if (clearBtn) clearBtn.onclick = (e) => { 
+            clearChat(); 
+            e.stopPropagation(); 
+        };
+        
+        if (sendBtn) {
+            sendBtn.onclick = () => {
+                if (messageInput) {
+                    const text = messageInput.value.trim();
+                    if (text) {
+                        sendToTelegram(text);
+                        messageInput.value = '';
+                    }
+                }
+            };
+        }
+        
+        if (messageInput) {
+            messageInput.onkeypress = (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (sendBtn) sendBtn.click();
+                }
+            };
+        }
+        
+        if (fileBtn && fileInput) {
+            fileBtn.onclick = () => fileInput.click();
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => sendToTelegram('', event.target.result);
+                    reader.readAsDataURL(file);
+                }
+                fileInput.value = '';
+            };
+        }
+        
+        // Запуск
+        setupActivityTracking();
+        
+        detectGeo().then(() => {
+            if (userPhone) {
+                isRegistered = true;
+                lastActivityTime = Date.now();
+                
+                const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
+                if (chatMessages && savedHistory.length > 0) {
+                    chatMessages.innerHTML = '';
+                    savedHistory.forEach(msg => {
+                        const div = document.createElement('div');
+                        
+                        if (msg.isSystem) {
+                            div.className = 'message system-message';
+                            div.innerText = msg.text;
+                        } else {
+                            div.className = `message ${msg.isUser ? 'user-message' : 'bot-message'}`;
+                            if (!msg.isUser && msg.operatorName) {
+                                const nameSpan = document.createElement('div');
+                                nameSpan.className = 'operator-name';
+                                nameSpan.innerText = msg.operatorName;
+                                div.appendChild(nameSpan);
+                            }
+                            if (msg.isImage && msg.imageUrl) {
+                                const img = document.createElement('img');
+                                img.src = msg.imageUrl;
+                                img.onclick = () => window.open(msg.imageUrl, '_blank');
+                                div.appendChild(img);
+                            }
+                            if (msg.text) div.appendChild(document.createTextNode(msg.text));
+                            
+                            const timeSpan = document.createElement('div');
+                            timeSpan.className = 'message-time';
+                            timeSpan.innerText = formatMessageTime(msg.telegramTime);
+                            div.appendChild(timeSpan);
+                        }
+                        
+                        chatMessages.appendChild(div);
+                    });
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+                
+                setTimeout(() => {
+                    sendStatusToServer(true);
+                    connectWebSocket();
+                }, 500);
+            } else {
+                setTimeout(() => showPhoneForm(), 500);
+            }
+        });
+        
+        setInterval(checkReplies, 3000);
     })();
 </script>
 </body>
