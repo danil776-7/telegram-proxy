@@ -495,7 +495,7 @@
         function init() {
             const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
             const SESSION_HOURS = 36;
-            const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности
+            const INACTIVITY_TIMEOUT = 30000;
             
             const countries = [
                 { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
@@ -510,6 +510,9 @@
             if (!userId) {
                 userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
                 localStorage.setItem('chat_user_id', userId);
+                console.log('🆕 Создан новый userId:', userId);
+            } else {
+                console.log('🆔 Загружен userId:', userId);
             }
             
             const sessionStart = localStorage.getItem('session_start');
@@ -521,6 +524,7 @@
                     localStorage.removeItem('chat_history');
                     localStorage.removeItem('chat_lastUpdateId');
                     localStorage.setItem('session_start', now.toString());
+                    console.log('🔄 Сессия обновлена');
                 }
             } else {
                 localStorage.setItem('session_start', now.toString());
@@ -531,6 +535,8 @@
             let lastUpdateId = parseInt(localStorage.getItem('chat_lastUpdateId') || '0');
             let userIp = '';
             let detectedCountry = 'UZ';
+            
+            console.log('📱 Статус регистрации:', isRegistered ? 'зарегистрирован' : 'не зарегистрирован');
             
             // WebSocket
             let ws = null;
@@ -605,7 +611,6 @@
                 return false;
             }
             
-            // Функция для проверки и обновления статуса
             function checkAndUpdateStatus() {
                 if (!isRegistered || isUnloading) return;
                 
@@ -619,7 +624,6 @@
                 }
             }
             
-            // Сброс активности (пользователь что-то делает)
             function onUserActivity() {
                 if (!isRegistered || isUnloading) return;
                 
@@ -696,13 +700,13 @@
                 startHeartbeat();
             }
             
-            // WebSocket
             function connectWebSocket() {
                 if (!isRegistered) return;
                 if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
                 
                 try {
                     const wsUrl = PROXY_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+                    console.log('🔌 Подключение к WebSocket:', `${wsUrl}/ws`);
                     ws = new WebSocket(`${wsUrl}/ws`);
                     
                     ws.onopen = () => {
@@ -713,6 +717,7 @@
                     ws.onmessage = (event) => {
                         try {
                             const data = JSON.parse(event.data);
+                            console.log('📨 WebSocket сообщение:', data);
                             if (data.type === 'message') {
                                 addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
                             }
@@ -757,10 +762,18 @@
             let lastMessageId = 0;
             
             function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
-                if (!chatMessages) return;
+                console.log('💬 addMessage вызван:', { text, isUser, isSystem, isImage, imageUrl, timestamp, operatorName });
+                
+                if (!chatMessages) {
+                    console.error('❌ chatMessages не найден!');
+                    return;
+                }
                 
                 const messageKey = `${text}_${timestamp}_${isUser}`;
-                if (lastMessageId === messageKey) return;
+                if (lastMessageId === messageKey) {
+                    console.log('⚠️ Дубликат сообщения, пропускаем');
+                    return;
+                }
                 lastMessageId = messageKey;
                 
                 const div = document.createElement('div');
@@ -796,6 +809,7 @@
                 
                 chatMessages.appendChild(div);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+                console.log('✅ Сообщение добавлено в чат');
                 
                 const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
                 history.push({ 
@@ -814,12 +828,15 @@
                     const ipData = await response.json();
                     userIp = ipData.ip;
                     detectedCountry = 'UZ';
+                    console.log('🌍 IP определен:', userIp);
                 } catch (error) {
+                    console.log('🌍 Ошибка определения IP:', error);
                     detectedCountry = 'UZ';
                 }
             }
             
             function showPhoneForm() {
+                console.log('📞 Показываем форму телефона');
                 const oldOverlay = document.querySelector('.phone-overlay');
                 if (oldOverlay) oldOverlay.remove();
                 
@@ -923,6 +940,7 @@
                         }
                         
                         const fullPhone = currentPhoneCode + digits;
+                        console.log('📞 Отправка регистрации:', { userId, fullPhone });
                         
                         if (phoneSubmit) {
                             phoneSubmit.disabled = true;
@@ -936,6 +954,7 @@
                                 body: JSON.stringify({ userId, ip: userIp, phone: fullPhone, region: currentCountryName })
                             });
                             const data = await response.json();
+                            console.log('📞 Ответ регистрации:', data);
                             
                             if (data.ok) {
                                 userPhone = fullPhone;
@@ -964,6 +983,7 @@
                                 }
                             }
                         } catch (err) {
+                            console.error('❌ Ошибка регистрации:', err);
                             if (phoneSubmit) {
                                 phoneSubmit.disabled = false;
                                 phoneSubmit.textContent = 'Начать чат';
@@ -972,14 +992,16 @@
                                 phoneError.innerText = 'Ошибка соединения';
                                 phoneError.style.color = '#ef4444';
                             }
-                            console.error('Ошибка:', err);
                         }
                     };
                 }
             }
             
             async function sendToTelegram(text, imageBase64 = null) {
+                console.log('📤 sendToTelegram вызван:', { text, isRegistered });
+                
                 if (!isRegistered) {
+                    console.log('📞 Не зарегистрирован, показываем форму');
                     showPhoneForm();
                     return;
                 }
@@ -988,19 +1010,24 @@
                 
                 if (!text && !imageBase64) return;
                 
-                if (text) addMessage(text, true);
-                else addMessage('Изображение', true);
+                if (text) {
+                    console.log('➕ Добавляем сообщение пользователя в чат:', text);
+                    addMessage(text, true);
+                } else {
+                    addMessage('Изображение', true);
+                }
                 
                 try {
+                    console.log('📡 Отправка на сервер...');
                     const response = await fetch(`${PROXY_URL}/send`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ userId, text, imageBase64 })
                     });
-                    await response.json();
-                    console.log('Сообщение отправлено');
+                    const data = await response.json();
+                    console.log('✅ Ответ сервера:', data);
                 } catch (err) {
-                    console.error('Ошибка отправки:', err);
+                    console.error('❌ Ошибка отправки:', err);
                     addMessage('Ошибка отправки сообщения. Попробуйте позже.', false, true);
                 }
             }
@@ -1022,7 +1049,9 @@
                         }
                         localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                     }
-                } catch (err) {}
+                } catch (err) {
+                    console.error('Ошибка получения:', err);
+                }
             }
             
             function clearChat() {
@@ -1095,6 +1124,7 @@
                 sendBtn.onclick = () => {
                     if (messageInput) {
                         const text = messageInput.value.trim();
+                        console.log('🔘 Кнопка отправки нажата, текст:', text);
                         if (text) {
                             sendToTelegram(text);
                             messageInput.value = '';
@@ -1107,6 +1137,7 @@
                 messageInput.onkeypress = (e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
+                        console.log('⏎ Enter нажат');
                         if (sendBtn) sendBtn.click();
                     }
                 };
@@ -1126,14 +1157,18 @@
             }
             
             // Запуск
+            console.log('🚀 Инициализация виджета...');
             setupActivityTracking();
             
             detectGeo().then(() => {
                 if (userPhone) {
+                    console.log('✅ Пользователь уже зарегистрирован:', userPhone);
                     isRegistered = true;
                     lastActivityTime = Date.now();
                     
                     const savedHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
+                    console.log('📜 Загружено сообщений из истории:', savedHistory.length);
+                    
                     if (chatMessages && savedHistory.length > 0) {
                         chatMessages.innerHTML = '';
                         savedHistory.forEach(msg => {
@@ -1174,11 +1209,13 @@
                         connectWebSocket();
                     }, 500);
                 } else {
+                    console.log('❌ Пользователь не зарегистрирован, показываем форму');
                     setTimeout(() => showPhoneForm(), 500);
                 }
             });
             
             setInterval(checkReplies, 3000);
+            console.log('🚀 Инициализация завершена');
         }
         
         if (document.readyState === 'loading') {
