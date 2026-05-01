@@ -495,7 +495,7 @@
         function init() {
             const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
             const SESSION_HOURS = 36;
-            const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности до офлайн
+            const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности
             
             const countries = [
                 { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
@@ -569,8 +569,6 @@
             
             async function sendStatusToServer(online, isSync = false) {
                 if (!isRegistered) return false;
-                
-                // Не отправляем тот же статус слишком часто
                 if (lastSentStatus === online && !isSync) return false;
                 
                 const payload = { userId, isOnline: online, isActive: online };
@@ -616,6 +614,7 @@
                 const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
                 
                 if (shouldBeOnline !== currentStatus) {
+                    console.log(`📊 Смена статуса: ${shouldBeOnline ? 'ОНЛАЙН' : 'ОФЛАЙН'} (неактивен ${Math.floor(inactiveTime/1000)}с)`);
                     sendStatusToServer(shouldBeOnline);
                 }
             }
@@ -627,12 +626,9 @@
                 const wasOffline = !currentStatus;
                 lastActivityTime = Date.now();
                 
-                // Если были офлайн и страница видима - включаем онлайн
-                if (wasOffline && isPageVisible) {
+                if (wasOffline) {
+                    console.log('🟢 Активность: включаем онлайн');
                     sendStatusToServer(true);
-                } else if (currentStatus) {
-                    // Если уже онлайн - просто обновляем время активности
-                    // и отправляем heartbeat если нужно
                 }
             }
             
@@ -663,25 +659,21 @@
                     messageInput.addEventListener('keypress', onUserActivity);
                 }
                 
-                // Видимость страницы
                 document.addEventListener('visibilitychange', () => {
                     if (isUnloading) return;
                     isPageVisible = !document.hidden;
                     console.log(`👁️ Видимость: ${isPageVisible ? 'видима' : 'скрыта'}`);
                     
                     if (isPageVisible) {
-                        // Страница стала видимой - сбрасываем активность и включаем онлайн
                         lastActivityTime = Date.now();
                         if (!currentStatus) {
                             sendStatusToServer(true);
                         }
                     } else {
-                        // Страница скрыта - проверяем статус
                         checkAndUpdateStatus();
                     }
                 });
                 
-                // Закрытие вкладки
                 window.addEventListener('beforeunload', () => {
                     isUnloading = true;
                     if (isRegistered && currentStatus) {
@@ -697,7 +689,6 @@
                     }
                 });
                 
-                // Периодическая проверка статуса
                 statusCheckInterval = setInterval(() => {
                     checkAndUpdateStatus();
                 }, 5000);
@@ -768,7 +759,6 @@
             function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
                 if (!chatMessages) return;
                 
-                // Защита от дублирования сообщений
                 const messageKey = `${text}_${timestamp}_${isUser}`;
                 if (lastMessageId === messageKey) return;
                 lastMessageId = messageKey;
@@ -994,7 +984,6 @@
                     return;
                 }
                 
-                // Обновляем активность при отправке
                 onUserActivity();
                 
                 if (!text && !imageBase64) return;
