@@ -1,12 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
-const https = require('https');
 const WebSocket = require('ws');
 const app = express();
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+app.set('trust proxy', true);
 
 const BOT_TOKEN = '8743342099:AAGWRLBrNjd8YlkHPSeqOU64J4-0fJdILPg';
 const GROUP_CHAT_ID = -1003911846697;
@@ -15,20 +15,21 @@ const SITE_URL = 'https://danil776-7.github.io';
 const users = new Map();
 const topicToUser = new Map();
 const wsClients = new Map();
+const imageCache = new Map();
+
+// Хранилище последних обновлений для каждого пользователя
 let lastUpdateId = 0;
+const userLastUpdateId = new Map();
 
 const lastStatusUpdate = new Map();
 const lastSentStatus = new Map();
 
-// Кэш для изображений
-const imageCache = new Map();
-
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
-// WebSocket соединения
+// WebSocket
 wss.on('connection', (ws, req) => {
-    console.log(' Новое WebSocket соединение');
+    console.log('🔌 Новое WebSocket соединение');
     let userId = null;
     
     ws.on('message', async (data) => {
@@ -37,7 +38,7 @@ wss.on('connection', (ws, req) => {
             if (message.type === 'register') {
                 userId = message.userId;
                 wsClients.set(userId, ws);
-                console.log(` WebSocket зарегистрирован для ${userId}`);
+                console.log(`✅ WebSocket зарегистрирован для ${userId}`);
                 ws.send(JSON.stringify({ type: 'registered', ok: true }));
             }
         } catch (err) {
@@ -62,20 +63,19 @@ function sendViaWebSocket(userId, message) {
     return false;
 }
 
-// ПРОКСИ ДЛЯ ИЗОБРАЖЕНИЙ (решает проблему с авторизацией)
+// Прокси для изображений
 app.get('/image/:fileId', async (req, res) => {
     const { fileId } = req.params;
     
-    // Проверяем кэш
     if (imageCache.has(fileId)) {
         const cached = imageCache.get(fileId);
         res.setHeader('Content-Type', cached.contentType);
         res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         return res.send(cached.data);
     }
     
     try {
-        // Получаем путь к файлу
         const fileResponse = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`);
         const fileData = await fileResponse.json();
         
@@ -86,18 +86,15 @@ app.get('/image/:fileId', async (req, res) => {
         const filePath = fileData.result.file_path;
         const imageUrl = `https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`;
         
-        // Скачиваем изображение
         const response = await fetch(imageUrl);
         const buffer = await response.arrayBuffer();
         const contentType = response.headers.get('content-type') || 'image/jpeg';
         
-        // Сохраняем в кэш
         imageCache.set(fileId, {
             data: Buffer.from(buffer),
             contentType: contentType
         });
         
-        // Очищаем кэш если слишком большой (оставляем последние 100)
         if (imageCache.size > 100) {
             const firstKey = imageCache.keys().next().value;
             imageCache.delete(firstKey);
@@ -105,6 +102,7 @@ app.get('/image/:fileId', async (req, res) => {
         
         res.setHeader('Content-Type', contentType);
         res.setHeader('Cache-Control', 'public, max-age=86400');
+        res.setHeader('Access-Control-Allow-Origin', '*');
         res.send(Buffer.from(buffer));
         
     } catch (err) {
@@ -143,7 +141,11 @@ async function getCountryByIp(ip) {
 }
 
 app.get('/', (req, res) => {
-    res.json({ status: 'ok', message: 'Proxy работает с WebSocket!', websocket: 'wss://telegram-proxy-wyqq.onrender.com/ws' });
+    res.json({ 
+        status: 'ok', 
+        message: 'Proxy работает с WebSocket!', 
+        websocket: `wss://${req.get('host')}/ws`
+    });
 });
 
 // РЕГИСТРАЦИЯ
@@ -210,6 +212,7 @@ app.post('/register', async (req, res) => {
         });
         topicToUser.set(topicId, userId);
         lastSentStatus.set(userId, true);
+        userLastUpdateId.set(userId, 0);
         
         console.log(`✅ Пользователь ${userId} зарегистрирован`);
         res.json({ ok: true, topicId });
@@ -258,6 +261,7 @@ app.post('/send', async (req, res) => {
                 })
             });
         }
+        console.log('✅ Сообщение отправлено в Telegram');
         res.json({ ok: true });
     } catch (err) {
         console.error('Ошибка отправки:', err);
@@ -282,7 +286,7 @@ app.post('/updateStatus', async (req, res) => {
         return res.json({ ok: true });
     }
     
-    if (lastSent !== isOnline && (now - lastUpdate) > 10000) {
+    if (lastSent !== isOnline && (now - lastUpdate) > 5000) {
         lastStatusUpdate.set(userId, now);
         lastSentStatus.set(userId, isOnline);
         user.isOnline = isOnline;
@@ -305,13 +309,21 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ
+// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ (только новые сообщения)
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
-    const currentOffset = parseInt(offset) || lastUpdateId;
+    
+    // Для каждого пользователя свой offset
+    let currentOffset;
+    if (userId && userLastUpdateId.has(userId)) {
+        currentOffset = userLastUpdateId.get(userId);
+    } else {
+        currentOffset = parseInt(offset) || 0;
+    }
     
     try {
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=5`;
+        // Получаем только новые сообщения (timeout=2 для быстрого ответа)
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=2`;
         const response = await fetch(url);
         const data = await response.json();
         
@@ -319,53 +331,68 @@ app.get('/getUpdates', async (req, res) => {
             return res.json({ ok: false, error: data.description });
         }
         
+        const protocol = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'https';
+        const host = req.get('host');
+        const baseUrl = `${protocol}://${host}`;
+        
         const filtered = [];
-        const proxyUrl = `${req.protocol}://${req.get('host')}`;
+        let newOffset = currentOffset;
         
         for (const update of data.result) {
             const msg = update.message;
-            if (msg && msg.chat.id === GROUP_CHAT_ID && msg.is_topic_message) {
-                const topicId = msg.message_thread_id;
-                const topicUserId = topicToUser.get(topicId);
-                
-                if (msg.from && msg.from.is_bot) continue;
-                if (msg.text && msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) continue;
-                
-                if (topicUserId && (!userId || topicUserId === userId)) {
-                    const messageData = {
-                        update_id: update.update_id,
-                        message: {
-                            text: msg.caption || msg.text || '',
-                            from: msg.from?.first_name || 'Поддержка',
-                            date: msg.date
-                        }
-                    };
-                    
-                    // Обработка фото - используем прокси сервера
-                    if (msg.photo && msg.photo.length > 0) {
-                        try {
-                            const photo = msg.photo[msg.photo.length - 1];
-                            messageData.message.imageUrl = `${proxyUrl}/image/${photo.file_id}`;
-                            messageData.message.hasImage = true;
-                        } catch (err) {}
-                    }
-                    
-                    filtered.push(messageData);
-                    if (update.update_id + 1 > lastUpdateId) {
-                        lastUpdateId = update.update_id + 1;
-                    }
-                    
-                    // Также отправляем через WebSocket
-                    sendViaWebSocket(topicUserId, {
-                        type: 'message',
+            if (!msg || !msg.chat || msg.chat.id !== GROUP_CHAT_ID) continue;
+            if (!msg.is_topic_message) continue;
+            
+            const topicId = msg.message_thread_id;
+            const topicUserId = topicToUser.get(topicId);
+            
+            // Пропускаем сообщения от ботов и системные
+            if (msg.from && msg.from.is_bot) continue;
+            if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
+            
+            // Если сообщение для нашего пользователя
+            if (topicUserId === userId) {
+                const messageData = {
+                    update_id: update.update_id,
+                    message: {
                         text: msg.caption || msg.text || '',
-                        isImage: !!msg.photo,
-                        imageUrl: msg.photo ? `${proxyUrl}/image/${msg.photo[msg.photo.length - 1].file_id}` : null,
-                        timestamp: msg.date,
-                        operatorName: msg.from?.first_name || 'Оператор'
-                    });
+                        from: msg.from?.first_name || 'Поддержка',
+                        date: msg.date
+                    }
+                };
+                
+                if (msg.photo && msg.photo.length > 0) {
+                    const photo = msg.photo[msg.photo.length - 1];
+                    messageData.message.imageUrl = `${baseUrl}/image/${photo.file_id}`;
+                    messageData.message.hasImage = true;
                 }
+                
+                filtered.push(messageData);
+                
+                // Отправляем также через WebSocket
+                sendViaWebSocket(topicUserId, {
+                    type: 'message',
+                    text: msg.caption || msg.text || '',
+                    isImage: !!(msg.photo && msg.photo.length > 0),
+                    imageUrl: msg.photo ? `${baseUrl}/image/${msg.photo[msg.photo.length - 1].file_id}` : null,
+                    timestamp: msg.date,
+                    operatorName: msg.from?.first_name || 'Оператор'
+                });
             }
+            
+            // Обновляем offset
+            if (update.update_id + 1 > newOffset) {
+                newOffset = update.update_id + 1;
+            }
+        }
+        
+        // Сохраняем новый offset для пользователя
+        if (userId && newOffset > currentOffset) {
+            userLastUpdateId.set(userId, newOffset);
+        }
+        
+        if (newOffset > lastUpdateId) {
+            lastUpdateId = newOffset;
         }
         
         res.json({ ok: true, result: filtered });
