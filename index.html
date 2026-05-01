@@ -6,13 +6,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <title>Чат с поддержкой</title>
     <style>
-        * { 
-            margin: 0; 
-            padding: 0; 
-            box-sizing: border-box; 
-            -webkit-tap-highlight-color: transparent;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
@@ -22,7 +16,6 @@
             align-items: center;
             padding: 16px;
         }
-        
         .demo-content {
             text-align: center;
             padding: 40px 24px;
@@ -33,7 +26,6 @@
             width: 100%;
             box-shadow: 0 10px 40px rgba(0,0,0,0.1);
         }
-        
         .demo-content h1 { 
             font-size: 28px;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
@@ -42,8 +34,6 @@
             background-clip: text;
             margin-bottom: 16px;
         }
-        
-        /* ========== ОСНОВНОЙ ВИДЖЕТ ========== */
         .chat-widget {
             position: fixed;
             bottom: 24px;
@@ -54,15 +44,14 @@
             max-height: calc(100vh - 48px);
             background: #FFFFFF;
             border-radius: 24px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
             z-index: 1000;
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         }
-        
         .chat-widget.closed {
             width: 60px;
             height: 60px;
@@ -71,15 +60,11 @@
             cursor: pointer;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
         }
-        
         .chat-widget.closed .chat-header,
         .chat-widget.closed .chat-messages,
         .chat-widget.closed .chat-input-area,
         .chat-widget.closed .phone-overlay,
-        .chat-widget.closed .clear-confirm-overlay { 
-            display: none; 
-        }
-        
+        .chat-widget.closed .clear-confirm-overlay { display: none; }
         .open-icon {
             display: none;
             width: 100%;
@@ -87,20 +72,8 @@
             align-items: center;
             justify-content: center;
         }
-        
-        .open-icon svg {
-            width: 28px;
-            height: 28px;
-            stroke: #FFFFFF;
-            stroke-width: 1.5;
-            fill: none;
-        }
-        
-        .chat-widget.closed .open-icon { 
-            display: flex; 
-        }
-        
-        /* ========== ШАПКА ========== */
+        .open-icon svg { width: 28px; height: 28px; stroke: #FFFFFF; stroke-width: 1.5; fill: none; }
+        .chat-widget.closed .open-icon { display: flex; }
         .chat-header {
             background: #FFFFFF;
             padding: 20px 20px 16px 20px;
@@ -110,13 +83,7 @@
             flex-shrink: 0;
             border-bottom: 1px solid #f0f0f0;
         }
-        
-        .chat-header-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
+        .chat-header-info { display: flex; align-items: center; gap: 12px; }
         .operator-avatar {
             width: 48px;
             height: 48px;
@@ -126,15 +93,7 @@
             align-items: center;
             justify-content: center;
         }
-        
-        .operator-avatar svg {
-            width: 24px;
-            height: 24px;
-            stroke: #FFFFFF;
-            stroke-width: 1.5;
-            fill: none;
-        }
-        
+        .operator-avatar svg { width: 24px; height: 24px; stroke: #FFFFFF; stroke-width: 1.5; fill: none; }
         .chat-header-text h3 {
             font-size: 18px;
             font-weight: 600;
@@ -145,13 +104,7 @@
             gap: 8px;
             flex-wrap: wrap;
         }
-        
-        .chat-header-text p {
-            font-size: 13px;
-            color: #8b8b9e;
-            margin: 0;
-        }
-        
+        .chat-header-text p { font-size: 13px; color: #8b8b9e; margin: 0; }
         .status-indicator {
             display: inline-block;
             width: 8px;
@@ -160,33 +113,18 @@
             background-color: #cbd5e1;
             transition: all 0.3s ease;
         }
-        
         .status-indicator.online {
             background-color: #10b981;
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+            box-shadow: 0 0 8px rgba(16,185,129,0.5);
             animation: pulse 2s infinite;
         }
-        
-        .status-text {
-            font-size: 11px;
-            font-weight: normal;
-            color: #8b8b9e;
-        }
-        
-        .status-text.online {
-            color: #10b981;
-        }
-        
+        .status-text { font-size: 11px; font-weight: normal; color: #8b8b9e; }
+        .status-text.online { color: #10b981; }
         @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
+            0%,100% { opacity: 1; transform: scale(1); }
             50% { opacity: 0.6; transform: scale(0.9); }
         }
-        
-        .header-buttons {
-            display: flex;
-            gap: 8px;
-        }
-        
+        .header-buttons { display: flex; gap: 8px; }
         .clear-btn, .close-btn {
             background: transparent;
             border: none;
@@ -200,21 +138,8 @@
             transition: all 0.2s;
             color: #8b8b9e;
         }
-        
-        .clear-btn svg, .close-btn svg {
-            width: 18px;
-            height: 18px;
-            stroke: currentColor;
-            stroke-width: 1.5;
-            fill: none;
-        }
-        
-        .clear-btn:hover, .close-btn:hover {
-            background: #f5f5f5;
-            color: #1a1a2e;
-        }
-        
-        /* ========== СООБЩЕНИЯ ========== */
+        .clear-btn svg, .close-btn svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        .clear-btn:hover, .close-btn:hover { background: #f5f5f5; color: #1a1a2e; }
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -224,21 +149,9 @@
             flex-direction: column;
             gap: 16px;
         }
-        
-        .chat-messages::-webkit-scrollbar {
-            width: 5px;
-        }
-        
-        .chat-messages::-webkit-scrollbar-track {
-            background: #f0f0f0;
-            border-radius: 10px;
-        }
-        
-        .chat-messages::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
-        
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 10px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .message {
             max-width: 85%;
             padding: 12px 16px;
@@ -248,26 +161,22 @@
             font-size: 14px;
             line-height: 1.5;
         }
-        
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
         .user-message {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: #FFFFFF;
             align-self: flex-end;
             border-bottom-right-radius: 4px;
         }
-        
         .bot-message {
             background: #f5f5f5;
             color: #1a1a2e;
             align-self: flex-start;
             border-bottom-left-radius: 4px;
         }
-        
         .system-message {
             background: #f0f0f0;
             color: #8b8b9e;
@@ -278,60 +187,14 @@
             border-radius: 20px;
             text-align: center;
         }
-        
-        .operator-name {
-            font-size: 12px;
-            font-weight: 600;
-            color: #6366f1;
-            margin-bottom: 6px;
-        }
-        
-        .message img {
-            max-width: 100%;
-            max-height: 200px;
-            border-radius: 12px;
-            margin-top: 8px;
-            cursor: pointer;
-            object-fit: contain;
-        }
-        
-        .message-time {
-            font-size: 10px;
-            opacity: 0.6;
-            margin-top: 8px;
-            text-align: right;
-        }
-        
-        .user-message .message-time {
-            color: rgba(255,255,255,0.7);
-        }
-        
-        .bot-message .message-time {
-            color: #8b8b9e;
-        }
-        
-        .welcome-message {
-            text-align: center;
-            padding: 32px 24px;
-            background: #fafafa;
-            border-radius: 20px;
-            margin: 20px 0;
-        }
-        
-        .welcome-message h4 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #1a1a2e;
-            margin-bottom: 12px;
-        }
-        
-        .welcome-message p {
-            font-size: 14px;
-            color: #8b8b9e;
-            line-height: 1.5;
-        }
-        
-        /* ========== ПОЛЕ ВВОДА ========== */
+        .operator-name { font-size: 12px; font-weight: 600; color: #6366f1; margin-bottom: 6px; }
+        .message img { max-width: 100%; max-height: 200px; border-radius: 12px; margin-top: 8px; cursor: pointer; object-fit: contain; }
+        .message-time { font-size: 10px; opacity: 0.6; margin-top: 8px; text-align: right; }
+        .user-message .message-time { color: rgba(255,255,255,0.7); }
+        .bot-message .message-time { color: #8b8b9e; }
+        .welcome-message { text-align: center; padding: 32px 24px; background: #fafafa; border-radius: 20px; margin: 20px 0; }
+        .welcome-message h4 { font-size: 20px; font-weight: 600; color: #1a1a2e; margin-bottom: 12px; }
+        .welcome-message p { font-size: 14px; color: #8b8b9e; line-height: 1.5; }
         .chat-input-area {
             display: flex;
             padding: 16px 20px;
@@ -341,7 +204,6 @@
             align-items: center;
             flex-shrink: 0;
         }
-        
         .chat-input {
             flex: 1;
             padding: 12px 16px;
@@ -354,17 +216,12 @@
             font-family: inherit;
             color: #1a1a2e;
         }
-        
         .chat-input:focus {
             border-color: #6366f1;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
             background: #FFFFFF;
         }
-        
-        .chat-input::placeholder {
-            color: #cbd5e1;
-        }
-        
+        .chat-input::placeholder { color: #cbd5e1; }
         .send-btn, .file-btn {
             background: #f0f0f0;
             border: none;
@@ -378,21 +235,8 @@
             transition: all 0.2s;
             color: #6366f1;
         }
-        
-        .send-btn svg, .file-btn svg {
-            width: 20px;
-            height: 20px;
-            stroke: currentColor;
-            stroke-width: 1.5;
-            fill: none;
-        }
-        
-        .send-btn:hover, .file-btn:hover {
-            background: #e8e8e8;
-            transform: scale(0.96);
-        }
-        
-        /* ========== ФОРМА ТЕЛЕФОНА ========== */
+        .send-btn svg, .file-btn svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+        .send-btn:hover, .file-btn:hover { background: #e8e8e8; transform: scale(0.96); }
         .phone-overlay {
             position: absolute;
             top: 0;
@@ -407,34 +251,10 @@
             padding: 40px 24px;
             overflow-y: auto;
         }
-        
-        .phone-card {
-            text-align: center;
-            width: 100%;
-            max-width: 320px;
-            margin: auto;
-        }
-        
-        .phone-card h4 {
-            font-size: 24px;
-            font-weight: 700;
-            color: #1a1a2e;
-            margin-bottom: 12px;
-        }
-        
-        .phone-card p {
-            font-size: 14px;
-            color: #8b8b9e;
-            margin-bottom: 32px;
-            line-height: 1.5;
-        }
-        
-        .custom-select {
-            position: relative;
-            width: 100%;
-            margin-bottom: 16px;
-        }
-        
+        .phone-card { text-align: center; width: 100%; max-width: 320px; margin: auto; }
+        .phone-card h4 { font-size: 24px; font-weight: 700; color: #1a1a2e; margin-bottom: 12px; }
+        .phone-card p { font-size: 14px; color: #8b8b9e; margin-bottom: 32px; line-height: 1.5; }
+        .custom-select { position: relative; width: 100%; margin-bottom: 16px; }
         .custom-select-trigger {
             display: flex;
             justify-content: space-between;
@@ -448,21 +268,9 @@
             font-weight: 500;
             transition: all 0.2s;
         }
-        
-        .custom-select-trigger:hover {
-            border-color: #6366f1;
-            background: #FFFFFF;
-        }
-        
-        .custom-select-trigger span:first-child {
-            color: #1a1a2e;
-        }
-        
-        .custom-select-trigger span:last-child {
-            color: #8b8b9e;
-            font-size: 13px;
-        }
-        
+        .custom-select-trigger:hover { border-color: #6366f1; background: #FFFFFF; }
+        .custom-select-trigger span:first-child { color: #1a1a2e; }
+        .custom-select-trigger span:last-child { color: #8b8b9e; font-size: 13px; }
         .custom-select-dropdown {
             position: absolute;
             top: 100%;
@@ -478,11 +286,7 @@
             display: none;
             box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
         }
-        
-        .custom-select-dropdown.show {
-            display: block;
-        }
-        
+        .custom-select-dropdown.show { display: block; }
         .custom-select-option {
             padding: 12px 16px;
             cursor: pointer;
@@ -490,11 +294,7 @@
             font-size: 14px;
             color: #1a1a2e;
         }
-        
-        .custom-select-option:hover {
-            background: #f5f5f5;
-        }
-        
+        .custom-select-option:hover { background: #f5f5f5; }
         .phone-input-wrapper {
             display: flex;
             align-items: center;
@@ -505,13 +305,11 @@
             margin-bottom: 16px;
             transition: all 0.2s;
         }
-        
         .phone-input-wrapper:focus-within {
             border-color: #6366f1;
             background: #FFFFFF;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.1);
         }
-        
         .phone-code {
             font-size: 15px;
             font-weight: 500;
@@ -519,7 +317,6 @@
             padding-right: 12px;
             border-right: 1px solid #e2e8f0;
         }
-        
         .phone-input {
             flex: 1;
             padding: 14px 0 14px 12px;
@@ -530,18 +327,8 @@
             outline: none;
             color: #1a1a2e;
         }
-        
-        .phone-input::placeholder {
-            color: #cbd5e1;
-        }
-        
-        .error-text {
-            color: #ef4444;
-            font-size: 13px;
-            margin-top: 8px;
-            text-align: left;
-        }
-        
+        .phone-input::placeholder { color: #cbd5e1; }
+        .error-text { color: #ef4444; font-size: 13px; margin-top: 8px; text-align: left; }
         .phone-submit {
             background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: #FFFFFF;
@@ -555,25 +342,9 @@
             margin-top: 8px;
             transition: all 0.2s;
         }
-        
-        .phone-submit:active { 
-            transform: scale(0.98); 
-        }
-        
-        .phone-submit:disabled { 
-            opacity: 0.6; 
-            cursor: not-allowed; 
-        }
-        
-        .agreement-text {
-            font-size: 11px;
-            color: #8b8b9e;
-            text-align: center;
-            margin-top: 20px;
-            line-height: 1.4;
-        }
-        
-        /* ========== МОДАЛЬНОЕ ОКНО ОЧИСТКИ ========== */
+        .phone-submit:active { transform: scale(0.98); }
+        .phone-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+        .agreement-text { font-size: 11px; color: #8b8b9e; text-align: center; margin-top: 20px; line-height: 1.4; }
         .clear-confirm-overlay {
             position: absolute;
             top: 0;
@@ -588,7 +359,6 @@
             border-radius: 24px;
             padding: 24px;
         }
-        
         .clear-confirm-modal {
             background: #FFFFFF;
             border-radius: 20px;
@@ -597,26 +367,9 @@
             width: 100%;
             text-align: center;
         }
-        
-        .clear-confirm-modal h4 {
-            font-size: 18px;
-            font-weight: 600;
-            color: #1a1a2e;
-            margin-bottom: 12px;
-        }
-        
-        .clear-confirm-modal p {
-            font-size: 14px;
-            color: #8b8b9e;
-            margin-bottom: 24px;
-            line-height: 1.5;
-        }
-        
-        .clear-confirm-buttons {
-            display: flex;
-            gap: 12px;
-        }
-        
+        .clear-confirm-modal h4 { font-size: 18px; font-weight: 600; color: #1a1a2e; margin-bottom: 12px; }
+        .clear-confirm-modal p { font-size: 14px; color: #8b8b9e; margin-bottom: 24px; line-height: 1.5; }
+        .clear-confirm-buttons { display: flex; gap: 12px; }
         .clear-confirm-cancel {
             flex: 1;
             padding: 12px;
@@ -628,11 +381,7 @@
             font-weight: 500;
             transition: all 0.2s;
         }
-        
-        .clear-confirm-cancel:hover {
-            background: #e8e8e8;
-        }
-        
+        .clear-confirm-cancel:hover { background: #e8e8e8; }
         .clear-confirm-ok {
             flex: 1;
             padding: 12px;
@@ -644,40 +393,18 @@
             font-weight: 500;
             transition: all 0.2s;
         }
-        
-        .clear-confirm-ok:hover {
-            background: #dc2626;
-        }
-        
-        /* ========== АДАПТИВ ========== */
+        .clear-confirm-ok:hover { background: #dc2626; }
         @media (max-width: 480px) {
-            .chat-widget {
-                width: 100%;
-                height: 100%;
-                bottom: 0;
-                right: 0;
-                border-radius: 0;
-            }
-            .chat-widget.closed {
-                width: 56px;
-                height: 56px;
-                bottom: 20px;
-                right: 20px;
-                border-radius: 28px;
-            }
+            .chat-widget { width: 100%; height: 100%; bottom: 0; right: 0; border-radius: 0; }
+            .chat-widget.closed { width: 56px; height: 56px; bottom: 20px; right: 20px; border-radius: 28px; }
             .message { max-width: 90%; font-size: 14px; }
             .phone-overlay { padding: 24px 20px; }
         }
-        
         @media (min-width: 769px) {
             .chat-widget { width: 420px; height: 700px; }
             .message { max-width: 75%; }
         }
-        
-        button, input, textarea, select {
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-        }
+        button, input, textarea, select { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
     </style>
 </head>
 <body>
@@ -750,27 +477,26 @@
 </div>
 
 <script>
-    // Полное отключение ошибок от сторонних скриптов
+    // Перехват ошибок
     window.addEventListener('error', function(e) {
-        if (e.filename && (e.filename.includes('override.js') || e.filename.includes('ipwhois') || e.message.includes('CORS'))) {
+        if (e.filename && (e.filename.includes('override.js') || e.message.includes('CORS'))) {
             e.preventDefault();
             e.stopPropagation();
             return false;
         }
         return true;
     });
-    
     window.addEventListener('unhandledrejection', function(e) {
         e.preventDefault();
         return false;
     });
-    
-    // Основной код
+
     (function() {
         function init() {
             const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
             const SESSION_HOURS = 36;
-            const INACTIVITY_TIMEOUT = 30000;
+            const INACTIVITY_TIMEOUT = 30000; // 30 секунд неактивности
+            const OFFLINE_DELAY = 5000; // Задержка перед отправкой офлайн
             
             const countries = [
                 { code: 'UZ', name: 'Узбекистан', phoneCode: '+998', maxDigits: 9, pattern: /^[0-9]{9}$/, mask: '(__) __ __ __' },
@@ -807,15 +533,21 @@
             let userIp = '';
             let detectedCountry = 'UZ';
             
+            // WebSocket
+            let ws = null;
+            let wsReconnectTimer = null;
+            let wsConnected = false;
+            
+            // Статус система
             let currentStatus = false;
             let lastActivityTime = Date.now();
             let isPageVisible = true;
-            let statusUpdateInterval = null;
             let heartbeatInterval = null;
-            let lastSentStatus = null;
-            let lastSentTime = 0;
+            let lastSentStatus = false;
+            let offlineTimer = null;
             let isUnloading = false;
             
+            // DOM элементы
             const statusIndicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('statusText');
             const widget = document.getElementById('chatWidget');
@@ -839,7 +571,7 @@
             
             async function sendStatusToServer(online, isSync = false) {
                 if (!isRegistered) return false;
-                if (lastSentStatus === online && (Date.now() - lastSentTime) < 5000) return false;
+                if (lastSentStatus === online && !isSync) return false;
                 
                 const payload = { userId, isOnline: online, isActive: online };
                 
@@ -849,9 +581,9 @@
                         const sent = navigator.sendBeacon(`${PROXY_URL}/updateStatus`, blob);
                         if (sent) {
                             lastSentStatus = online;
-                            lastSentTime = Date.now();
                             currentStatus = online;
                             updateStatusUI(online);
+                            console.log(`📊 Статус отправлен (beacon): ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
                         }
                         return sent;
                     } else {
@@ -863,34 +595,47 @@
                         
                         if (response.ok) {
                             lastSentStatus = online;
-                            lastSentTime = Date.now();
                             currentStatus = online;
                             updateStatusUI(online);
+                            console.log(`📊 Статус отправлен: ${online ? 'ОНЛАЙН' : 'ОФЛАЙН'}`);
                             return true;
                         }
                     }
                 } catch (err) {
-                    // Игнорируем ошибки
+                    console.error('Ошибка отправки статуса:', err);
                 }
                 return false;
             }
             
-            function checkAndUpdateStatus() {
-                if (!isRegistered || isUnloading) return;
-                const now = Date.now();
-                const inactiveTime = now - lastActivityTime;
-                const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
-                
-                if (shouldBeOnline !== currentStatus) {
-                    sendStatusToServer(shouldBeOnline);
+            // Функция для перехода в офлайн с задержкой
+            function scheduleOffline() {
+                if (offlineTimer) clearTimeout(offlineTimer);
+                offlineTimer = setTimeout(() => {
+                    if (currentStatus && !isUnloading) {
+                        sendStatusToServer(false);
+                    }
+                }, OFFLINE_DELAY);
+            }
+            
+            function cancelOffline() {
+                if (offlineTimer) {
+                    clearTimeout(offlineTimer);
+                    offlineTimer = null;
                 }
             }
             
             function onUserActivity() {
                 if (!isRegistered || isUnloading) return;
+                
+                const wasInactive = (Date.now() - lastActivityTime) >= INACTIVITY_TIMEOUT;
                 lastActivityTime = Date.now();
-                if (!currentStatus && isPageVisible) {
+                cancelOffline();
+                
+                if (wasInactive && !currentStatus && isPageVisible) {
                     sendStatusToServer(true);
+                } else if (currentStatus) {
+                    // Продлеваем онлайн статус
+                    scheduleOffline();
                 }
             }
             
@@ -903,8 +648,9 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ userId, isOnline: true, isActive: true, heartbeat: true })
                         }).catch(() => {});
+                        console.log('💓 Heartbeat отправлен');
                     }
-                }, 20000);
+                }, 15000); // Каждые 15 секунд
             }
             
             function setupActivityTracking() {
@@ -920,35 +666,101 @@
                     messageInput.addEventListener('keypress', onUserActivity);
                 }
                 
+                // Отслеживание видимости страницы
                 document.addEventListener('visibilitychange', () => {
                     if (isUnloading) return;
                     isPageVisible = !document.hidden;
+                    console.log(`👁️ Видимость страницы: ${isPageVisible ? 'видима' : 'скрыта'}`);
                     
                     if (isPageVisible) {
+                        // Страница стала видимой - сбрасываем таймер и включаем онлайн
                         lastActivityTime = Date.now();
-                        checkAndUpdateStatus();
+                        cancelOffline();
                         if (!currentStatus) {
                             sendStatusToServer(true);
+                        } else {
+                            scheduleOffline();
                         }
                     } else {
+                        // Страница скрыта - планируем офлайн через 5 секунд
                         if (currentStatus) {
-                            sendStatusToServer(false);
+                            scheduleOffline();
                         }
                     }
                 });
                 
+                // Закрытие вкладки - немедленно отправляем офлайн
                 window.addEventListener('beforeunload', () => {
                     isUnloading = true;
+                    cancelOffline();
+                    if (isRegistered && currentStatus) {
+                        console.log('🚪 Страница закрывается, отправляем офлайн...');
+                        sendStatusToServer(false, true);
+                    }
+                });
+                
+                window.addEventListener('pagehide', () => {
+                    isUnloading = true;
+                    cancelOffline();
                     if (isRegistered && currentStatus) {
                         sendStatusToServer(false, true);
                     }
                 });
                 
-                statusUpdateInterval = setInterval(() => {
-                    checkAndUpdateStatus();
-                }, 5000);
-                
                 startHeartbeat();
+            }
+            
+            // WebSocket соединение
+            function connectWebSocket() {
+                if (!isRegistered) return;
+                if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+                
+                try {
+                    const wsUrl = PROXY_URL.replace('https://', 'wss://').replace('http://', 'ws://');
+                    ws = new WebSocket(`${wsUrl}/ws`);
+                    
+                    ws.onopen = () => {
+                        console.log('🔌 WebSocket подключен');
+                        wsConnected = true;
+                        ws.send(JSON.stringify({ type: 'register', userId: userId }));
+                    };
+                    
+                    ws.onmessage = (event) => {
+                        try {
+                            const data = JSON.parse(event.data);
+                            if (data.type === 'message') {
+                                addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
+                            }
+                        } catch (err) {
+                            console.error('WebSocket сообщение ошибка:', err);
+                        }
+                    };
+                    
+                    ws.onerror = (error) => {
+                        console.error('WebSocket ошибка:', error);
+                        wsConnected = false;
+                    };
+                    
+                    ws.onclose = () => {
+                        console.log('🔌 WebSocket отключен');
+                        wsConnected = false;
+                        if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+                        wsReconnectTimer = setTimeout(() => {
+                            if (isRegistered) connectWebSocket();
+                        }, 5000);
+                    };
+                } catch (err) {
+                    console.error('WebSocket создание ошибка:', err);
+                }
+            }
+            
+            function disconnectWebSocket() {
+                wsConnected = false;
+                if (ws) {
+                    ws.close();
+                    ws = null;
+                }
+                if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
             }
             
             function formatMessageTime(timestamp) {
@@ -964,11 +776,8 @@
                 if (!chatMessages) return;
                 
                 const div = document.createElement('div');
-                
                 const welcomeMsg = chatMessages.querySelector('.welcome-message');
-                if (welcomeMsg && !isSystem) {
-                    welcomeMsg.remove();
-                }
+                if (welcomeMsg && !isSystem) welcomeMsg.remove();
                 
                 if (isSystem) {
                     div.className = 'message system-message';
@@ -1155,6 +964,8 @@
                                 
                                 lastActivityTime = Date.now();
                                 await sendStatusToServer(true);
+                                scheduleOffline();
+                                connectWebSocket();
                             } else {
                                 if (phoneSubmit) {
                                     phoneSubmit.disabled = false;
@@ -1174,6 +985,7 @@
                                 phoneError.innerText = 'Ошибка соединения';
                                 phoneError.style.color = '#ef4444';
                             }
+                            console.error('Ошибка:', err);
                         }
                     };
                 }
@@ -1199,7 +1011,9 @@
                         body: JSON.stringify({ userId, text, imageBase64 })
                     });
                     await response.json();
+                    console.log('Сообщение отправлено');
                 } catch (err) {
+                    console.error('Ошибка отправки:', err);
                     addMessage('Ошибка отправки сообщения. Попробуйте позже.', false, true);
                 }
             }
@@ -1209,7 +1023,6 @@
                 try {
                     const response = await fetch(`${PROXY_URL}/getUpdates?offset=${lastUpdateId}&userId=${userId}`);
                     if (!response.ok) return;
-                    
                     const data = await response.json();
                     if (data.ok && data.result) {
                         for (const update of data.result) {
@@ -1222,9 +1035,7 @@
                         }
                         localStorage.setItem('chat_lastUpdateId', lastUpdateId);
                     }
-                } catch (err) {
-                    // Игнорируем ошибки
-                }
+                } catch (err) {}
             }
             
             function clearChat() {
@@ -1248,6 +1059,8 @@
                 if (cancelBtn) cancelBtn.onclick = () => overlay.remove();
                 if (okBtn) {
                     okBtn.onclick = () => {
+                        disconnectWebSocket();
+                        cancelOffline();
                         localStorage.removeItem('user_phone');
                         localStorage.removeItem('chat_history');
                         localStorage.setItem('chat_lastUpdateId', '0');
@@ -1255,6 +1068,7 @@
                         isRegistered = false;
                         lastUpdateId = 0;
                         currentStatus = false;
+                        lastSentStatus = false;
                         
                         if (chatMessages) {
                             chatMessages.innerHTML = `
@@ -1371,6 +1185,8 @@
                     
                     setTimeout(() => {
                         sendStatusToServer(true);
+                        scheduleOffline();
+                        connectWebSocket();
                     }, 500);
                 } else {
                     setTimeout(() => showPhoneForm(), 500);
