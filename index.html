@@ -478,25 +478,6 @@
 
 <script>
     (function() {
-        // Простая функция добавления сообщения для теста
-        function testAddMessage() {
-            const chatMessages = document.getElementById('chatMessages');
-            if (!chatMessages) return;
-            
-            // Убираем welcome message
-            const welcome = chatMessages.querySelector('.welcome-message');
-            if (welcome) welcome.remove();
-            
-            const div = document.createElement('div');
-            div.className = 'message user-message';
-            div.innerHTML = 'Тестовое сообщение <div class="message-time">' + new Date().toLocaleTimeString() + '</div>';
-            chatMessages.appendChild(div);
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-        
-        // Запускаем тест через 2 секунды
-        setTimeout(testAddMessage, 2000);
-        
         const PROXY_URL = 'https://telegram-proxy-wyqq.onrender.com';
         const SESSION_HOURS = 36;
         const INACTIVITY_TIMEOUT = 30000;
@@ -548,6 +529,9 @@
         let lastSentStatus = null;
         let isUnloading = false;
         let statusCheckInterval = null;
+        
+        // Защита от дублирования сообщений
+        let processedMessageIds = new Set();
         
         // DOM элементы
         const statusIndicator = document.getElementById('statusIndicator');
@@ -740,11 +724,22 @@
             });
         }
         
-        // Глобальная функция добавления сообщения
-        window.addMessage = function(text, isUser, isSystem, isImage, imageUrl, timestamp, operatorName) {
-            if (!chatMessages) {
-                console.error('chatMessages не найден');
+        function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
+            if (!chatMessages) return;
+            
+            // Создаем уникальный ID сообщения
+            const messageId = `${text}_${timestamp}_${isUser}_${Date.now()}`;
+            
+            // Проверяем на дубликат
+            if (processedMessageIds.has(messageId)) {
                 return;
+            }
+            processedMessageIds.add(messageId);
+            
+            // Очищаем старые ID (оставляем последние 100)
+            if (processedMessageIds.size > 100) {
+                const firstId = processedMessageIds.keys().next().value;
+                processedMessageIds.delete(firstId);
             }
             
             // Убираем welcome message
@@ -793,10 +788,7 @@
             });
             while (history.length > 200) history.shift();
             localStorage.setItem('chat_history', JSON.stringify(history));
-        };
-        
-        // Алиас для простоты
-        const addMessage = window.addMessage;
+        }
         
         async function detectGeo() {
             try {
@@ -1036,6 +1028,7 @@
             if (okBtn) {
                 okBtn.onclick = () => {
                     disconnectWebSocket();
+                    processedMessageIds.clear();
                     localStorage.removeItem('user_phone');
                     localStorage.removeItem('chat_history');
                     localStorage.setItem('chat_lastUpdateId', '0');
