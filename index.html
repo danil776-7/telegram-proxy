@@ -531,7 +531,7 @@
         let statusCheckInterval = null;
         
         // Защита от дублирования сообщений
-        let processedMessageIds = new Set();
+        let processedUpdateIds = new Set();
         
         // DOM элементы
         const statusIndicator = document.getElementById('statusIndicator');
@@ -585,19 +585,15 @@
                         return true;
                     }
                 }
-            } catch (err) {
-                console.error('Ошибка отправки статуса:', err);
-            }
+            } catch (err) {}
             return false;
         }
         
         function checkAndUpdateStatus() {
             if (!isRegistered || isUnloading) return;
-            
             const now = Date.now();
             const inactiveTime = now - lastActivityTime;
             const shouldBeOnline = isPageVisible && (inactiveTime < INACTIVITY_TIMEOUT);
-            
             if (shouldBeOnline !== currentStatus) {
                 sendStatusToServer(shouldBeOnline);
             }
@@ -605,10 +601,8 @@
         
         function onUserActivity() {
             if (!isRegistered || isUnloading) return;
-            
             const wasOffline = !currentStatus;
             lastActivityTime = Date.now();
-            
             if (wasOffline) {
                 sendStatusToServer(true);
             }
@@ -643,12 +637,9 @@
             document.addEventListener('visibilitychange', () => {
                 if (isUnloading) return;
                 isPageVisible = !document.hidden;
-                
                 if (isPageVisible) {
                     lastActivityTime = Date.now();
-                    if (!currentStatus) {
-                        sendStatusToServer(true);
-                    }
+                    if (!currentStatus) sendStatusToServer(true);
                 } else {
                     checkAndUpdateStatus();
                 }
@@ -656,22 +647,15 @@
             
             window.addEventListener('beforeunload', () => {
                 isUnloading = true;
-                if (isRegistered && currentStatus) {
-                    sendStatusToServer(false, true);
-                }
+                if (isRegistered && currentStatus) sendStatusToServer(false, true);
             });
             
             window.addEventListener('pagehide', () => {
                 isUnloading = true;
-                if (isRegistered && currentStatus) {
-                    sendStatusToServer(false, true);
-                }
+                if (isRegistered && currentStatus) sendStatusToServer(false, true);
             });
             
-            statusCheckInterval = setInterval(() => {
-                checkAndUpdateStatus();
-            }, 5000);
-            
+            statusCheckInterval = setInterval(() => checkAndUpdateStatus(), 5000);
             startHeartbeat();
         }
         
@@ -683,63 +667,47 @@
                 const wsUrl = PROXY_URL.replace('https://', 'wss://').replace('http://', 'ws://');
                 ws = new WebSocket(`${wsUrl}/ws`);
                 
-                ws.onopen = () => {
-                    ws.send(JSON.stringify({ type: 'register', userId: userId }));
-                };
-                
+                ws.onopen = () => ws.send(JSON.stringify({ type: 'register', userId: userId }));
                 ws.onmessage = (event) => {
                     try {
                         const data = JSON.parse(event.data);
                         if (data.type === 'message') {
-                            addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName);
+                            addMessage(data.text, false, false, data.isImage, data.imageUrl, data.timestamp, data.operatorName, data.updateId);
                         }
                     } catch (err) {}
                 };
-                
-                ws.onerror = (error) => {};
-                
                 ws.onclose = () => {
                     if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-                    wsReconnectTimer = setTimeout(() => {
-                        if (isRegistered) connectWebSocket();
-                    }, 5000);
+                    wsReconnectTimer = setTimeout(() => { if (isRegistered) connectWebSocket(); }, 5000);
                 };
             } catch (err) {}
         }
         
         function disconnectWebSocket() {
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
+            if (ws) { ws.close(); ws = null; }
             if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
         }
         
         function formatMessageTime(timestamp) {
             const date = timestamp ? new Date(timestamp * 1000) : new Date();
-            return date.toLocaleTimeString('ru-RU', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                timeZone: 'Europe/Amsterdam'
-            });
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Amsterdam' });
         }
         
-        function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null) {
+        function addMessage(text, isUser, isSystem = false, isImage = false, imageUrl = null, timestamp = null, operatorName = null, updateId = null) {
             if (!chatMessages) return;
             
-            // Создаем уникальный ID сообщения
-            const messageId = `${text}_${timestamp}_${isUser}_${Date.now()}`;
-            
-            // Проверяем на дубликат
-            if (processedMessageIds.has(messageId)) {
+            // Защита от дублирования по update_id
+            if (updateId && processedUpdateIds.has(updateId)) {
+                console.log('⚠️ Дубликат сообщения, пропускаем (updateId:', updateId, ')');
                 return;
             }
-            processedMessageIds.add(messageId);
-            
-            // Очищаем старые ID (оставляем последние 100)
-            if (processedMessageIds.size > 100) {
-                const firstId = processedMessageIds.keys().next().value;
-                processedMessageIds.delete(firstId);
+            if (updateId) {
+                processedUpdateIds.add(updateId);
+                // Очищаем старые ID
+                if (processedUpdateIds.size > 100) {
+                    const firstId = processedUpdateIds.keys().next().value;
+                    processedUpdateIds.delete(firstId);
+                }
             }
             
             // Убираем welcome message
@@ -780,12 +748,7 @@
             
             // Сохраняем историю
             const history = JSON.parse(localStorage.getItem('chat_history') || '[]');
-            history.push({ 
-                text, isUser, isSystem, isImage, imageUrl, 
-                time: Date.now(), 
-                telegramTime: timestamp,
-                operatorName: operatorName
-            });
+            history.push({ text, isUser, isSystem, isImage, imageUrl, time: Date.now(), telegramTime: timestamp, operatorName: operatorName, updateId: updateId });
             while (history.length > 200) history.shift();
             localStorage.setItem('chat_history', JSON.stringify(history));
         }
@@ -880,9 +843,7 @@
             if (phoneInput) {
                 phoneInput.oninput = function() {
                     let value = this.value.replace(/\D/g, '');
-                    if (value.length > currentMaxDigits) {
-                        value = value.slice(0, currentMaxDigits);
-                    }
+                    if (value.length > currentMaxDigits) value = value.slice(0, currentMaxDigits);
                     this.value = value;
                     if (phoneError) phoneError.innerText = '';
                     if (value.length > 0 && value.length < currentMaxDigits && phoneError) {
@@ -897,19 +858,12 @@
                     const digits = phoneInput ? phoneInput.value.replace(/\D/g, '') : '';
                     
                     if (!digits || digits.length === 0 || digits.length !== currentMaxDigits || !currentPattern.test(digits)) {
-                        if (phoneError) {
-                            phoneError.innerText = 'Неверно указан номер телефона';
-                            phoneError.style.color = '#ef4444';
-                        }
+                        if (phoneError) { phoneError.innerText = 'Неверно указан номер телефона'; phoneError.style.color = '#ef4444'; }
                         return;
                     }
                     
                     const fullPhone = currentPhoneCode + digits;
-                    
-                    if (phoneSubmit) {
-                        phoneSubmit.disabled = true;
-                        phoneSubmit.textContent = 'Регистрация...';
-                    }
+                    if (phoneSubmit) { phoneSubmit.disabled = true; phoneSubmit.textContent = 'Регистрация...'; }
                     
                     try {
                         const response = await fetch(`${PROXY_URL}/register`, {
@@ -924,64 +878,38 @@
                             localStorage.setItem('user_phone', fullPhone);
                             isRegistered = true;
                             overlay.remove();
-                            
-                            if (chatMessages) {
-                                chatMessages.innerHTML = '';
-                            }
-                            
+                            if (chatMessages) chatMessages.innerHTML = '';
                             addMessage('Добрый день! Подскажите, когда будет готов мой заказ 4412?', true);
                             addMessage('Здравствуйте! Уже проверяю статус вашего заказа. Одну минуту, пожалуйста...', false, false, false, null, null, 'Оператор Анна');
-                            
                             lastActivityTime = Date.now();
                             await sendStatusToServer(true);
                             connectWebSocket();
                         } else {
-                            if (phoneSubmit) {
-                                phoneSubmit.disabled = false;
-                                phoneSubmit.textContent = 'Начать чат';
-                            }
-                            if (phoneError) {
-                                phoneError.innerText = 'Ошибка сервера';
-                                phoneError.style.color = '#ef4444';
-                            }
+                            if (phoneSubmit) { phoneSubmit.disabled = false; phoneSubmit.textContent = 'Начать чат'; }
+                            if (phoneError) { phoneError.innerText = 'Ошибка сервера'; phoneError.style.color = '#ef4444'; }
                         }
                     } catch (err) {
-                        if (phoneSubmit) {
-                            phoneSubmit.disabled = false;
-                            phoneSubmit.textContent = 'Начать чат';
-                        }
-                        if (phoneError) {
-                            phoneError.innerText = 'Ошибка соединения';
-                            phoneError.style.color = '#ef4444';
-                        }
-                        console.error('Ошибка:', err);
+                        if (phoneSubmit) { phoneSubmit.disabled = false; phoneSubmit.textContent = 'Начать чат'; }
+                        if (phoneError) { phoneError.innerText = 'Ошибка соединения'; phoneError.style.color = '#ef4444'; }
                     }
                 };
             }
         }
         
         async function sendToTelegram(text, imageBase64 = null) {
-            if (!isRegistered) {
-                showPhoneForm();
-                return;
-            }
-            
+            if (!isRegistered) { showPhoneForm(); return; }
             onUserActivity();
-            
             if (!text && !imageBase64) return;
-            
             if (text) addMessage(text, true);
             else addMessage('Изображение', true);
             
             try {
-                const response = await fetch(`${PROXY_URL}/send`, {
+                await fetch(`${PROXY_URL}/send`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, text, imageBase64 })
                 });
-                await response.json();
             } catch (err) {
-                console.error('Ошибка отправки:', err);
                 addMessage('Ошибка отправки сообщения. Попробуйте позже.', false, true);
             }
         }
@@ -997,7 +925,7 @@
                         if (update.update_id > lastUpdateId) {
                             lastUpdateId = update.update_id;
                             if (update.message && !update.message.text?.includes('НОВЫЙ')) {
-                                addMessage(update.message.text || 'Изображение', false, false, update.message.hasImage, update.message.imageUrl, update.message.date, 'Оператор Анна');
+                                addMessage(update.message.text || 'Изображение', false, false, update.message.hasImage, update.message.imageUrl, update.message.date, 'Оператор Анна', update.update_id);
                             }
                         }
                     }
@@ -1028,7 +956,7 @@
             if (okBtn) {
                 okBtn.onclick = () => {
                     disconnectWebSocket();
-                    processedMessageIds.clear();
+                    processedUpdateIds.clear();
                     localStorage.removeItem('user_phone');
                     localStorage.removeItem('chat_history');
                     localStorage.setItem('chat_lastUpdateId', '0');
@@ -1063,15 +991,8 @@
             };
         }
         
-        if (closeBtn) closeBtn.onclick = (e) => { 
-            if (widget) widget.classList.add('closed'); 
-            e.stopPropagation(); 
-        };
-        
-        if (clearBtn) clearBtn.onclick = (e) => { 
-            clearChat(); 
-            e.stopPropagation(); 
-        };
+        if (closeBtn) closeBtn.onclick = (e) => { if (widget) widget.classList.add('closed'); e.stopPropagation(); };
+        if (clearBtn) clearBtn.onclick = (e) => { clearChat(); e.stopPropagation(); };
         
         if (sendBtn) {
             sendBtn.onclick = () => {
