@@ -16,8 +16,6 @@ const users = new Map();
 const topicToUser = new Map();
 const wsClients = new Map();
 const imageCache = new Map();
-
-// Хранилище последнего update_id для каждого пользователя
 const userLastUpdateId = new Map();
 
 const lastStatusUpdate = new Map();
@@ -308,11 +306,10 @@ app.post('/updateStatus', async (req, res) => {
     res.json({ ok: true });
 });
 
-// ⭐ ГЛАВНОЕ: ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ ИЗ TELEGRAM
+// ПОЛУЧЕНИЕ ОБНОВЛЕНИЙ ИЗ TELEGRAM (POLLING)
 app.get('/getUpdates', async (req, res) => {
     const { offset, userId } = req.query;
     
-    // Получаем текущий offset для пользователя
     let currentOffset = 0;
     if (userId && userLastUpdateId.has(userId)) {
         currentOffset = userLastUpdateId.get(userId);
@@ -323,7 +320,6 @@ app.get('/getUpdates', async (req, res) => {
     console.log(`📡 getUpdates для ${userId}: offset=${currentOffset}`);
     
     try {
-        // Запрашиваем новые сообщения из Telegram
         const url = `https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${currentOffset}&timeout=5`;
         const response = await fetch(url);
         const data = await response.json();
@@ -340,7 +336,6 @@ app.get('/getUpdates', async (req, res) => {
         const filtered = [];
         let maxUpdateId = currentOffset;
         
-        // Обрабатываем каждое обновление
         for (const update of data.result) {
             const msg = update.message;
             if (!msg || !msg.chat || msg.chat.id !== GROUP_CHAT_ID) continue;
@@ -349,13 +344,11 @@ app.get('/getUpdates', async (req, res) => {
             const topicId = msg.message_thread_id;
             const topicUserId = topicToUser.get(topicId);
             
-            // Пропускаем сообщения от ботов и системные
             if (msg.from && msg.from.is_bot) continue;
             if (msg.text && (msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ') || msg.text.includes('закрепил'))) continue;
             
-            console.log(`📨 Получено сообщение из Telegram для topicId=${topicId}, userId=${topicUserId}: ${msg.text?.substring(0, 50)}`);
+            console.log(`📨 Получено сообщение из Telegram: ${msg.text?.substring(0, 50)}`);
             
-            // Если сообщение для нашего пользователя
             if (topicUserId === userId) {
                 const messageData = {
                     update_id: update.update_id,
@@ -366,18 +359,14 @@ app.get('/getUpdates', async (req, res) => {
                     }
                 };
                 
-                // Обработка фото
                 if (msg.photo && msg.photo.length > 0) {
                     const photo = msg.photo[msg.photo.length - 1];
                     messageData.message.imageUrl = `${baseUrl}/image/${photo.file_id}`;
                     messageData.message.hasImage = true;
-                    console.log(`📷 Изображение: ${messageData.message.imageUrl}`);
                 }
                 
                 filtered.push(messageData);
-                console.log(`✅ Сообщение добавлено в ответ для ${userId}`);
                 
-                // Отправляем через WebSocket
                 sendViaWebSocket(topicUserId, {
                     type: 'message',
                     text: msg.caption || msg.text || '',
@@ -389,19 +378,16 @@ app.get('/getUpdates', async (req, res) => {
                 });
             }
             
-            // Обновляем максимальный update_id
             if (update.update_id + 1 > maxUpdateId) {
                 maxUpdateId = update.update_id + 1;
             }
         }
         
-        // Сохраняем новый offset для пользователя
         if (userId && maxUpdateId > currentOffset) {
             userLastUpdateId.set(userId, maxUpdateId);
-            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId} (было ${currentOffset})`);
+            console.log(`💾 Сохранен offset для ${userId}: ${maxUpdateId}`);
         }
         
-        console.log(`📨 Возвращаем ${filtered.length} новых сообщений для ${userId}`);
         res.json({ ok: true, result: filtered });
         
     } catch (err) {
@@ -410,7 +396,7 @@ app.get('/getUpdates', async (req, res) => {
     }
 });
 
-// Webhook endpoint для мгновенных обновлений (альтернатива polling)
+// Webhook endpoint (опционально)
 app.post('/webhook', async (req, res) => {
     const update = req.body;
     res.sendStatus(200);
@@ -452,20 +438,28 @@ app.post('/webhook', async (req, res) => {
             updateId: msg.message_id
         });
         
-        console.log(`📨 Webhook: сообщение отправлено через WebSocket пользователю ${userId}`);
+        console.log(`📨 Webhook: сообщение отправлено пользователю ${userId}`);
     } catch (err) {
         console.error('Webhook ошибка:', err);
     }
 });
 
+// Сброс offset (для отладки)
+app.get('/reset', (req, res) => {
+    userLastUpdateId.clear();
+    console.log('🔄 Все offset сброшены');
+    res.json({ ok: true, message: 'All offsets reset' });
+});
+
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+
 server.listen(PORT, () => {
     console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН!`);
     console.log(`📡 Порт: ${PORT}`);
-    console.log(`🔌 WebSocket: wss://telegram-proxy-wyqq.onrender.com/ws`);
+    console.log(`🔌 WebSocket: wss://${HOST.replace('https://', '').replace('http://', '')}/ws`);
     console.log(`🖼️  Image proxy: /image/:fileId`);
     console.log(`📡 Группа Telegram: ${GROUP_CHAT_ID}`);
-    console.log(`\n💡 Для получения сообщений из Telegram используется polling (каждые 3 секунды)`);
-    console.log(`💡 Чтобы настроить Webhook (мгновенные сообщения), отправьте запрос:`);
-    console.log(`   curl -F "url=https://${req.hostname}/webhook" https://api.telegram.org/bot${BOT_TOKEN}/setWebhook\n`);
+    console.log(`\n💡 Для получения сообщений используется polling (каждые 3 секунды)`);
+    console.log(`💡 Для отладки: откройте ${HOST}/reset чтобы сбросить offset\n`);
 });
