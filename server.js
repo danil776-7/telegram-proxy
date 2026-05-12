@@ -24,6 +24,17 @@ const lastSentStatus = new Map();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: '/ws' });
 
+// ===== ФУНКЦИЯ УДАЛЕНИЯ WEBHOOK =====
+async function deleteWebhook() {
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/deleteWebhook`);
+        const data = await response.json();
+        console.log('🔌 Webhook удален:', data);
+    } catch (err) {
+        console.error('Ошибка удаления webhook:', err);
+    }
+}
+
 // WebSocket
 wss.on('connection', (ws, req) => {
     console.log('🔌 Новое WebSocket соединение');
@@ -396,54 +407,6 @@ app.get('/getUpdates', async (req, res) => {
     }
 });
 
-// Webhook endpoint (опционально)
-app.post('/webhook', async (req, res) => {
-    const update = req.body;
-    res.sendStatus(200);
-    
-    try {
-        const msg = update.message;
-        if (!msg || !msg.chat || msg.chat.id !== GROUP_CHAT_ID) return;
-        if (!msg.is_topic_message) return;
-        
-        const topicId = msg.message_thread_id;
-        const userId = topicToUser.get(topicId);
-        if (!userId) return;
-        
-        if (msg.from && msg.from.is_bot) return;
-        if (msg.text && msg.text.includes('НОВЫЙ ПОЛЬЗОВАТЕЛЬ')) return;
-        
-        const protocol = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'https';
-        const host = req.get('host');
-        const baseUrl = `${protocol}://${host}`;
-        
-        let imageUrl = null;
-        let hasImage = false;
-        
-        if (msg.photo && msg.photo.length > 0) {
-            try {
-                const photo = msg.photo[msg.photo.length - 1];
-                imageUrl = `${baseUrl}/image/${photo.file_id}`;
-                hasImage = true;
-            } catch (err) {}
-        }
-        
-        sendViaWebSocket(userId, {
-            type: 'message',
-            text: msg.caption || msg.text || '',
-            isImage: hasImage,
-            imageUrl: imageUrl,
-            timestamp: msg.date,
-            operatorName: msg.from?.first_name || 'Оператор',
-            updateId: msg.message_id
-        });
-        
-        console.log(`📨 Webhook: сообщение отправлено пользователю ${userId}`);
-    } catch (err) {
-        console.error('Webhook ошибка:', err);
-    }
-});
-
 // Сброс offset (для отладки)
 app.get('/reset', (req, res) => {
     userLastUpdateId.clear();
@@ -451,15 +414,24 @@ app.get('/reset', (req, res) => {
     res.json({ ok: true, message: 'All offsets reset' });
 });
 
+// ЗАПУСК СЕРВЕРА
 const PORT = process.env.PORT || 3000;
-const HOST = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
 
-server.listen(PORT, () => {
-    console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН!`);
-    console.log(`📡 Порт: ${PORT}`);
-    console.log(`🔌 WebSocket: wss://${HOST.replace('https://', '').replace('http://', '')}/ws`);
-    console.log(`🖼️  Image proxy: /image/:fileId`);
-    console.log(`📡 Группа Telegram: ${GROUP_CHAT_ID}`);
-    console.log(`\n💡 Для получения сообщений используется polling (каждые 3 секунды)`);
-    console.log(`💡 Для отладки: откройте ${HOST}/reset чтобы сбросить offset\n`);
+// Сначала удаляем webhook, потом запускаем сервер
+deleteWebhook().then(() => {
+    server.listen(PORT, () => {
+        console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН!`);
+        console.log(`📡 Порт: ${PORT}`);
+        console.log(`🔌 WebSocket: wss://telegram-proxy-wyqq.onrender.com/ws`);
+        console.log(`🖼️  Image proxy: /image/:fileId`);
+        console.log(`📡 Группа Telegram: ${GROUP_CHAT_ID}`);
+        console.log(`\n💡 Для получения сообщений используется polling (каждые 3 секунды)`);
+        console.log(`💡 Webhook удален, polling активен\n`);
+    });
+}).catch(err => {
+    console.error('Ошибка при запуске:', err);
+    server.listen(PORT, () => {
+        console.log(`\n🚀 СЕРВЕР ЗАПУЩЕН (с ошибкой удаления webhook)`);
+        console.log(`📡 Порт: ${PORT}\n`);
+    });
 });
